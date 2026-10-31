@@ -126,6 +126,7 @@ class ZokoSource:
     name = "zoko"
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
+        self._owns_client = client is None
         self._client = client or httpx.AsyncClient(
             headers={"User-Agent": USER_AGENT}, follow_redirects=True, timeout=15.0
         )
@@ -138,6 +139,10 @@ class ZokoSource:
         self._episodes: TTLCache[tuple, EpisodeList | None] = TTLCache(maxsize=4096, ttl=CACHE_TTL)
         # Results that may change soon (no episodes yet, a still-airing show) live here instead.
         self._recent: TTLCache[tuple, object] = TTLCache(maxsize=4096, ttl=MISS_TTL)
+
+    async def aclose(self) -> None:
+        if self._owns_client:
+            await self._client.aclose()
 
     async def _config(self, mal_id: int, episode: int, lang: Lang) -> dict | None:
         key = (mal_id, episode, lang)

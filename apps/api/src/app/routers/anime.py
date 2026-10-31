@@ -148,6 +148,7 @@ async def sources(request: Request, anime_id: int, user: CurrentUser, session: S
     raw = await _mal(request).visible_details(anime_id, user.show_nsfw)
     available = await _available_sources(request, raw)
     saved = await session.get(SourceChoice, (user.id, anime_id))
+    await session.commit()  # the scrapers below can take seconds: don't hold a connection
     choice = None
     if saved is not None and saved.source in available:
         choice = StreamOption(source=saved.source, lang="dub" if saved.lang == "dub" else "sub")

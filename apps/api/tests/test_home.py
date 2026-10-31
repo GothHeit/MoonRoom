@@ -264,3 +264,30 @@ async def test_continue_watching_fills_up_with_the_mal_watching_list(client, ses
     await client.delete("/me/progress/40/continue", headers=headers)
     body = (await client.get("/home", headers=headers)).json()
     assert [i["anime"]["id"] for i in body["rows"][0]["items"]] == [20]
+
+
+@respx.mock
+async def test_home_survives_a_timing_out_mal_list(client, session):
+    user, headers = await make_user(session, "kafka")
+    session.add(
+        MalLink(
+            user_id=user.id,
+            access_token="a",
+            refresh_token="r",
+            expires_at=utcnow() + timedelta(hours=1),
+        )
+    )
+    await session.commit()
+    mock_season(node(1))
+    mock_ranking(node(10))
+    mock_details(1)
+    respx.get(f"{API_BASE}/users/@me/animelist").mock(side_effect=httpx.ReadTimeout("slow"))
+
+    r = await client.get("/home", headers=headers)
+    assert r.status_code == 200
+    assert "my_list" not in [row["id"] for row in r.json()["rows"]]
+
+    # The list endpoints answer a clean 502 instead of a 500.
+    r = await client.get("/me/animelist", headers=headers)
+    assert r.status_code == 502
+    assert r.json()["error"]["code"] == "mal_unavailable"

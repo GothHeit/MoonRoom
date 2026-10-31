@@ -1,5 +1,6 @@
 """Linking a user's MyAnimeList account (OAuth2 with PKCE) and editing their list."""
 
+import asyncio
 import secrets
 import uuid
 from datetime import timedelta
@@ -20,6 +21,8 @@ from app.models import MalLink, MalOAuthState, User
 OAUTH_BASE = "https://myanimelist.net/v1/oauth2"
 STATE_LIFETIME = timedelta(minutes=10)
 LIST_CACHE_TTL = 60  # seconds: the home page and the list page both read the list
+CALL_TIMEOUT = 15  # seconds: a full list page can be slow
+MAX_CONCURRENT_CALLS = 4
 
 
 def _bearer(token: str) -> dict:
@@ -30,8 +33,17 @@ class MalAccounts:
     def __init__(self, settings: Settings, http: httpx.AsyncClient):
         self._settings = settings
         self._http = http
+        self._slots = asyncio.Semaphore(MAX_CONCURRENT_CALLS)
         # (user id, status, nsfw) -> the user's list. Dropped whenever the site changes it.
         self._lists: TTLCache[tuple, dict] = TTLCache(maxsize=256, ttl=LIST_CACHE_TTL)
+
+    async def _call(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        """One MAL call with a timeout and a concurrency limit; network errors become a 502."""
+        try:
+            async with self._slots:
+                return await self._http.request(method, url, timeout=CALL_TIMEOUT, **kwargs)
+        except httpx.HTTPError as exc:
+            raise ApiError(502, "mal_unavailable", f"MyAnimeList request failed: {exc}") from exc
 
     def _forget_lists(self, user_id: uuid.UUID) -> None:
         for key in [k for k in self._lists if k[0] == user_id]:
@@ -144,7 +156,7 @@ class MalAccounts:
         items: list[dict] = []
         url: str | None = f"{API_BASE}/users/@me/animelist"
         while url:
-            response = await self._http.get(url, headers=_bearer(token), params=params)
+            response = await self._call("GET", url, headers=_bearer(token), params=params)
             if response.status_code != 200:
                 raise ApiError(
                     502, "mal_unavailable", f"MyAnimeList answered {response.status_code}"
@@ -158,7 +170,8 @@ class MalAccounts:
     async def entry(self, session: AsyncSession, user: User, anime_id: int) -> dict | None:
         """The user's list entry for one title, or None when it isn't on their list."""
         token = await self._valid_token(session, user)
-        response = await self._http.get(
+        response = await self._call(
+            "GET",
             f"{API_BASE}/anime/{anime_id}",
             headers=_bearer(token),
             params={"fields": "my_list_status"},
@@ -177,8 +190,11 @@ class MalAccounts:
     ) -> dict:
         token = await self._valid_token(session, user)
         try:
-            response = await self._http.patch(
-                f"{API_BASE}/anime/{anime_id}/my_list_status", headers=_bearer(token), data=changes
+            response = await self._call(
+                "PATCH",
+                f"{API_BASE}/anime/{anime_id}/my_list_status",
+                headers=_bearer(token),
+                data=changes,
             )
         finally:
             # After the call, so a list read meanwhile can't re-cache the old one.
@@ -190,8 +206,8 @@ class MalAccounts:
     async def remove_entry(self, session: AsyncSession, user: User, anime_id: int) -> None:
         token = await self._valid_token(session, user)
         try:
-            response = await self._http.delete(
-                f"{API_BASE}/anime/{anime_id}/my_list_status", headers=_bearer(token)
+            response = await self._call(
+                "DELETE", f"{API_BASE}/anime/{anime_id}/my_list_status", headers=_bearer(token)
             )
         finally:
             self._forget_lists(user.id)
@@ -213,14 +229,21 @@ class MalAccounts:
         link = await session.get(MalLink, user.id)
         if link is None:
             raise ApiError(400, "mal_not_linked", "No MyAnimeList account linked")
-        if link.expires_at > utcnow() + timedelta(minutes=1):
-            return link.access_token
+        access_token, refresh_token = link.access_token, link.refresh_token
+        fresh = link.expires_at > utcnow() + timedelta(minutes=1)
+        # End the read transaction: the MAL calls that follow must not pin a pooled connection.
+        await session.commit()
+        if fresh:
+            return access_token
 
         tokens = await self._token_request(
-            {"grant_type": "refresh_token", "refresh_token": link.refresh_token}
+            {"grant_type": "refresh_token", "refresh_token": refresh_token}
         )
         if tokens is None:
             raise ApiError(401, "mal_session_expired", "MyAnimeList session expired, link again")
+        link = await session.get(MalLink, user.id)
+        if link is None:
+            raise ApiError(400, "mal_not_linked", "No MyAnimeList account linked")
         self._apply_tokens(link, tokens)
         await session.commit()
         return link.access_token

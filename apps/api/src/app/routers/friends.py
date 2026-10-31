@@ -195,6 +195,7 @@ async def _activity(
         await session.scalars(select(row).order_by(row.updated_at.desc()).limit(limit * 2))
     )
     people = await summaries(session, list({r.user_id for r in candidates}))
+    await session.commit()  # MAL lookups below: don't hold a connection through them
     cards = await _cards(
         request.app.state.mal, list({r.anime_id for r in candidates}), viewer.show_nsfw
     )
@@ -424,6 +425,7 @@ async def profile(
     out.friends = friend_count
     out.stats = ProfileStats(titles=titles, episodes=episodes, friends=friend_count)
     progress = await latest_per_anime(session, target.id, 8)
+    await session.commit()  # MAL lookups below: don't hold a connection through them
     cards = await _cards(
         request.app.state.mal, list({p.anime_id for p in progress}), user.show_nsfw
     )

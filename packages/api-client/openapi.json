@@ -437,6 +437,22 @@
         "title": "AnimeDetailsOut",
         "type": "object"
       },
+      "AnimeListOut": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AnimeCard"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "AnimeListOut",
+        "type": "object"
+      },
       "AvatarOut": {
         "properties": {
           "kind": {
@@ -915,6 +931,19 @@
         "title": "HomeRow",
         "type": "object"
       },
+      "InviteIn": {
+        "properties": {
+          "days_valid": {
+            "default": 7,
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "Days Valid",
+            "type": "integer"
+          }
+        },
+        "title": "InviteIn",
+        "type": "object"
+      },
       "InviteOut": {
         "properties": {
           "code": {
@@ -1179,6 +1208,22 @@
           "relation"
         ],
         "title": "LookupOut",
+        "type": "object"
+      },
+      "MalListOut": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ListItemOut"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "MalListOut",
         "type": "object"
       },
       "MalStatistics": {
@@ -1587,6 +1632,76 @@
           }
         },
         "title": "Picture",
+        "type": "object"
+      },
+      "PlaybackOut": {
+        "properties": {
+          "default_audio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Audio"
+          },
+          "fonts": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Fonts",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "skips": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SkipOut"
+            },
+            "title": "Skips",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "subtitles": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SubtitleOut"
+            },
+            "title": "Subtitles",
+            "type": "array"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "kind",
+          "resolution",
+          "url"
+        ],
+        "title": "PlaybackOut",
         "type": "object"
       },
       "PlayerPreferencesIO": {
@@ -2063,19 +2178,38 @@
             "type": "string"
           },
           "title": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Title",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           }
         },
         "required": [
           "source",
           "anime_id",
-          "title",
           "episode"
         ],
         "title": "RoomCreate",
+        "type": "object"
+      },
+      "RoomInviteIn": {
+        "properties": {
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "RoomInviteIn",
         "type": "object"
       },
       "RoomOut": {
@@ -2123,7 +2257,7 @@
             "type": "array"
           },
           "playback": {
-            "$ref": "#/components/schemas/app__routers__rooms__PlaybackOut"
+            "$ref": "#/components/schemas/RoomPlaybackOut"
           },
           "source": {
             "title": "Source",
@@ -2156,6 +2290,35 @@
           "playback"
         ],
         "title": "RoomOut",
+        "type": "object"
+      },
+      "RoomPlaybackOut": {
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "playing": {
+            "title": "Playing",
+            "type": "boolean"
+          },
+          "position": {
+            "title": "Position",
+            "type": "number"
+          }
+        },
+        "required": [
+          "playing",
+          "position"
+        ],
+        "title": "RoomPlaybackOut",
         "type": "object"
       },
       "SeasonalOut": {
@@ -2584,164 +2747,6 @@
         ],
         "title": "ValidationError",
         "type": "object"
-      },
-      "app__routers__invites__InviteIn": {
-        "properties": {
-          "days_valid": {
-            "default": 7,
-            "maximum": 90.0,
-            "minimum": 1.0,
-            "title": "Days Valid",
-            "type": "integer"
-          }
-        },
-        "title": "InviteIn",
-        "type": "object"
-      },
-      "app__routers__mal__AnimeListOut": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/ListItemOut"
-            },
-            "title": "Data",
-            "type": "array"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "title": "AnimeListOut",
-        "type": "object"
-      },
-      "app__routers__rooms__InviteIn": {
-        "properties": {
-          "user_id": {
-            "format": "uuid",
-            "title": "User Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "user_id"
-        ],
-        "title": "InviteIn",
-        "type": "object"
-      },
-      "app__routers__rooms__PlaybackOut": {
-        "properties": {
-          "by": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "By"
-          },
-          "playing": {
-            "title": "Playing",
-            "type": "boolean"
-          },
-          "position": {
-            "title": "Position",
-            "type": "number"
-          }
-        },
-        "required": [
-          "playing",
-          "position"
-        ],
-        "title": "PlaybackOut",
-        "type": "object"
-      },
-      "app__routers__watch__PlaybackOut": {
-        "properties": {
-          "default_audio": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Default Audio"
-          },
-          "fonts": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "default": {},
-            "title": "Fonts",
-            "type": "object"
-          },
-          "kind": {
-            "title": "Kind",
-            "type": "string"
-          },
-          "resolution": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resolution"
-          },
-          "skips": {
-            "default": [],
-            "items": {
-              "$ref": "#/components/schemas/SkipOut"
-            },
-            "title": "Skips",
-            "type": "array"
-          },
-          "source": {
-            "title": "Source",
-            "type": "string"
-          },
-          "subtitles": {
-            "default": [],
-            "items": {
-              "$ref": "#/components/schemas/SubtitleOut"
-            },
-            "title": "Subtitles",
-            "type": "array"
-          },
-          "url": {
-            "title": "Url",
-            "type": "string"
-          }
-        },
-        "required": [
-          "source",
-          "kind",
-          "resolution",
-          "url"
-        ],
-        "title": "PlaybackOut",
-        "type": "object"
-      },
-      "app__schemas__AnimeListOut": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/AnimeCard"
-            },
-            "title": "Data",
-            "type": "array"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "title": "AnimeListOut",
-        "type": "object"
       }
     },
     "securitySchemes": {
@@ -2916,7 +2921,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__AnimeListOut"
+                  "$ref": "#/components/schemas/AnimeListOut"
                 }
               }
             },
@@ -3001,7 +3006,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__AnimeListOut"
+                  "$ref": "#/components/schemas/AnimeListOut"
                 }
               }
             },
@@ -3740,7 +3745,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__routers__invites__InviteIn"
+                "$ref": "#/components/schemas/InviteIn"
               }
             }
           },
@@ -3908,7 +3913,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__routers__mal__AnimeListOut"
+                  "$ref": "#/components/schemas/MalListOut"
                 }
               }
             },
@@ -5610,7 +5615,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__routers__rooms__InviteIn"
+                "$ref": "#/components/schemas/RoomInviteIn"
               }
             }
           },
@@ -6058,7 +6063,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__routers__watch__PlaybackOut"
+                  "$ref": "#/components/schemas/PlaybackOut"
                 }
               }
             },

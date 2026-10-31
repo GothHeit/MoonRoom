@@ -59,7 +59,7 @@ class ListItemOut(BaseModel):
     list_status: ListStatusOut
 
 
-class AnimeListOut(BaseModel):
+class MalListOut(BaseModel):
     data: list[ListItemOut]
 
 
@@ -110,7 +110,7 @@ async def unlink(request: Request, user: CurrentUser, session: Session):
     await _accounts(request).disconnect(session, user)
 
 
-@router.get("/me/animelist", response_model=AnimeListOut)
+@router.get("/me/animelist", response_model=MalListOut)
 async def animelist(
     request: Request, user: CurrentUser, session: Session, status: ListStatus | None = None
 ):

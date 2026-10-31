@@ -26,7 +26,8 @@ KEEPALIVE_SECONDS = 15
 class RoomCreate(BaseModel):
     source: str = Field(min_length=1, max_length=40)
     anime_id: int = Field(ge=1)
-    title: str = Field(min_length=1, max_length=200)
+    # Ignored: the room's title comes from MyAnimeList, never from the client.
+    title: str | None = Field(default=None, max_length=200)
     episode: int = Field(ge=0, le=10_000)
     lang: Literal["sub", "dub"] = "sub"
 
@@ -36,7 +37,7 @@ class MemberOut(BaseModel):
     username: str
 
 
-class PlaybackOut(BaseModel):
+class RoomPlaybackOut(BaseModel):
     playing: bool
     position: float
     by: str | None = None
@@ -56,7 +57,7 @@ class RoomOut(BaseModel):
     votes: dict[str, int]
     # Ids of the people whose video is loading; the room is held while there are any.
     buffering: list[str]
-    playback: PlaybackOut
+    playback: RoomPlaybackOut
 
 
 class ControlIn(BaseModel):
@@ -76,7 +77,7 @@ class EpisodeIn(BaseModel):
     episode: int = Field(ge=0, le=10_000)
 
 
-class InviteIn(BaseModel):
+class RoomInviteIn(BaseModel):
     user_id: uuid.UUID
 
 
@@ -103,9 +104,10 @@ async def create_room(body: RoomCreate, request: Request, user: CurrentUser):
     if body.source not in request.app.state.sources:
         raise ApiError(404, "source_not_found", f"Video source '{body.source}' is not enabled")
     # Same visibility rule as playback: a title hidden by the user's +18 switch can't be hosted.
-    await request.app.state.mal.visible_details(body.anime_id, user.show_nsfw)
+    details = await request.app.state.mal.visible_details(body.anime_id, user.show_nsfw)
+    title = str(details.get("title") or f"#{body.anime_id}")
     rooms: Rooms = request.app.state.rooms
-    room = rooms.create(user.id, body.source, body.anime_id, body.title, body.episode, body.lang)
+    room = rooms.create(user.id, body.source, body.anime_id, title, body.episode, body.lang)
     return room.snapshot()
 
 
@@ -119,7 +121,7 @@ async def get_room(code: str, request: Request, user: CurrentUser):
 
 @router.post("/{code}/invite", status_code=204)
 async def invite_friend(
-    code: str, body: InviteIn, request: Request, user: CurrentUser, session: Session
+    code: str, body: RoomInviteIn, request: Request, user: CurrentUser, session: Session
 ):
     """Invites a friend to a room you are in. They get a notification."""
     room = _room(request, code)

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+from collections.abc import Awaitable
 from typing import Annotated, Literal
 from urllib.parse import urljoin
 
@@ -19,6 +20,17 @@ from app.security import create_playback_token, decode_access_token, decode_play
 from app.sources.base import EpisodeList, Lang, SkipKind, Stream, VideoSource
 
 logger = logging.getLogger(__name__)
+
+
+async def _upstream[T](work: Awaitable[T]) -> T:
+    """Scraper and video host failures (timeouts, resets, bad statuses) become a clean 502."""
+    try:
+        return await work
+    except (httpx.HTTPError, TimeoutError) as exc:
+        logger.warning("Upstream request failed: %s: %s", type(exc).__name__, exc)
+        raise ApiError(502, "upstream_failed", "The video host did not answer") from exc
+
+
 router = APIRouter(prefix="/watch", tags=["watch"])
 _bearer = HTTPBearer(auto_error=False)
 
@@ -198,7 +210,7 @@ async def episodes(
 ):
     src = _source(request, source)
     anime = await request.app.state.mal.visible_details(anime_id, user.show_nsfw)
-    result = await src.episodes(anime, lang)
+    result = await _upstream(src.episodes(anime, lang))
     if result is None:
         raise ApiError(404, "not_available", "This anime isn't available from this source")
     return episodes_out(source, result, str(user.id))
@@ -335,7 +347,7 @@ async def video(request: Request, session: Session, token: Annotated[str, Query(
 
     src = _source(request, claims["src"])
     anime = await request.app.state.mal.details(claims["aid"])
-    stream = await src.stream(anime, claims["ep"], claims["lang"])
+    stream = await _upstream(src.stream(anime, claims["ep"], claims["lang"]))
     if stream is None or stream.kind != "mp4":
         raise ApiError(404, "not_available", "This episode isn't available any more")
 
@@ -344,11 +356,13 @@ async def video(request: Request, session: Session, token: Annotated[str, Query(
         headers["Range"] = request.headers["range"]  # lets the player seek
 
     http: httpx.AsyncClient = request.app.state.http
-    upstream = await http.send(
-        http.build_request(
-            "GET", stream.url, headers=headers, timeout=httpx.Timeout(30.0, read=None)
-        ),
-        stream=True,
+    upstream = await _upstream(
+        http.send(
+            http.build_request(
+                "GET", stream.url, headers=headers, timeout=httpx.Timeout(30.0, read=None)
+            ),
+            stream=True,
+        )
     )
     if upstream.status_code == 416:
         # A seek past the end: players expect the real 416 and the size in Content-Range.
@@ -370,6 +384,9 @@ async def video(request: Request, session: Session, token: Annotated[str, Query(
         try:
             async for chunk in upstream.aiter_bytes():
                 yield chunk
+        except (httpx.HTTPError, TimeoutError) as exc:
+            # Headers are already sent: all that's left is to cut the stream short.
+            logger.info("Video host dropped a stream: %s", type(exc).__name__)
         finally:
             await upstream.aclose()
 
@@ -414,6 +431,8 @@ async def _read_playlist(upstream: httpx.Response) -> str:
             if size > hls.MAX_PLAYLIST_BYTES:
                 raise ApiError(502, "upstream_failed", "Playlist from the video host is too large")
             chunks.append(chunk)
+    except (httpx.HTTPError, TimeoutError) as exc:
+        raise ApiError(502, "upstream_failed", "The video host did not answer") from exc
     finally:
         await upstream.aclose()
     return b"".join(chunks).decode("utf-8", errors="replace")
@@ -467,7 +486,7 @@ async def hls_proxy(
         await session.commit()  # the scraper call below can be slow
         src = _source(request, claims["src"])
         anime = await request.app.state.mal.details(claims["aid"])
-        stream = await src.stream(anime, claims["ep"], claims["lang"])
+        stream = await _upstream(src.stream(anime, claims["ep"], claims["lang"]))
         if stream is None or stream.kind != "hls":
             raise ApiError(404, "not_available", "This episode isn't available any more")
         url, referer, viewer = stream.url, stream.upstream_headers.get("Referer", ""), claims["sub"]
@@ -489,7 +508,7 @@ async def hls_proxy(
     if "range" in request.headers:
         headers["Range"] = request.headers["range"]
     http: httpx.AsyncClient = request.app.state.http
-    upstream, url = await _open_upstream(http, url, headers)
+    upstream, url = await _upstream(_open_upstream(http, url, headers))
     if upstream.status_code >= 400 and upstream.status_code != 416:
         await upstream.aclose()
         raise ApiError(502, "upstream_failed", f"Video host answered {upstream.status_code}")
@@ -515,6 +534,9 @@ async def hls_proxy(
         try:
             async for chunk in upstream.aiter_bytes():
                 yield chunk
+        except (httpx.HTTPError, TimeoutError) as exc:
+            # Headers are already sent: all that's left is to cut the stream short.
+            logger.info("Video host dropped a stream: %s", type(exc).__name__)
         finally:
             await upstream.aclose()
 

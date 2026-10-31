@@ -119,6 +119,7 @@ class AnimesDigitalSource:
     name = "animesdigital"
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
+        self._owns_client = client is None
         self._client = client or httpx.AsyncClient(
             headers={"User-Agent": USER_AGENT}, follow_redirects=True, timeout=15.0
         )
@@ -128,6 +129,10 @@ class AnimesDigitalSource:
         self._recent: TTLCache[tuple, None] = TTLCache(maxsize=4096, ttl=MISS_TTL)
         # Listings being read, so concurrent callers (a title page, a fallback) share the work.
         self._inflight: dict[tuple, asyncio.Future[Listing | None]] = {}
+
+    async def aclose(self) -> None:
+        if self._owns_client:
+            await self._client.aclose()
 
     async def _get(self, url: str) -> str:
         response = await self._client.get(url)

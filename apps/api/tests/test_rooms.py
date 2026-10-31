@@ -8,7 +8,7 @@ import respx
 from app.errors import ApiError
 from app.main import app
 from app.mal.client import API_BASE
-from app.rooms import EMPTY_GRACE_SECONDS, MAX_MEMBERS, Room, Rooms
+from app.rooms import EMPTY_GRACE_SECONDS, HOST_GRACE_SECONDS, MAX_MEMBERS, Room, Rooms
 from tests.conftest import make_user
 from tests.mal_fixtures import node
 
@@ -193,6 +193,7 @@ async def test_the_api_creates_and_runs_a_room(client, session):
         headers=host_headers,
     )
     assert created.status_code == 201
+    assert created.json()["title"] == app.state.mal._details[21]["title"]
     code = created.json()["code"]
 
     found = await client.get(f"/watch/rooms/{code.lower()}", headers=guest_headers)
@@ -482,3 +483,23 @@ async def test_a_room_cannot_be_made_for_a_title_hidden_by_the_adult_switch(clie
     assert hidden.status_code == 404
     _, adult = await make_user(session, "adult", nsfw=True)
     assert (await client.post("/watch/rooms", json=body, headers=adult)).status_code == 201
+
+
+async def test_a_room_whose_host_never_returns_goes_to_the_next_joiner():
+    room, host = new_room()
+    friend = uuid.uuid4()
+    qh = room.join(host, "kafka")
+    qf = room.join(friend, "friend")
+    room.leave(host, qh)
+    room.leave(friend, qf)  # a Wi-Fi blip took both out; the host's timer found nobody to pass to
+
+    room.host_left_at = time.monotonic() - 1
+    room.join(friend, "friend")  # back within the grace: the host may still return
+    assert room.host_id == host
+
+    room.leave(friend, next(iter(room.members[friend].queues)))
+    room.host_left_at = time.monotonic() - HOST_GRACE_SECONDS - 1
+    room.join(friend, "friend")  # the grace is over: the room is theirs
+    assert room.host_id == friend
+    room.join(host, "kafka")
+    assert room.host_id == friend

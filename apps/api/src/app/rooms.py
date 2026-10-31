@@ -73,6 +73,9 @@ class Room:
     held: bool = False
     # Until when a viewer who held the room may not hold it again.
     hold_blocked: dict[uuid.UUID, float] = field(default_factory=dict)
+    # When the host was last seen leaving (monotonic), so a room whose host never came back
+    # can be handed to whoever joins next.
+    host_left_at: float | None = None
     _hold_timer: asyncio.TimerHandle | None = None
 
     def now_position(self) -> float:
@@ -122,6 +125,16 @@ class Room:
             raise ApiError(409, "room_full", "The room is full")
         queue: asyncio.Queue[Event | None] = asyncio.Queue()
         is_new = user_id not in self.members
+        if user_id == self.host_id:
+            self.host_left_at = None
+        elif (
+            self.host_id not in self.members
+            and self.host_left_at is not None
+            and time.monotonic() - self.host_left_at > HOST_GRACE_SECONDS
+        ):
+            # The host dropped while this person was gone too, and never came back.
+            self.host_id = user_id
+            self.host_left_at = None
         self.members.setdefault(user_id, Member(username)).queues.add(queue)
         self.empty_since = None
         self.invited.pop(user_id, None)
@@ -142,6 +155,8 @@ class Room:
         del self.members[user_id]
         self.votes.pop(user_id, None)
         self._stop_buffering(user_id)
+        if user_id == self.host_id:
+            self.host_left_at = time.monotonic()
         if not self.members:
             self.empty_since = time.monotonic()
             self.position = self.now_position()

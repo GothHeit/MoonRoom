@@ -4,6 +4,7 @@ from collections.abc import Awaitable
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Literal
 
+import httpx
 from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
 
@@ -44,6 +45,8 @@ async def _soft[T](work: Awaitable[T], what: str) -> T | None:
         return await work
     except ApiError as exc:
         log.warning("home: %s unavailable: %s", what, exc.code)
+    except httpx.HTTPError as exc:
+        log.warning("home: %s failed: %s", what, exc)
     except ValueError as exc:  # e.g. a MAL token that TOKEN_ENCRYPTION_KEY can't decrypt
         log.warning("home: %s failed: %s", what, exc)
     return None

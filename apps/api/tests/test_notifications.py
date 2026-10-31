@@ -99,7 +99,7 @@ async def test_a_room_invite_shows_who_where_and_whether_the_room_is_open(client
     guest, guest_headers = await make_user(session, "friend")
     await befriend(client, host_headers, guest_headers, "friend")
     app.state.sources = {"zoko": object()}
-    app.state.mal._details[21] = {"id": 21, "rating": "pg_13"}
+    app.state.mal._details[21] = {"id": 21, "title": "One Piece", "rating": "pg_13"}
     created = await client.post(
         "/watch/rooms",
         json={"source": "zoko", "anime_id": 21, "title": "One Piece", "episode": 3},

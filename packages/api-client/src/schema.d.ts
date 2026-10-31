@@ -1256,6 +1256,11 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** AnimeListOut */
+        AnimeListOut: {
+            /** Data */
+            data: components["schemas"]["AnimeCard"][];
+        };
         /** AvatarOut */
         AvatarOut: {
             /**
@@ -1414,6 +1419,14 @@ export interface components {
             /** Items */
             items: components["schemas"]["HomeItem"][];
         };
+        /** InviteIn */
+        InviteIn: {
+            /**
+             * Days Valid
+             * @default 7
+             */
+            days_valid: number;
+        };
         /** InviteOut */
         InviteOut: {
             /** Code */
@@ -1515,6 +1528,11 @@ export interface components {
              */
             relation: "self" | "none" | "friends" | "outgoing" | "incoming";
             user: components["schemas"]["UserSummary"];
+        };
+        /** MalListOut */
+        MalListOut: {
+            /** Data */
+            data: components["schemas"]["ListItemOut"][];
         };
         /** MalStatistics */
         MalStatistics: {
@@ -1623,6 +1641,36 @@ export interface components {
             large?: string | null;
             /** Medium */
             medium?: string | null;
+        };
+        /** PlaybackOut */
+        PlaybackOut: {
+            /** Default Audio */
+            default_audio?: string | null;
+            /**
+             * Fonts
+             * @default {}
+             */
+            fonts: {
+                [key: string]: string;
+            };
+            /** Kind */
+            kind: string;
+            /** Resolution */
+            resolution: number | null;
+            /**
+             * Skips
+             * @default []
+             */
+            skips: components["schemas"]["SkipOut"][];
+            /** Source */
+            source: string;
+            /**
+             * Subtitles
+             * @default []
+             */
+            subtitles: components["schemas"]["SubtitleOut"][];
+            /** Url */
+            url: string;
         };
         /** PlayerPreferencesIO */
         PlayerPreferencesIO: {
@@ -1806,7 +1854,15 @@ export interface components {
             /** Source */
             source: string;
             /** Title */
-            title: string;
+            title?: string | null;
+        };
+        /** RoomInviteIn */
+        RoomInviteIn: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
         };
         /** RoomOut */
         RoomOut: {
@@ -1829,7 +1885,7 @@ export interface components {
             locked: boolean;
             /** Members */
             members: components["schemas"]["MemberOut"][];
-            playback: components["schemas"]["app__routers__rooms__PlaybackOut"];
+            playback: components["schemas"]["RoomPlaybackOut"];
             /** Source */
             source: string;
             /** Title */
@@ -1838,6 +1894,15 @@ export interface components {
             votes: {
                 [key: string]: number;
             };
+        };
+        /** RoomPlaybackOut */
+        RoomPlaybackOut: {
+            /** By */
+            by?: string | null;
+            /** Playing */
+            playing: boolean;
+            /** Position */
+            position: number;
         };
         /** SeasonalOut */
         SeasonalOut: {
@@ -2000,71 +2065,6 @@ export interface components {
             /** Error Type */
             type: string;
         };
-        /** InviteIn */
-        app__routers__invites__InviteIn: {
-            /**
-             * Days Valid
-             * @default 7
-             */
-            days_valid: number;
-        };
-        /** AnimeListOut */
-        app__routers__mal__AnimeListOut: {
-            /** Data */
-            data: components["schemas"]["ListItemOut"][];
-        };
-        /** InviteIn */
-        app__routers__rooms__InviteIn: {
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
-        };
-        /** PlaybackOut */
-        app__routers__rooms__PlaybackOut: {
-            /** By */
-            by?: string | null;
-            /** Playing */
-            playing: boolean;
-            /** Position */
-            position: number;
-        };
-        /** PlaybackOut */
-        app__routers__watch__PlaybackOut: {
-            /** Default Audio */
-            default_audio?: string | null;
-            /**
-             * Fonts
-             * @default {}
-             */
-            fonts: {
-                [key: string]: string;
-            };
-            /** Kind */
-            kind: string;
-            /** Resolution */
-            resolution: number | null;
-            /**
-             * Skips
-             * @default []
-             */
-            skips: components["schemas"]["SkipOut"][];
-            /** Source */
-            source: string;
-            /**
-             * Subtitles
-             * @default []
-             */
-            subtitles: components["schemas"]["SubtitleOut"][];
-            /** Url */
-            url: string;
-        };
-        /** AnimeListOut */
-        app__schemas__AnimeListOut: {
-            /** Data */
-            data: components["schemas"]["AnimeCard"][];
-        };
     };
     responses: never;
     parameters: never;
@@ -2146,7 +2146,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__schemas__AnimeListOut"];
+                    "application/json": components["schemas"]["AnimeListOut"];
                 };
             };
             /** @description Validation Error */
@@ -2206,7 +2206,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__schemas__AnimeListOut"];
+                    "application/json": components["schemas"]["AnimeListOut"];
                 };
             };
         };
@@ -2711,7 +2711,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__routers__invites__InviteIn"];
+                "application/json": components["schemas"]["InviteIn"];
             };
         };
         responses: {
@@ -2825,7 +2825,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__routers__mal__AnimeListOut"];
+                    "application/json": components["schemas"]["MalListOut"];
                 };
             };
             /** @description Validation Error */
@@ -3942,7 +3942,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__routers__rooms__InviteIn"];
+                "application/json": components["schemas"]["RoomInviteIn"];
             };
         };
         responses: {
@@ -4203,7 +4203,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__routers__watch__PlaybackOut"];
+                    "application/json": components["schemas"]["PlaybackOut"];
                 };
             };
             /** @description Validation Error */

@@ -101,6 +101,9 @@ async def lifespan(app: FastAPI):
             pruner.cancel()
             if checker is not None:
                 checker.cancel()
+            for source in app.state.sources.values():
+                if hasattr(source, "aclose"):
+                    await source.aclose()
     await db.dispose_engine()
 
 

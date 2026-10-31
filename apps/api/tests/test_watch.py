@@ -326,3 +326,42 @@ async def test_a_picked_source_is_remembered_per_user_and_title(client, session)
     fastapi_app.state.sources = {"fake": FakeSource()}
     fastapi_app.state.source_hints.clear()
     assert (await client.get("/anime/21/sources", headers=headers)).json()["choice"] is None
+
+
+class Flaky(FakeSource):
+    """A scraper whose site is down, but only after the playback token was issued."""
+
+    down = False
+
+    async def episodes(self, anime, lang):
+        if self.down:
+            raise httpx.ReadTimeout("slow")
+        return await super().episodes(anime, lang)
+
+    async def stream(self, anime, episode, lang):
+        if self.down:
+            raise httpx.HTTPStatusError(
+                "503", request=httpx.Request("GET", "https://x"), response=httpx.Response(503)
+            )
+        return await super().stream(anime, episode, lang)
+
+
+@respx.mock
+async def test_source_and_video_host_failures_answer_upstream_failed(client, session):
+    source = Flaky()
+    fastapi_app.state.sources = {"fake": source}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    play = await client.post("/watch/fake/21/episodes/1/play", headers=headers)
+    url = play.json()["url"]
+
+    source.down = True
+    eps = await client.get("/watch/fake/21/episodes", headers=headers)
+    assert (eps.status_code, eps.json()["error"]["code"]) == (502, "upstream_failed")
+    video = await client.get(url)
+    assert (video.status_code, video.json()["error"]["code"]) == (502, "upstream_failed")
+
+    source.down = False
+    respx.get(VIDEO_URL).mock(side_effect=httpx.ConnectTimeout("stalled"))
+    video = await client.get(url)
+    assert (video.status_code, video.json()["error"]["code"]) == (502, "upstream_failed")
