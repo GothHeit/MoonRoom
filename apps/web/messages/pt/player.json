@@ -36,7 +36,10 @@
       "upstream_failed": "O servidor do vídeo não respondeu. Tente de novo daqui a pouco.",
       "playback_failed": "O vídeo parou de carregar. Tente de novo.",
       "network": "Não foi possível conectar ao servidor.",
-      "unknown": "Algo deu errado. Tente de novo."
+      "unknown": "Algo deu errado. Tente de novo.",
+      "too_many_rooms": "Há salas demais abertas agora. Tente mais tarde.",
+      "anime_not_found": "Este título não está disponível.",
+      "room_full": "Esta sala está cheia (10 pessoas)."
     },
     "skipIntro": "Pular abertura",
     "skipOutro": "Pular encerramento",

@@ -1,15 +1,15 @@
 import { errorCode } from "@app/api-client";
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { GridSkeleton } from "@/components/grid/PosterGrid";
 import { LinkMalCard } from "@/components/list/LinkMalCard";
 import { ListView } from "@/components/list/ListView";
-import { redirect } from "@/i18n/navigation";
 import { toApiError } from "@/lib/errors";
 import { LIST_STATUSES, type ListStatus } from "@/lib/catalog";
-import { serverApi, unwrap } from "@/lib/server-api";
+import { expiredSessionPath, serverApi, unwrap } from "@/lib/server-api";
 import { titled } from "@/lib/page-title";
 
 async function Entries({ active, locale }: { active: ListStatus; locale: string }) {
@@ -22,7 +22,7 @@ async function Entries({ active, locale }: { active: ListStatus; locale: string 
   if (data !== undefined) return <ListView entries={data.data} initial={active} />;
   const code = errorCode(error);
   if (code === "mal_session_expired" || code === "mal_not_linked") return <LinkMalCard expired={code === "mal_session_expired"} />;
-  if (response.status === 401) redirect({ href: "/login", locale });
+  if (response.status === 401) redirect(expiredSessionPath(locale));
   throw toApiError(response.status, error);
 }
 

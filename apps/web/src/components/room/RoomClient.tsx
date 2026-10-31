@@ -12,6 +12,18 @@ import { Link } from "@/i18n/navigation";
 import { RoomPanel } from "./RoomPanel";
 import { useRoom, type RoomState } from "./useRoom";
 
+const ACTION_ERRORS = [
+  "room_not_found",
+  "controls_locked",
+  "host_only",
+  "invalid_episode",
+  "empty_message",
+  "network",
+  "not_in_room",
+  "source_not_found",
+  "not_authenticated",
+];
+
 type Props = {
   initial: RoomState;
   meId: string;
@@ -37,7 +49,11 @@ export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyl
     withdrawVote,
     setLocked,
     switchStream,
-  } = useRoom(initial);
+  } = useRoom(initial, (code) => {
+    // A locked room already shows its own toast through the control events.
+    if (code === "controls_locked") return;
+    toast(t(`actionErrors.${ACTION_ERRORS.includes(code) ? code : "unknown"}`), "error");
+  });
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(0);
   const unread = open ? 0 : messages.length - seen;

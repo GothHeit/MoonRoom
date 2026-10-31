@@ -20,9 +20,6 @@
     "errorTitle": "Something went wrong"
   },
   "placeholder": {
-    "greeting": "Hello, {name}",
-    "tagline": "Your catalog is on its way.",
-    "rowTitle": "Coming soon",
     "comingSoon": "This page is coming soon."
   },
   "errors": {

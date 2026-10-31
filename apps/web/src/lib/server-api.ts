@@ -1,8 +1,6 @@
 import { createApiClient } from "@app/api-client";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
-
-import { redirect } from "@/i18n/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { API_URL } from "./config";
 import { ACCESS_COOKIE } from "./cookies";
@@ -14,16 +12,21 @@ export async function serverApi() {
   return createApiClient(API_URL, () => access);
 }
 
+/** A route that drops the cookies before showing /login, so the middleware cannot send the user back. */
+export function expiredSessionPath(locale: string) {
+  return `/api/auth/expired?locale=${encodeURIComponent(locale)}`;
+}
+
 type Result<T> = { data?: T; error?: unknown; response: Response };
 
 /**
- * Unwraps an API result. 404 shows the not-found page, 401 sends the user to sign in and any
+ * Unwraps an API result. 404 shows the not-found page, 401 clears the stale cookies and sends the user to sign in and any
  * other failure throws an ApiError for the nearest error boundary.
  */
 export async function unwrap<T>(result: Promise<Result<T>>, locale: string): Promise<T> {
   const { data, error, response } = await result;
   if (data !== undefined) return data;
   if (response.status === 404) notFound();
-  if (response.status === 401) redirect({ href: "/login", locale });
+  if (response.status === 401) redirect(expiredSessionPath(locale));
   throw toApiError(response.status, error);
 }

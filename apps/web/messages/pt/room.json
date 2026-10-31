@@ -31,7 +31,6 @@
       "network": "A conexão com a sala caiu."
     },
     "joinTitle": "Entrar em uma sala",
-    "joinIntro": "Digite o código que um amigo compartilhou para assistir juntos. Para abrir uma sala, abra um episódio e escolha Assistir juntos.",
     "codeLabel": "Código da sala",
     "invalidCode": "Isso não parece um código de sala.",
     "join": "Entrar",
@@ -48,6 +47,18 @@
     "haveCodeBody": "Digite o código que um amigo compartilhou.",
     "createTitle": "Abrir uma sala",
     "createBody": "Abra qualquer episódio e escolha Assistir juntos. Depois convide amigos ou compartilhe o código.",
-    "createCta": "Escolher o que assistir"
+    "createCta": "Escolher o que assistir",
+    "actionErrors": {
+      "room_not_found": "Esta sala acabou.",
+      "controls_locked": "Só o anfitrião controla a reprodução nesta sala.",
+      "host_only": "Só o anfitrião pode fazer isso.",
+      "invalid_episode": "Episódio inválido.",
+      "empty_message": "Escreva uma mensagem antes de enviar.",
+      "network": "Não foi possível conectar à sala.",
+      "unknown": "Não deu certo. Tente de novo.",
+      "not_in_room": "Entre na sala primeiro.",
+      "source_not_found": "O streaming está desativado neste servidor.",
+      "not_authenticated": "Sua sessão expirou. Entre de novo."
+    }
   }
 }

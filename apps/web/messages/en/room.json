@@ -31,7 +31,6 @@
       "network": "Lost the connection to the room."
     },
     "joinTitle": "Join a room",
-    "joinIntro": "Enter the code a friend shared to watch together. To start a room yourself, open an episode and choose Watch together.",
     "codeLabel": "Room code",
     "invalidCode": "That doesn't look like a room code.",
     "join": "Join",
@@ -48,6 +47,18 @@
     "haveCodeBody": "Enter the code a friend shared.",
     "createTitle": "Start a room",
     "createBody": "Open any episode and choose Watch together. Then invite friends or share the code.",
-    "createCta": "Pick something to watch"
+    "createCta": "Pick something to watch",
+    "actionErrors": {
+      "room_not_found": "This room has ended.",
+      "controls_locked": "Only the host controls playback in this room.",
+      "host_only": "Only the host can do that.",
+      "invalid_episode": "That episode isn't valid.",
+      "empty_message": "Write a message before sending.",
+      "network": "Couldn't reach the room.",
+      "unknown": "That didn't work. Try again.",
+      "not_in_room": "Join the room first.",
+      "source_not_found": "Streaming is turned off on this server.",
+      "not_authenticated": "Your session expired. Sign in again."
+    }
   }
 }

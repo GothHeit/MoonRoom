@@ -20,9 +20,6 @@
     "errorTitle": "Algo deu errado"
   },
   "placeholder": {
-    "greeting": "Olá, {name}",
-    "tagline": "Seu catálogo está a caminho.",
-    "rowTitle": "Em breve",
     "comingSoon": "Esta página chega em breve."
   },
   "errors": {

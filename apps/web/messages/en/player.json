@@ -36,7 +36,10 @@
       "upstream_failed": "The video host didn't answer. Try again in a moment.",
       "playback_failed": "The video stopped loading. Try again.",
       "network": "Couldn't reach the server.",
-      "unknown": "Something went wrong. Try again."
+      "unknown": "Something went wrong. Try again.",
+      "too_many_rooms": "Too many rooms are open right now. Try again later.",
+      "anime_not_found": "This title isn't available.",
+      "room_full": "This room is full (10 people)."
     },
     "skipIntro": "Skip intro",
     "skipOutro": "Skip credits",

@@ -20,12 +20,29 @@ git fetch --quiet origin main
 # Production-only clone, so follow origin/main even if it was rewritten or rolled back.
 git reset --quiet --hard origin/main
 head=$(git rev-parse HEAD)
-if [ "$head" = "$(cat "$state" 2>/dev/null || true)" ]; then
+last=$(cat "$state" 2>/dev/null || true)
+if [ "$head" = "$last" ]; then
   exit 0
 fi
 
 log "deploying $(git rev-parse --short "$head")"
 cd deploy
+
+# The API runs `alembic upgrade head` when it starts, so take a fresh dump first whenever the
+# migrations changed (or there is no record of the last build). If it fails, nothing is deployed.
+if [ -z "$last" ] || ! git cat-file -e "$last^{commit}" 2>/dev/null \
+   || ! git diff --quiet "$last" "$head" -- ../apps/api/migrations; then
+  if docker compose ps --status running --services 2>/dev/null | grep -qx db; then
+    log "migrations changed: backing up the database first"
+    if ! ./backup.sh >/dev/null; then
+      log "backup FAILED; not deploying $(git rev-parse --short "$head")"
+      exit 1
+    fi
+  else
+    log "database not running (first deploy?): skipping the backup"
+  fi
+fi
+
 if docker compose up -d --build --remove-orphans; then
   echo "$head" > "$state"
   docker image prune -f >/dev/null || true

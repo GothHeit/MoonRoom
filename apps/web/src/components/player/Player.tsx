@@ -53,7 +53,16 @@ const SEEK_STEP = 10;
 const VOLUME_STEP = 0.1;
 const HIDE_CONTROLS_MS = 3000;
 export const NEXT_COUNTDOWN = 10;
-const ERRORS = ["not_available", "source_not_found", "upstream_failed", "playback_failed", "network"];
+const ERRORS = [
+  "not_available",
+  "source_not_found",
+  "upstream_failed",
+  "playback_failed",
+  "network",
+  "too_many_rooms",
+  "anime_not_found",
+  "room_full",
+];
 
 /** The audio track matching the source's default (by name or language), else the first. */
 export function pickAudio(tracks: { id: number; name: string; lang?: string }[], wanted: string | null): number {

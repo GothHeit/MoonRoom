@@ -27,7 +27,11 @@ function stamp(playback: RoomState["playback"]): Playback {
 }
 
 /** Joins a room over server-sent events and keeps its state, chat and playback up to date. */
-export function useRoom(initial: RoomState) {
+export function useRoom(initial: RoomState, onError?: (code: string) => void) {
+  const errorHandler = useRef(onError);
+  useEffect(() => {
+    errorHandler.current = onError;
+  });
   const code = initial.code;
   const [room, setRoom] = useState(initial);
   const [playback, setPlayback] = useState(() => stamp(initial.playback));
@@ -82,6 +86,16 @@ export function useRoom(initial: RoomState) {
 
   const path = useMemo(() => ({ params: { path: { code } } }), [code]);
 
+  /** Runs a room action and reports a refusal (openapi-fetch returns errors instead of throwing). */
+  const report = useCallback(async (call: Promise<{ error?: unknown }>) => {
+    try {
+      const result = await call;
+      if (result.error) errorHandler.current?.(errorCode(result.error));
+    } catch {
+      errorHandler.current?.("network");
+    }
+  }, []);
+
   const send = useCallback(
     (action: LocalEvent, position: number) =>
       api.POST("/watch/rooms/{code}/control", { ...path, body: { action, position } }).catch(() => undefined),
@@ -93,28 +107,28 @@ export function useRoom(initial: RoomState) {
     [path],
   );
   const say = useCallback(
-    (text: string) => api.POST("/watch/rooms/{code}/chat", { ...path, body: { text } }).catch(() => undefined),
-    [path],
+    (text: string) => report(api.POST("/watch/rooms/{code}/chat", { ...path, body: { text } })),
+    [path, report],
   );
   const react = useCallback(
     (emoji: string) => api.POST("/watch/rooms/{code}/reaction", { ...path, body: { emoji } }).catch(() => undefined),
     [path],
   );
   const voteEpisode = useCallback(
-    (episode: number) => api.POST("/watch/rooms/{code}/episode", { ...path, body: { episode } }).catch(() => undefined),
-    [path],
+    (episode: number) => report(api.POST("/watch/rooms/{code}/episode", { ...path, body: { episode } })),
+    [path, report],
   );
   const withdrawVote = useCallback(
-    () => api.DELETE("/watch/rooms/{code}/episode", path).catch(() => undefined),
-    [path],
+    () => report(api.DELETE("/watch/rooms/{code}/episode", path)),
+    [path, report],
   );
   const switchStream = useCallback(
-    (to: StreamChoice) => api.PUT("/watch/rooms/{code}/stream", { ...path, body: to }).catch(() => undefined),
-    [path],
+    (to: StreamChoice) => report(api.PUT("/watch/rooms/{code}/stream", { ...path, body: to })),
+    [path, report],
   );
   const setLocked = useCallback(
-    (locked: boolean) => api.PUT("/watch/rooms/{code}/lock", { ...path, body: { locked } }).catch(() => undefined),
-    [path],
+    (locked: boolean) => report(api.PUT("/watch/rooms/{code}/lock", { ...path, body: { locked } })),
+    [path, report],
   );
 
   return { room, playback, messages, status, lastReaction, send, setBuffering, say, react, voteEpisode, withdrawVote, setLocked, switchStream };
