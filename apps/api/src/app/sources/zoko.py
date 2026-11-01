@@ -16,6 +16,7 @@ from typing import Literal, cast
 import httpx
 from cachetools import TTLCache
 
+from app.singleflight import SingleFlight
 from app.sources.base import EpisodeList, Lang, Skip, Stream, Subtitle
 
 EMBED = "https://zokoanime.video"
@@ -133,8 +134,8 @@ class ZokoSource:
         # Every embed page read, misses included, so probing and playback share the work.
         self._configs: TTLCache[tuple, dict | None] = TTLCache(maxsize=16384, ttl=CACHE_TTL)
         self._misses: TTLCache[tuple, None] = TTLCache(maxsize=16384, ttl=MISS_TTL)
-        # Pages being fetched, so concurrent callers (a title page, a fallback) share one request.
-        self._inflight: dict[tuple, asyncio.Task[dict | None]] = {}
+        # Concurrent callers (a title page, a fallback) share one request.
+        self._flights: SingleFlight[tuple, dict | None] = SingleFlight()
         self._streams: TTLCache[tuple, Stream | None] = TTLCache(maxsize=4096, ttl=CACHE_TTL)
         self._episodes: TTLCache[tuple, EpisodeList | None] = TTLCache(maxsize=4096, ttl=CACHE_TTL)
         # Results that may change soon (no episodes yet, a still-airing show) live here instead.
@@ -150,18 +151,7 @@ class ZokoSource:
             return self._configs[key]
         if key in self._misses:
             return None
-        task = self._inflight.get(key)
-        if task is None:
-            task = asyncio.ensure_future(self._fetch_config(key))
-            self._inflight[key] = task
-            task.add_done_callback(lambda t: self._settle(key, t))
-        # Shielded: one caller giving up must not cancel the fetch the others wait on.
-        return await asyncio.shield(task)
-
-    def _settle(self, key: tuple, task: asyncio.Task[dict | None]) -> None:
-        self._inflight.pop(key, None)
-        if not task.cancelled():
-            task.exception()  # read it, so a fetch nobody waits on isn't left unretrieved
+        return await self._flights.run(key, lambda: self._fetch_config(key))
 
     async def _fetch_config(self, key: tuple) -> dict | None:
         mal_id, episode, lang = key

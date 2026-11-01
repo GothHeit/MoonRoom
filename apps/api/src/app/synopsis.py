@@ -12,6 +12,7 @@ import re
 import httpx
 from cachetools import TLRUCache
 
+from app.singleflight import SingleFlight
 from app.sources.animesdigital import BASE, USER_AGENT, find
 
 log = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ def parse_synopsis(page: str) -> str | None:
 class PtSynopses:
     def __init__(self, http: httpx.AsyncClient) -> None:
         self._http = http
-        self._inflight: dict[int, asyncio.Future[str | None]] = {}
+        self._flights: SingleFlight[int, str | None] = SingleFlight()
         # Values are (text or None, ttl).
         self._cache: TLRUCache[int, tuple[str | None, float]] = TLRUCache(
             maxsize=4096, ttu=lambda _key, value, now: now + value[1]
@@ -48,11 +49,7 @@ class PtSynopses:
         if (hit := self._cache.get(key)) is not None:
             return hit[0]
         # Concurrent requests for the same title (a cold home page) share one scrape.
-        task = self._inflight.get(key)
-        if task is None:
-            task = self._inflight[key] = asyncio.ensure_future(self._fetch(key, detail))
-            task.add_done_callback(lambda _t: self._inflight.pop(key, None))
-        return await asyncio.shield(task)
+        return await self._flights.run(key, lambda: self._fetch(key, detail))
 
     async def _fetch(self, key: int, detail: dict) -> str | None:
         try:

@@ -1,10 +1,8 @@
 import asyncio
 import logging
-from collections.abc import Awaitable
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Literal
 
-import httpx
 from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
 
@@ -17,6 +15,7 @@ from app.models import ContinueHidden, MalLink, WatchProgress
 from app.routers.friends import sharing_friend_ids
 from app.routers.progress import latest_per_anime, to_out
 from app.schemas import AnimeCard, GenreOut, HomeHero, HomeItem, HomeOut, HomeRow
+from app.soft import soft
 
 if TYPE_CHECKING:
     from app.anizip import AniZip
@@ -39,19 +38,6 @@ GENRE_POOL = (1, 2, 4, 8, 10, 22, 24, 36, 30, 37, 7, 41)
 MAL_STALE_AFTER = timedelta(days=60)
 
 
-async def _soft[T](work: Awaitable[T], what: str) -> T | None:
-    """One failing section (MAL down, expired link) shouldn't blank the whole home page."""
-    try:
-        return await work
-    except ApiError as exc:
-        log.warning("home: %s unavailable: %s", what, exc.code)
-    except httpx.HTTPError as exc:
-        log.warning("home: %s failed: %s", what, exc)
-    except ValueError as exc:  # e.g. a MAL token that TOKEN_ENCRYPTION_KEY can't decrypt
-        log.warning("home: %s failed: %s", what, exc)
-    return None
-
-
 def _items(nodes: list[dict]) -> list[HomeItem]:
     return [HomeItem(anime=AnimeCard.from_node(n)) for n in nodes[:ROW_SIZE]]
 
@@ -60,7 +46,7 @@ async def _continue_row(
     mal: MalClient, rows: list[WatchProgress], allow_nsfw: bool
 ) -> list[HomeItem]:
     async def one(row: WatchProgress) -> HomeItem | None:
-        anime = await _soft(mal.details(row.anime_id), f"details {row.anime_id}")
+        anime = await soft(mal.details(row.anime_id), f"details {row.anime_id}")
         if anime is None or (not allow_nsfw and not is_safe(anime)):
             return None
         card = AnimeCard.from_node(anime)
@@ -171,7 +157,7 @@ async def _friends_popular_ids(session: Session, user: CurrentUser) -> list[int]
 
 async def _friends_popular_row(mal: MalClient, ids: list[int], show_nsfw: bool) -> list[HomeItem]:
     async def card(anime_id: int) -> HomeItem | None:
-        node = await _soft(mal.details(anime_id), f"details {anime_id}")
+        node = await soft(mal.details(anime_id), f"details {anime_id}")
         if node is None or (not show_nsfw and not is_safe(node)):
             return None
         return HomeItem(anime=AnimeCard.from_node(node))
@@ -202,7 +188,7 @@ async def _heroes(
 
     async def one(pick: dict) -> HomeHero:
         details, wide_art = await asyncio.gather(
-            _soft(mal.details(pick["id"]), "hero details"), _wide_art(anizip, pick["id"])
+            soft(mal.details(pick["id"]), "hero details"), _wide_art(anizip, pick["id"])
         )
         pictures = [p.get("large") for p in (details or {}).get("pictures") or [] if p.get("large")]
         synopsis, synopsis_lang = (details or {}).get("synopsis"), None
@@ -243,7 +229,7 @@ async def home(
     anizip = request.app.state.anizip
 
     async def seasonal_with_heroes():
-        seasonal = await _soft(mal.seasonal(1, user.show_nsfw), "seasonal")
+        seasonal = await soft(mal.seasonal(1, user.show_nsfw), "seasonal")
         nodes = [i["node"] for i in (seasonal or {}).get("data", [])]
         return seasonal, await _heroes(mal, nodes, pt_synopses, anizip)
 
@@ -257,12 +243,12 @@ async def home(
     ) = await asyncio.gather(
         seasonal_with_heroes(),
         _friends_popular_row(mal, friend_ids, user.show_nsfw),
-        _soft(mal.top(user.show_nsfw), "top"),
+        soft(mal.top(user.show_nsfw), "top"),
         _continue_row(mal, progress, user.show_nsfw),
-        _soft(
+        soft(
             _mal_rows(request, user, session, {p.anime_id for p in progress}, hidden), "MAL lists"
         ),
-        _soft(_genre_rows(mal, user.show_nsfw), "genre rows"),
+        soft(_genre_rows(mal, user.show_nsfw), "genre rows"),
     )
     seasonal, heroes = seasonal_and_heroes
     my_list, from_mal = mal_rows or ([], [])

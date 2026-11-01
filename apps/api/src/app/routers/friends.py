@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import uuid
-from collections.abc import Awaitable
 from datetime import datetime
 from typing import Annotated, Literal
 
@@ -21,6 +20,7 @@ from app.models import Friendship, MalLink, User, WatchProgress
 from app.notifications import forget_pair, notify, withdraw
 from app.routers.progress import latest_per_anime
 from app.schemas import AnimeCard
+from app.soft import soft
 
 router = APIRouter(tags=["friends"])
 log = logging.getLogger(__name__)
@@ -158,17 +158,9 @@ def user_summary(user: User, mal_picture: str | None = None) -> UserSummary:
     )
 
 
-async def _soft[T](work: Awaitable[T]) -> T | None:
-    try:
-        return await work
-    except (ApiError, ValueError) as exc:
-        log.warning("friends: details unavailable: %s", exc)
-        return None
-
-
 async def _cards(mal: MalClient, ids: list[int], allow_nsfw: bool) -> dict[int, AnimeCard]:
     """Cards for the titles MAL can describe, leaving out adult ones for a viewer who hides them."""
-    found = await asyncio.gather(*(_soft(mal.details(i)) for i in ids))
+    found = await asyncio.gather(*(soft(mal.details(i), "friends: details") for i in ids))
     return {
         i: AnimeCard.from_node(node)
         for i, node in zip(ids, found, strict=True)

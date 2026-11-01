@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/i18n/navigation", () => ({ Link: () => null, useRouter: () => ({}) }));
 vi.mock("@/lib/api", () => ({ api: {} }));
 
-const { pickAudio, pickTrack } = await import("./Player");
+const { pickAudio } = await import("./useHls");
+const { pickTrack } = await import("./useSubtitles");
 
 describe("pickTrack", () => {
   const tracks = [

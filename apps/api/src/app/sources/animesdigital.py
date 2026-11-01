@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, quote, urlparse
 import httpx
 from cachetools import TTLCache
 
+from app.singleflight import SingleFlight
 from app.sources.base import EpisodeList, Lang, Stream
 from app.sources.matching import Candidate, match, same_season, search_queries
 
@@ -127,8 +128,8 @@ class AnimesDigitalSource:
         self._streams: TTLCache[tuple, Stream | None] = TTLCache(maxsize=4096, ttl=CACHE_TTL)
         # Misses (no match, no HLS player) live here instead, since they may change soon.
         self._recent: TTLCache[tuple, None] = TTLCache(maxsize=4096, ttl=MISS_TTL)
-        # Listings being read, so concurrent callers (a title page, a fallback) share the work.
-        self._inflight: dict[tuple, asyncio.Future[Listing | None]] = {}
+        # Concurrent callers (a title page, a fallback) share the work.
+        self._flights: SingleFlight[tuple, Listing | None] = SingleFlight()
 
     async def aclose(self) -> None:
         if self._owns_client:
@@ -145,17 +146,7 @@ class AnimesDigitalSource:
             return self._listings[key]
         if key in self._recent:
             return None
-        task = self._inflight.get(key)
-        if task is None:
-            task = self._inflight[key] = asyncio.ensure_future(self._read_listing(key, anime))
-            task.add_done_callback(lambda t: self._settle(key, t))
-        # Shielded: one caller giving up must not cancel the read the others wait on.
-        return await asyncio.shield(task)
-
-    def _settle(self, key: tuple, task: asyncio.Future[Listing | None]) -> None:
-        self._inflight.pop(key, None)
-        if not task.cancelled():
-            task.exception()  # read it, so a read nobody waits on isn't left unretrieved
+        return await self._flights.run(key, lambda: self._read_listing(key, anime))
 
     async def _read_listing(self, key: tuple, anime: dict) -> Listing | None:
         listing = None

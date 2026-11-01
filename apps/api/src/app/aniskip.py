@@ -6,12 +6,12 @@ as long as the one playing. Best effort: any failure gives no skips. Answers are
 memory per episode, whatever the length asked about.
 """
 
-import asyncio
 import logging
 
 import httpx
 from cachetools import TLRUCache
 
+from app.singleflight import SingleFlight
 from app.sources.base import Skip, SkipKind
 
 log = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def pick_skips(results: list[dict], length: float) -> list[Skip]:
 class AniSkip:
     def __init__(self, http: httpx.AsyncClient) -> None:
         self._http = http
-        self._inflight: dict[tuple[int, int], asyncio.Future[list[dict]]] = {}
+        self._flights: SingleFlight[tuple[int, int], list[dict]] = SingleFlight()
         # Values are (results, ttl).
         self._cache: TLRUCache[tuple[int, int], tuple[list[dict], float]] = TLRUCache(
             maxsize=8192, ttu=lambda _key, value, now: now + value[1]
@@ -64,11 +64,7 @@ class AniSkip:
         key = (mal_id, episode)
         if (hit := self._cache.get(key)) is not None:
             return hit[0]
-        task = self._inflight.get(key)
-        if task is None:
-            task = self._inflight[key] = asyncio.ensure_future(self._fetch(key))
-            task.add_done_callback(lambda _t: self._inflight.pop(key, None))
-        return await asyncio.shield(task)
+        return await self._flights.run(key, lambda: self._fetch(key))
 
     async def _fetch(self, key: tuple[int, int]) -> list[dict]:
         mal_id, episode = key

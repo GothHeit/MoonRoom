@@ -4,13 +4,14 @@ ani.zip maps MAL ids to TheTVDB and serves its art. Best effort: any failure giv
 answers are cached in memory per title.
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Literal
 
 import httpx
 from cachetools import TLRUCache
+
+from app.singleflight import SingleFlight
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ def parse(body: dict) -> TitleArt:
 class AniZip:
     def __init__(self, http: httpx.AsyncClient) -> None:
         self._http = http
-        self._inflight: dict[int, asyncio.Future[TitleArt]] = {}
+        self._flights: SingleFlight[int, TitleArt] = SingleFlight()
         # Values are (art, ttl).
         self._cache: TLRUCache[int, tuple[TitleArt, float]] = TLRUCache(
             maxsize=4096, ttu=lambda _key, value, now: now + value[1]
@@ -87,11 +88,7 @@ class AniZip:
     async def art(self, mal_id: int) -> TitleArt:
         if (hit := self._cache.get(mal_id)) is not None:
             return hit[0]
-        task = self._inflight.get(mal_id)
-        if task is None:
-            task = self._inflight[mal_id] = asyncio.ensure_future(self._fetch(mal_id))
-            task.add_done_callback(lambda _t: self._inflight.pop(mal_id, None))
-        return await asyncio.shield(task)
+        return await self._flights.run(mal_id, lambda: self._fetch(mal_id))
 
     async def _fetch(self, mal_id: int) -> TitleArt:
         try:

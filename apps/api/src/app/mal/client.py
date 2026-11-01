@@ -5,7 +5,6 @@ clear `mal_unavailable` error instead of a KeyError on an error body.
 """
 
 import asyncio
-from collections.abc import Awaitable, Callable
 from datetime import date
 from typing import Any
 
@@ -14,6 +13,7 @@ from cachetools import TTLCache
 from rapidfuzz import fuzz
 
 from app.errors import ApiError
+from app.singleflight import SingleFlight
 
 API_BASE = "https://api.myanimelist.net/v2"
 
@@ -92,24 +92,8 @@ class MalClient:
         # Listing pages (seasonal, top, search, browse pools) change slowly: a short TTL keeps
         # the home page from hitting MAL on every load.
         self._pages: TTLCache[tuple, dict] = TTLCache(maxsize=512, ttl=LIST_TTL)
-        # Requests in flight, so concurrent cold callers for the same page share one call.
-        self._inflight: dict[tuple, asyncio.Task[dict]] = {}
-
-    def _finish(self, key: tuple, task: asyncio.Task[dict]) -> None:
-        self._inflight.pop(key, None)
-        # Read the outcome, so a fetch that fails after every waiter gave up isn't reported
-        # as "exception was never retrieved".
-        if not task.cancelled():
-            task.exception()
-
-    async def _single_flight(self, key: tuple, fetch: Callable[[], Awaitable[dict]]) -> dict:
-        task = self._inflight.get(key)
-        if task is None:
-            task = asyncio.ensure_future(fetch())
-            self._inflight[key] = task
-            task.add_done_callback(lambda t: self._finish(key, t))
-        # Shielded: one caller giving up must not cancel the fetch the others wait on.
-        return await asyncio.shield(task)
+        # Concurrent cold callers for the same page share one call.
+        self._flights: SingleFlight[tuple, dict] = SingleFlight()
 
     async def _get(self, path: str, params: dict[str, Any]) -> dict:
         key = (path, tuple(sorted(params.items())))
@@ -122,7 +106,7 @@ class MalClient:
             self._pages[key] = data
             return data
 
-        return await self._single_flight(key, load)
+        return await self._flights.run(key, load)
 
     async def _fetch(self, path: str, params: dict[str, Any]) -> dict:
         try:
@@ -266,4 +250,4 @@ class MalClient:
             self._details[anime_id] = data
             return data
 
-        return await self._single_flight(("details", anime_id), load)
+        return await self._flights.run(("details", anime_id), load)
