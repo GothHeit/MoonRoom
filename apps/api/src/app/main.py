@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
     db.init_engine(settings.database_url)
     async with httpx.AsyncClient(follow_redirects=True) as http:
         app.state.http = http
-        app.state.mal = MalClient(settings.mal_client_id, http)
+        app.state.mal = MalClient(settings.mal_client_id, http, settings.mal_api_base)
         app.state.mal_accounts = MalAccounts(settings, http)
         app.state.aniskip = AniSkip(http)
         app.state.anizip = AniZip(http)

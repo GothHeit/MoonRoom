@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     web_url: str = "http://localhost:3000"
 
     mal_client_id: str = ""
+    # Where public MAL data is read from. Only the end-to-end tests point it elsewhere.
+    mal_api_base: str = "https://api.myanimelist.net/v2"
     mal_client_secret: str = ""
     mal_redirect_uri: str = "http://localhost:8000/mal/callback"
 

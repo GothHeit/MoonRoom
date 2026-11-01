@@ -82,7 +82,8 @@ def rank_search_results(query: str, items: list[dict], limit: int = 8) -> list[d
 
 
 class MalClient:
-    def __init__(self, client_id: str, http: httpx.AsyncClient):
+    def __init__(self, client_id: str, http: httpx.AsyncClient, api_base: str = API_BASE):
+        self._api_base = api_base
         self._headers = {"X-MAL-CLIENT-ID": client_id}
         self._http = http
         # Cold-cache bursts (home, profiles) would otherwise fire dozens of calls at once and
@@ -112,7 +113,7 @@ class MalClient:
         try:
             async with self._slots:
                 response = await self._http.get(
-                    f"{API_BASE}{path}", headers=self._headers, params=params, timeout=15
+                    f"{self._api_base}{path}", headers=self._headers, params=params, timeout=15
                 )
         except httpx.HTTPError as exc:
             raise ApiError(502, "mal_unavailable", f"MyAnimeList request failed: {exc}") from exc
