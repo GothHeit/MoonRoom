@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
 
+import { artImage } from "./artImage";
+
+// The art side is 3/5 of the window from md up, the whole width on phones.
+export const HERO_SIZES = "(min-width: 768px) 60vw, 100vw";
+
 type Props = {
   /** A wide picture: fills the art side. */
   art?: string | null;
@@ -29,7 +34,7 @@ export function HeroSplit({ art, poster, posterAlt = "", eager = true, overlay, 
           (art ? (
             // eslint-disable-next-line @next/next/no-img-element -- remote catalog art
             <img
-              src={art}
+              {...artImage(art, HERO_SIZES)}
               alt=""
               {...loading}
               decoding="async"

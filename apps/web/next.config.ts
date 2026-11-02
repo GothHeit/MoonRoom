@@ -16,6 +16,17 @@ const nextConfig: NextConfig = {
   agentRules: false,
   // Hides the dev-only "N" badge that sits over the player.
   devIndicators: false,
+  images: {
+    // TheTVDB art (hero pictures, episode stills) is resized here to the screen it is shown on. The
+    // widest size is the 1920 px original, so big and retina screens keep full resolution.
+    remotePatterns: [{ protocol: "https", hostname: "artworks.thetvdb.com" }],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [96, 192, 288, 384],
+    qualities: [82],
+    formats: ["image/webp"],
+    // Catalog art never changes under the same address.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

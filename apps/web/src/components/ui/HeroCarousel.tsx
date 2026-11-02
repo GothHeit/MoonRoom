@@ -29,6 +29,17 @@ export function HeroCarousel({ slides, cta }: { slides: HeroSlide[]; cta: string
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reduced, setReduced] = useState(true);
+  // Slides whose picture is in the page: the ones shown so far plus the one coming next, so the
+  // banner downloads one picture first and the rest only as it rotates.
+  const [loaded, setLoaded] = useState<ReadonlySet<number>>(() => new Set([0]));
+
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const next = (index + 1) % slides.length;
+    // Not at once: the shown picture and the first rows go first.
+    const timer = setTimeout(() => setLoaded((set) => (set.has(index) && set.has(next) ? set : new Set(set).add(index).add(next))), 1500);
+    return () => clearTimeout(timer);
+  }, [index, slides.length]);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -123,7 +134,11 @@ export function HeroCarousel({ slides, cta }: { slides: HeroSlide[]; cta: string
             // Every slide sits in the same grid cell, so the banner is as tall as the tallest one.
             className={`col-start-1 row-start-1 transition-opacity duration-300 ease-out ${active ? "opacity-100" : "opacity-0"}`}
           >
-            <HeroSplit art={slide.wideArt} poster={slide.image} eager={i === 0}>
+            <HeroSplit
+              art={loaded.has(i) || active ? slide.wideArt : null}
+              poster={loaded.has(i) || active ? slide.image : null}
+              eager={i === 0}
+            >
               {text}
             </HeroSplit>
           </div>

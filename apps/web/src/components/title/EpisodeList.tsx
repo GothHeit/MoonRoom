@@ -3,11 +3,16 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { artImage } from "@/components/ui/artImage";
 import { placeholderFor } from "@/components/ui/PosterCard";
 import { Link } from "@/i18n/navigation";
 import { watchHref, type Lang } from "@/lib/watch-target";
 
 import { progressRatio, type Progress } from "./resume";
+
+// Widths the still is shown at: a 144 px thumbnail on phones, one grid column from sm up.
+const STILL_SIZES =
+  "(min-width: 1800px) 17vw, (min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 144px";
 
 // Long shows are split into pages so the list stays quick to scan.
 export const PAGE_SIZE = 100;
@@ -94,7 +99,7 @@ export function EpisodeList({ source, lang = "sub", animeId, episodes, progress,
                   {image ? (
                     // eslint-disable-next-line @next/next/no-img-element -- stills come from the source or ani.zip
                     <img
-                      src={image}
+                      {...(still ? { src: image } : artImage(image ?? "", STILL_SIZES))}
                       alt=""
                       loading="lazy"
                       decoding="async"

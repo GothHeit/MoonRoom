@@ -1,6 +1,8 @@
 import { getTranslations } from "next-intl/server";
 
+import { artImage } from "@/components/ui/artImage";
 import { ButtonLink } from "@/components/ui/Button";
+import { HERO_SIZES } from "@/components/ui/HeroSplit";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 import { titleArt } from "./titleArt";
@@ -25,7 +27,7 @@ export async function WideArt({ id, locale }: { id: number; locale: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- remote catalog art
     <img
-      src={art.backdrop}
+      {...artImage(art.backdrop, HERO_SIZES)}
       alt=""
       fetchPriority="high"
       decoding="async"

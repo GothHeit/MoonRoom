@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderIntl } from "@/test/intl";
@@ -37,5 +37,16 @@ describe("HeroCarousel", () => {
   it("has no dots for a single title", () => {
     renderIntl(<HeroCarousel slides={slides.slice(0, 1)} cta="Watch now" />);
     expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("loads only the first picture at first, then the one coming next", () => {
+    vi.useFakeTimers();
+    const art = [1, 2, 3].map((id) => ({ id, title: `T${id}`, href: `/anime/${id}`, wideArt: `/art/${id}.jpg` }));
+    const { container } = renderIntl(<HeroCarousel slides={art} cta="Watch now" />);
+    const sources = () => [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
+    expect(sources()).toEqual(["/art/1.jpg"]);
+    act(() => void vi.advanceTimersByTime(1600));
+    expect(sources()).toEqual(["/art/1.jpg", "/art/2.jpg"]);
+    vi.useRealTimers();
   });
 });
