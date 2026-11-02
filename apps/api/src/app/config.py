@@ -19,6 +19,10 @@ class Settings(BaseSettings):
 
     # Required: the app refuses to start without it, instead of failing at first login.
     jwt_secret: str = Field(min_length=32)
+    # Comma-separated secrets that signed tokens before the last rotation. Tokens they signed
+    # are still accepted (never issued) until they expire, so rotating JWT_SECRET signs nobody
+    # out: move the old value here, set a new JWT_SECRET, and drop it after a day.
+    jwt_previous_secrets: str = ""
     access_token_minutes: int = 15
     refresh_token_days: int = 30
     playback_token_minutes: int = 360
@@ -42,6 +46,9 @@ class Settings(BaseSettings):
 
     # Private deployments only: Portuguese synopses from an unlicensed site. Off in public builds.
     pt_synopsis_scrape: bool = False
+
+    # Serve /docs, /redoc and /openapi.json. Off in production.
+    api_docs: bool = True
 
     # Comma-separated list of browser origins allowed to call the API.
     cors_origins: str = "http://localhost:3000"
@@ -80,6 +87,11 @@ class Settings(BaseSettings):
     def library_roots(self) -> list[str]:
         roots = [self.local_library_dir, *self.local_library_dirs.split(",")]
         return list(dict.fromkeys(r.strip() for r in roots if r.strip()))
+
+    @property
+    def jwt_verification_secrets(self) -> list[str]:
+        previous = [s.strip() for s in self.jwt_previous_secrets.split(",") if s.strip()]
+        return [self.jwt_secret, *previous]
 
     @property
     def video_source_names(self) -> list[str]:

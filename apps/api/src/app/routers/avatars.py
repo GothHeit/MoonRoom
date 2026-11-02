@@ -13,7 +13,7 @@ from app.avatars import (
     save_avatar,
 )
 from app.config import get_settings
-from app.deps import CurrentUser, Session
+from app.deps import CurrentUser, Session, throttle
 from app.errors import ApiError
 from app.models import User
 from app.routers.auth import MeOut, build_me
@@ -37,7 +37,7 @@ async def _read_limited(request: Request) -> bytes:
     return bytes(data)
 
 
-@router.put("/me/avatar", response_model=MeOut)
+@router.put("/me/avatar", response_model=MeOut, dependencies=[throttle("avatar_upload")])
 async def upload_avatar(request: Request, user: CurrentUser, session: Session):
     """Sets the picture from the raw image bytes (PNG, JPEG or WebP, up to 2 MB). The server
     crops it to a square and stores a 256 px WebP."""

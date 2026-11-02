@@ -25,6 +25,7 @@ services:
       APP_NAME: ${APP_NAME:-MoonRoom}
       DATABASE_URL: postgresql+asyncpg://app:${POSTGRES_PASSWORD}@db:5432/app
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in deploy/.env}
+      JWT_PREVIOUS_SECRETS: ${JWT_PREVIOUS_SECRETS:-}
       TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:?set TOKEN_ENCRYPTION_KEY in deploy/.env}
       CORS_ORIGINS: ${PUBLIC_URL:?set PUBLIC_URL in deploy/.env}
       WEB_URL: ${PUBLIC_URL}
@@ -35,6 +36,7 @@ services:
       PT_SYNOPSIS_SCRAPE: ${PT_SYNOPSIS_SCRAPE:-false}
       # Only Caddy can reach the API, and it writes the real client address.
       TRUST_PROXY_HEADERS: "true"
+      API_DOCS: "false"
     volumes: [avatars:/data/avatars]
     depends_on:
       db: {condition: service_healthy}
@@ -79,7 +81,7 @@ services:
 
   # Opt-in with COMPOSE_PROFILES=tunnel (set in .env.example). Leave it out on a VPS.
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.10.7  # pinned: bump by hand every few months
     profiles: [tunnel]
     restart: unless-stopped
     command: tunnel --no-autoupdate run

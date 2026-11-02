@@ -12,11 +12,12 @@ from app.anizip import AniZip
 from app.cleanup import prune
 from app.config import get_settings
 from app.errors import install_error_handlers
+from app.logs import install_logging
 from app.mal.account import MalAccounts
 from app.mal.client import MalClient
 from app.notifications import check_new_episodes
 from app.probes import StreamProbes
-from app.ratelimit import AuthLimits
+from app.ratelimit import ActionLimits, AuthLimits
 from app.rooms import Rooms
 from app.routers import (
     anime,
@@ -41,11 +42,12 @@ EPISODE_CHECK_FIRST_RUN_SECONDS = 120
 PRUNE_INTERVAL_SECONDS = 6 * 3600
 
 
-async def _sweep(limits: AuthLimits, rooms: Rooms) -> None:
+async def _sweep(limits: AuthLimits, actions: ActionLimits, rooms: Rooms) -> None:
     # Idle rate-limit keys are otherwise only dropped when the same key is seen again.
     while True:
         await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
         limits.sweep()
+        actions.sweep()
         rooms.sweep()
 
 
@@ -86,12 +88,15 @@ async def lifespan(app: FastAPI):
 
             app.state.pt_synopses = PtSynopses(http)
         app.state.auth_limits = AuthLimits(settings)
+        app.state.action_limits = ActionLimits()
         app.state.rooms = Rooms(settings.max_rooms_per_host)
         app.state.source_hints = new_source_hints()
         app.state.probes = StreamProbes(http)
         app.state.watch = watch.WatchCaches()
         app.state.sources = load_sources(settings.video_source_names)
-        sweeper = asyncio.create_task(_sweep(app.state.auth_limits, app.state.rooms))
+        sweeper = asyncio.create_task(
+            _sweep(app.state.auth_limits, app.state.action_limits, app.state.rooms)
+        )
         pruner = asyncio.create_task(_prune())
         checker = (
             asyncio.create_task(_episode_checks(app, settings.episode_check_hours))
@@ -115,7 +120,17 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=f"{settings.app_name} API", version="0.1.0", lifespan=lifespan)
+    install_logging()
+    # The interactive docs map every route; a public deployment has no use for them.
+    docs = settings.api_docs
+    app = FastAPI(
+        title=f"{settings.app_name} API",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,

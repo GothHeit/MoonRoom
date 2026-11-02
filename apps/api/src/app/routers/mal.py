@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
-from app.deps import CurrentUser, Session, browser_user_id
+from app.deps import ClientIp, CurrentUser, Session, browser_user_id, throttle
 from app.errors import ApiError
 from app.mal.account import MalAccounts
 from app.schemas import AnimeCard
@@ -73,7 +73,7 @@ def _accounts(request: Request) -> MalAccounts:
     return request.app.state.mal_accounts
 
 
-@router.get("/mal/link", response_model=LinkOut)
+@router.get("/mal/link", response_model=LinkOut, dependencies=[throttle("mal_link")])
 async def start_link(request: Request, user: CurrentUser, session: Session):
     return {"auth_url": await _accounts(request).authorize_url(session, user)}
 
@@ -82,10 +82,14 @@ async def start_link(request: Request, user: CurrentUser, session: Session):
 async def callback(
     request: Request,
     session: Session,
+    ip: ClientIp,
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
 ):
+    # Reached straight from the browser, with no session required: cap it per address so a
+    # flood can't turn into database work.
+    request.app.state.action_limits.hit("mal_callback", ip)
     # MAL sends `error` and no `code` when the user denies access.
     # The state row remembers the user's language, so they land back on their own locale.
     locale = (await _accounts(request).state_locale(session, state)) if state else None
@@ -131,7 +135,11 @@ async def get_entry(request: Request, anime_id: int, user: CurrentUser, session:
     )
 
 
-@router.patch("/me/animelist/{anime_id}", response_model=ListUpdated)
+@router.patch(
+    "/me/animelist/{anime_id}",
+    response_model=ListUpdated,
+    dependencies=[throttle("mal_list_write")],
+)
 async def update_entry(
     request: Request, anime_id: int, body: ListUpdate, user: CurrentUser, session: Session
 ):
@@ -141,6 +149,8 @@ async def update_entry(
     return await _accounts(request).update_entry(session, user, anime_id, changes)
 
 
-@router.delete("/me/animelist/{anime_id}", status_code=204)
+@router.delete(
+    "/me/animelist/{anime_id}", status_code=204, dependencies=[throttle("mal_list_write")]
+)
 async def remove_entry(request: Request, anime_id: int, user: CurrentUser, session: Session):
     await _accounts(request).remove_entry(session, user, anime_id)

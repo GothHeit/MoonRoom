@@ -13,7 +13,7 @@ from sqlalchemy.orm import aliased
 
 from app.avatars import AvatarOut, avatar_out
 from app.db import utcnow
-from app.deps import CurrentUser, Session
+from app.deps import CurrentUser, Session, throttle
 from app.errors import ApiError
 from app.mal.client import MalClient, is_safe
 from app.models import Friendship, MalLink, User, WatchProgress
@@ -203,7 +203,7 @@ async def _activity(
 # ---------------------------------------------------------------- lookup and requests
 
 
-@router.get("/users/lookup", response_model=LookupOut)
+@router.get("/users/lookup", response_model=LookupOut, dependencies=[throttle("user_lookup")])
 async def lookup(
     username: Annotated[str, Query(min_length=1, max_length=32)],
     user: CurrentUser,
@@ -243,7 +243,12 @@ async def _ask(session: Session, user: User, target: User) -> None:
     await notify(session, target.id, "friend_request", actor_id=user.id)
 
 
-@router.post("/friends/requests", response_model=LookupOut, status_code=201)
+@router.post(
+    "/friends/requests",
+    response_model=LookupOut,
+    status_code=201,
+    dependencies=[throttle("friend_request")],
+)
 async def send_request(body: RequestIn, user: CurrentUser, session: Session):
     """Asks to be friends. If they already asked you, this accepts their request."""
     target = await session.scalar(

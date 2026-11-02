@@ -5,7 +5,8 @@ services:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
       POSTGRES_DB: app
-    ports: ["5432:5432"]
+    # Loopback only: nothing else on the network can reach the dev database or API.
+    ports: ["127.0.0.1:5432:5432"]
     volumes: [db-data:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app"]
@@ -19,7 +20,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://app:app@db:5432/app
     volumes: [avatars:/data/avatars]
-    ports: ["8000:8000"]
+    ports: ["127.0.0.1:8000:8000"]
     depends_on:
       db: {condition: service_healthy}
 

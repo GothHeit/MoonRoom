@@ -53,7 +53,7 @@ from Windows):
 
 ```bash
 git clone https://github.com/GothHeit/MoonRoom ~/moonroom-prod
-cp ~/projetos/AniLib/deploy/.env ~/moonroom-prod/deploy/.env
+cp ~/projetos/MoonRoom/deploy/.env ~/moonroom-prod/deploy/.env
 mkdir -p ~/.config/systemd/user
 cp ~/moonroom-prod/deploy/systemd/moonroom-deploy.* ~/.config/systemd/user/
 systemctl --user daemon-reload
@@ -77,7 +77,16 @@ gunzip -c backups/moonroom-<stamp>.sql.gz | docker compose exec -T db psql -U ap
 ```
 
 Keep a copy off the PC too (cloud drive, another disk). Also back up `deploy/.env`: losing
-`TOKEN_ENCRYPTION_KEY` makes linked MAL accounts unreadable, and changing `JWT_SECRET` logs everyone out.
+`TOKEN_ENCRYPTION_KEY` makes linked MAL accounts unreadable.
+
+### Rotating JWT_SECRET
+
+Rotate it if it may have leaked, or once a year. Nobody is signed out:
+
+1. Move the current value to `JWT_PREVIOUS_SECRETS` and put a new one in `JWT_SECRET`.
+2. Restart the stack. Tokens signed with the old secret keep working until they expire; a video
+   already playing may need a reload.
+3. A day later, empty `JWT_PREVIOUS_SECRETS` and restart again.
 
 ## Proxy and cookie settings
 
@@ -132,7 +141,7 @@ for a library that is converted once and watched many times. `--preset` and `--c
    have videos but no `moonroom.toml` yet:
 
    ```sh
-   cd ~/projetos/AniLib/apps/api
+   cd ~/projetos/MoonRoom/apps/api
    uv run python -m app.library scan /mnt/d/hate/art/anime --dry-run
    ```
 

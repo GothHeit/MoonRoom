@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from app import db
-from app.deps import CurrentUser, Session
+from app.deps import CurrentUser, Session, throttle
 from app.errors import ApiError
 from app.models import User
 from app.notifications import notify
@@ -99,7 +99,7 @@ def _room(request: Request, code: str) -> Room:
     return rooms.get(code)
 
 
-@router.post("", response_model=RoomOut, status_code=201)
+@router.post("", response_model=RoomOut, status_code=201, dependencies=[throttle("room_create")])
 async def create_room(body: RoomCreate, request: Request, user: CurrentUser):
     if body.source not in request.app.state.sources:
         raise ApiError(404, "source_not_found", f"Video source '{body.source}' is not enabled")
@@ -119,7 +119,7 @@ async def get_room(code: str, request: Request, user: CurrentUser):
     return room.snapshot()
 
 
-@router.post("/{code}/invite", status_code=204)
+@router.post("/{code}/invite", status_code=204, dependencies=[throttle("room_invite")])
 async def invite_friend(
     code: str, body: RoomInviteIn, request: Request, user: CurrentUser, session: Session
 ):
@@ -151,12 +151,12 @@ async def buffering(code: str, body: BufferingIn, request: Request, user: Curren
     _room(request, code).set_buffering(user.id, body.buffering)
 
 
-@router.post("/{code}/chat", status_code=204)
+@router.post("/{code}/chat", status_code=204, dependencies=[throttle("room_chat")])
 async def chat(code: str, body: ChatIn, request: Request, user: CurrentUser):
     _room(request, code).say(user.id, body.text)
 
 
-@router.post("/{code}/reaction", status_code=204)
+@router.post("/{code}/reaction", status_code=204, dependencies=[throttle("room_reaction")])
 async def reaction(code: str, body: ReactionIn, request: Request, user: CurrentUser):
     _room(request, code).react(user.id, body.emoji)
 

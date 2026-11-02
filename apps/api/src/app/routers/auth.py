@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
@@ -23,6 +24,9 @@ from app.security import (
 )
 
 router = APIRouter(tags=["auth"])
+
+# Security events, one line each, never with a password or token.
+audit = logging.getLogger("app.audit")
 
 Locale = Literal["pt", "en"]
 # "auto" clears the preference (pt-BR, then English); "off" hides subtitles.
@@ -162,6 +166,7 @@ async def register(body: RegisterIn, session: Session, request: Request, ip: Cli
         raise ApiError(409, "username_taken", "Username already taken") from None
     invite.used_by = user.id
     invite.used_at = utcnow()
+    audit.info("register user=%s ip=%s", user.id, ip)
     return await _issue_tokens(session, user, _device(request, ip))
 
 
@@ -181,9 +186,11 @@ async def login(body: LoginIn, session: Session, request: Request, ip: ClientIp)
     user = await session.scalar(select(User).where(User.username == body.username.lower()))
     password_hash = user.password_hash if user else DUMMY_PASSWORD_HASH
     if not await verify_password_async(body.password, password_hash) or user is None:
+        audit.info("login failed username=%r ip=%s", username, ip)
         raise ApiError(401, "invalid_credentials", "Wrong username or password")
     limits.login_ip.forgive(ip)
     limits.login_user.reset(attempt)
+    audit.info("login user=%s ip=%s", user.id, ip)
     return await _issue_tokens(session, user, _device(request, ip))
 
 
@@ -239,6 +246,7 @@ async def refresh(body: RefreshIn, session: Session, request: Request, ip: Clien
             .values(revoked_at=utcnow(), expires_at=utcnow())
         )
         await session.commit()
+        audit.warning("refresh token replayed, all sessions ended user=%s ip=%s", token.user_id, ip)
         raise ApiError(401, "invalid_refresh_token", "Refresh token was already used")
 
     token.revoked_at = utcnow()
@@ -319,6 +327,7 @@ async def revoke_session(session_id: uuid.UUID, user: CurrentUser, session: Sess
     await session.commit()
     if result.rowcount == 0:  # type: ignore[attr-defined]
         raise ApiError(404, "session_not_found", "No such session")
+    audit.info("session revoked user=%s session=%s", user.id, session_id)
 
 
 @router.delete("/me/sessions", status_code=204)
@@ -326,6 +335,7 @@ async def revoke_all_sessions(user: CurrentUser, session: Session):
     """Signs the user out everywhere, this device included."""
     await session.execute(_revoke(user))
     await session.commit()
+    audit.info("all sessions revoked user=%s", user.id)
 
 
 @router.post("/me/password", status_code=204)
@@ -341,9 +351,11 @@ async def change_password(
     limiter.check(key)
     limiter.record(key)
     if not await verify_password_async(body.current_password, user.password_hash):
+        audit.info("password change refused user=%s", user.id)
         raise ApiError(403, "wrong_password", "Current password is wrong")
     limiter.reset(key)
     user.password_hash = await hash_password_async(body.new_password)
     # Every other device must sign in again; this one keeps its session.
     await session.execute(_revoke(user, keep=current))
     await session.commit()
+    audit.info("password changed user=%s", user.id)

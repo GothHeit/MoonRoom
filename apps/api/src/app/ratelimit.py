@@ -85,3 +85,43 @@ class AuthLimits:
         for limiter in (self.login_ip, self.login_user, self.register_ip, self.register_user):
             limiter.sweep()
         self.password_user.sweep()
+
+
+# Caps on actions that cost other people (notifications), outside services (MAL) or the server
+# (image decoding), as (hits, window in seconds). Generous for a person, tight for a script.
+ACTION_RULES: dict[str, tuple[int, float]] = {
+    # Per client address: the browser reaches this one directly, without a session.
+    "mal_callback": (20, 600),
+    "mal_link": (10, 600),
+    "mal_list_write": (120, 600),
+    "user_lookup": (60, 600),
+    "friend_request": (30, 3600),
+    "avatar_upload": (20, 3600),
+    "room_create": (20, 3600),
+    "room_invite": (60, 3600),
+    "room_chat": (40, 60),
+    "room_reaction": (60, 60),
+}
+
+
+class ActionLimits:
+    """One sliding window per action, keyed by user id (or client address)."""
+
+    def __init__(
+        self,
+        rules: dict[str, tuple[int, float]] = ACTION_RULES,
+        clock: Callable[[], float] = time.monotonic,
+    ):
+        self._limiters = {
+            name: RateLimiter(limit, window, clock) for name, (limit, window) in rules.items()
+        }
+
+    def hit(self, action: str, key: str) -> None:
+        """Counts one attempt, or raises 429 when `key` is over the action's limit."""
+        limiter = self._limiters[action]
+        limiter.check(key)
+        limiter.record(key)
+
+    def sweep(self) -> None:
+        for limiter in self._limiters.values():
+            limiter.sweep()

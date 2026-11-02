@@ -46,11 +46,15 @@ def _encode(claims: dict, lifetime: timedelta) -> str:
 
 
 def _decode(token: str, kind: str) -> dict | None:
-    try:
-        claims = jwt.decode(token, get_settings().jwt_secret, algorithms=[ALGORITHM])
-    except jwt.PyJWTError:
-        return None
-    return claims if claims.get("typ") == kind else None
+    for secret in get_settings().jwt_verification_secrets:
+        try:
+            claims = jwt.decode(token, secret, algorithms=[ALGORITHM])
+        except jwt.InvalidSignatureError:
+            continue  # maybe signed before the last rotation
+        except jwt.PyJWTError:
+            return None
+        return claims if claims.get("typ") == kind else None
+    return None
 
 
 def create_access_token(user_id: uuid.UUID, session_id: uuid.UUID | None = None) -> str:

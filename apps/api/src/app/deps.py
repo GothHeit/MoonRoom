@@ -94,3 +94,12 @@ def client_ip(request: Request) -> str:
 
 
 ClientIp = Annotated[str, Depends(client_ip)]
+
+
+def throttle(action: str):
+    """A route dependency counting one `action` (see ratelimit.ACTION_RULES) per user."""
+
+    async def check(request: Request, user: CurrentUser) -> None:
+        request.app.state.action_limits.hit(action, str(user.id))
+
+    return Depends(check)

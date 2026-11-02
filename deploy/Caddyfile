@@ -8,6 +8,9 @@
 
 # SITE_ADDRESS is ":80" behind the tunnel; set it to the domain name on a VPS to get automatic HTTPS.
 {$SITE_ADDRESS::80} {
+	# Don't advertise the server software.
+	header -Server
+
 	# Live streams (watch-together rooms) must not wait to fill a compression buffer.
 	@compressible not path_regexp ^/api/proxy/watch/rooms/[^/]+/events$
 	encode @compressible zstd gzip
