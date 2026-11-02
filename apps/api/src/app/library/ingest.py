@@ -2,13 +2,15 @@
 
 Per episode, an HLS master with up to two variants, so each device picks what it can play:
 - the original video repackaged without re-encoding, when it is HEVC or 8-bit H.264;
-- an 8-bit H.264 copy, unless the original already is one.
+- an 8-bit H.264 copy, unless the original already is one: x264 at a slow preset, which keeps
+  the quality of a faster one in a smaller file (conversion runs once, playback forever).
 Audio becomes stereo AAC (copied when it already is). Text subtitles are kept as ASS for the
 web player's renderer, plus a WebVTT copy for native players. Fonts attached to the files
 are collected once per title. Chapters named like an opening or ending become skips.
 
-Needs ffmpeg and ffprobe on PATH. Only reads the originals; everything is written under the
-output folder, and an episode is assembled in a hidden folder next to its final place.
+Needs ffmpeg and ffprobe on PATH. Only reads the originals, which stay where they are; everything
+is written under the output folder, and an episode is assembled in a hidden folder next to its
+final place.
 """
 
 import hashlib
@@ -31,6 +33,7 @@ from app.library import (
     read_json,
     title_dir,
     write_json,
+    write_title,
 )
 from app.library.fonts import font_names
 
@@ -95,8 +98,16 @@ class Manifest:
 @dataclass(frozen=True)
 class Options:
     force: bool = False
-    preset: str = "medium"
+    preset: str = "slow"
     crf: int = 19
+
+
+@dataclass
+class Result:
+    converted: int = 0
+    skipped: int = 0
+    # Episode number -> why it failed (only when ingest was told to keep going).
+    failed: dict[int, str] = field(default_factory=dict)
 
 
 def load_manifest(folder: Path, path: Path | None, overrides: dict[str, Any]) -> Manifest:
@@ -116,9 +127,8 @@ def load_manifest(folder: Path, path: Path | None, overrides: dict[str, Any]) ->
     unknown = set(data) - set(known)
     if unknown:
         raise IngestError(f"Unknown manifest keys: {', '.join(sorted(unknown))}")
-    manifest = Manifest(**data)
-    manifest.title = manifest.title or folder.name
-    return manifest
+    # The title stays empty when nothing names it, so a later run keeps the one already stored.
+    return Manifest(**data)
 
 
 def episode_number(name: str, manifest: Manifest) -> int | None:
@@ -268,6 +278,18 @@ def bandwidth(variant: Path) -> tuple[int, int]:
     )
     average = (sum(sizes) + (variant / "init.mp4").stat().st_size) * 8 / total
     return int(peak), int(average)
+
+
+def audio_codec_tag(audio: dict) -> str:
+    """The CODECS entry for the audio as stored: AAC is copied with its profile, anything else
+    becomes AAC-LC."""
+    if _audio_args(audio)[1] == "copy":
+        profile = str(audio.get("profile", "")).lower()
+        if profile == "he-aacv2":
+            return "mp4a.40.29"
+        if profile == "he-aac":
+            return "mp4a.40.5"
+    return "mp4a.40.2"
 
 
 def master_playlist(variants: list[tuple[str, dict]], audio_codec: str = "mp4a.40.2") -> str:
@@ -448,7 +470,7 @@ def ingest_episode(
         encode_h264(src, video, audio, work / "h264", options)
         variants.append("h264")
     details = [(v, _variant_info(work / v)) for v in variants]
-    (work / MASTER).write_text(master_playlist(details), encoding="utf-8")
+    (work / MASTER).write_text(master_playlist(details, audio_codec_tag(audio)), encoding="utf-8")
 
     subtitles = extract_subtitles(src, streams, work / "subs", manifest.default_subtitle)
     collect_fonts(src, streams, work / "attachments", title)
@@ -472,6 +494,13 @@ def ingest_episode(
     return True
 
 
+def title_name(title: Path, manifest: Manifest, folder: Path) -> str:
+    """The manifest's title, else the one stored by an earlier run, else the folder name."""
+    stored = read_json(title / TITLE_META)
+    previous = stored.get("title") if isinstance(stored, dict) else None
+    return manifest.title or previous or folder.name
+
+
 def ingest(
     folder: Path,
     root: Path,
@@ -479,19 +508,35 @@ def ingest(
     options: Options,
     only: set[int] | None = None,
     log=print,
-) -> int:
-    """Converts every episode in `folder` (or just `only`). Returns how many were converted."""
+    keep_going: bool = False,
+) -> Result:
+    """Converts every episode in `folder` (or just `only`). With `keep_going`, an episode that
+    fails is reported in the result and the next one is tried; otherwise the error stops it."""
     episodes = find_episodes(folder, manifest)
     title = title_dir(root, manifest.mal_id, manifest.lang)
     title.mkdir(parents=True, exist_ok=True)
-    write_json(title / TITLE_META, {"title": manifest.title})
-    converted = 0
+    name = title_name(title, manifest, folder)
+    write_title(title, name)
+    result = Result()
     for number, src in sorted(episodes.items()):
         if only is not None and number not in only:
             continue
         log(f"Episode {number}: {src.name}")
-        if ingest_episode(src, number, title, manifest, options):
-            converted += 1
+        try:
+            converted = ingest_episode(src, number, title, manifest, options)
+        except (IngestError, OSError) as e:
+            if not keep_going:
+                raise
+            shutil.rmtree(title / f".{number}.partial", ignore_errors=True)
+            result.failed[number] = str(e)
+            log(f"  FAILED: {e}")
+            continue
+        if converted:
+            result.converted += 1
+            # Listed right away, so a long run shows each episode as soon as it is ready.
+            write_title(title, name)
         else:
+            result.skipped += 1
             log("  already converted, skipped")
-    return converted
+    write_title(title, name)
+    return result

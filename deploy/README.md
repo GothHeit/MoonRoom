@@ -18,7 +18,8 @@ friends -> Cloudflare -> cloudflared -> Caddy -> web (Next.js) -> api -> db
 3. A MyAnimeList app (https://myanimelist.net/apiconfig) whose redirect URL is exactly
    `https://<your hostname>/mal/callback`. Keep `http://localhost:8000/mal/callback` too if you
    still run the dev setup, since MAL accepts several.
-4. Docker with the Compose plugin on the PC, set to start on boot.
+4. Docker with the Compose plugin on the machine that hosts the site (the PC today, the NAS
+   later; see "Running on the NAS"), set to start on boot.
 
 ## First run
 
@@ -96,25 +97,23 @@ fetches Portuguese synopses from an unlicensed site, so keep it `false` outside 
 ## Local library
 
 The `local` video source plays your own episode files, converted ahead of time so watching
-costs the PC almost nothing. Each episode keeps its original video (repackaged, not re-encoded)
-for devices that can play it, plus an H.264 copy for the rest. Subtitles stay styled, with the
-fonts from the files, and a plain copy for iPhone full screen. It is private like the other
-sources: never enable it on anything public.
+costs the server almost nothing (no transcoding while someone watches). Each episode keeps its
+original video (repackaged, not re-encoded) for devices that can play it, plus an H.264 copy for
+the rest. Subtitles stay styled, with the fonts from the files, and a plain copy for iPhone full
+screen. It is private like the other sources: never enable it on anything public.
 
-The originals are only read. The converted copies go in `D:\moonroom-library`
-(`/mnt/d/moonroom-library` in WSL): the original video again plus the H.264 copy, which is
-bigger, so expect a few times the size of the originals. Nothing is written to C:. Conversion runs on the PC itself with the ffmpeg already installed in WSL, so the
-Docker images don't grow.
+The originals are only read and stay where they are; keep them, they are the master copy. The
+converted copies go in `D:\moonroom-library` (`/mnt/d/moonroom-library` in WSL) on the PC, or the
+NAS share once it hosts the site: the original video again plus the H.264 copy, so expect a few
+times the size of the originals. Nothing is written to C:. Conversion runs on the PC itself with
+the ffmpeg already installed in WSL, so the Docker images don't grow.
 
-1. Check the episode numbering. The number is taken from the last number in each file name
-   outside brackets; this only prints the mapping:
+The H.264 copy uses x264's `slow` preset at CRF 19 with the animation tuning: the same picture
+as a faster preset in a smaller file. It takes longer to convert, once, which is the right trade
+for a library that is converted once and watched many times. `--preset` and `--crf` change it
+(`veryslow` is a little smaller again and much slower; a lower CRF is better and bigger).
 
-   ```sh
-   cd ~/projetos/AniLib/apps/api
-   uv run python -m app.library ingest /mnt/d/hate/art/anime/Clannad --mal-id 2167 --dry-run
-   ```
-
-   When a folder needs more than flags, put a `moonroom.toml` next to the episodes:
+1. Give each show folder a `moonroom.toml` next to its episodes:
 
    ```toml
    mal_id = 2167
@@ -128,24 +127,113 @@ Docker images don't grow.
    # "Clannad - Another World.mkv" = 25
    ```
 
-2. Convert. The H.264 copy is the slow part; repackaging the original takes seconds. Episodes
-   already converted are skipped, so it can be stopped and run again:
+   The episode number is taken from the last number in each file name outside brackets. Check
+   the mapping of everything at once; this converts nothing and also lists the folders that
+   have videos but no `moonroom.toml` yet:
+
+   ```sh
+   cd ~/projetos/AniLib/apps/api
+   uv run python -m app.library scan /mnt/d/hate/art/anime --dry-run
+   ```
+
+2. Convert the whole tree. Episodes already converted are skipped, so it can be stopped and run
+   again whenever you add a show; an episode that fails is reported and the rest carry on:
+
+   ```sh
+   uv run python -m app.library scan /mnt/d/hate/art/anime --out /mnt/d/moonroom-library
+   ```
+
+   Each run appends a summary (converted, skipped, failed, folders without a manifest) to
+   `ingest.log` in the library folder. `--force` converts again.
+
+   One folder at a time, with flags instead of a manifest, works too:
 
    ```sh
    uv run python -m app.library ingest /mnt/d/hate/art/anime/Clannad --mal-id 2167 \
      --default-subtitle Emmid --out /mnt/d/moonroom-library
    ```
 
-   `--episodes 1,2` converts only some, `--force` converts again, `--preset` and `--crf` tune
-   the H.264 copy (defaults `medium` and 19).
+   `--episodes 1,2` converts only some. A title keeps the name it was first given unless a
+   later run names it again.
 
-3. Serve it: in `deploy/.env` set `COMPOSE_FILE=compose.yaml:compose.library.yaml`, add
-   `local` to `VIDEO_SOURCES` (e.g. `zoko,animesdigital,local`), then `docker compose up -d`.
-   The title then lists "Local library" in the player's source menu. New conversions show up
-   without a restart.
+3. Serve it: in `deploy/.env` set `COMPOSE_FILE=compose.yaml:compose.library.yaml` and
+   `LIBRARY_DIR` to the library folder, add `local` to `VIDEO_SOURCES` (e.g.
+   `zoko,animesdigital,local`), then `docker compose up -d`. The title then lists "Local
+   library" in the player's source menu. New conversions show up within a minute, without a
+   restart.
 
-For development, set `LOCAL_LIBRARY_DIR=/mnt/d/moonroom-library` and add `local` to
+**Two library folders.** When one disk fills up, start a second folder and add
+`compose.library-more.yaml` to `COMPOSE_FILE` with `LIBRARY_DIR_2` pointing at it. A title is
+served from whichever folder holds it, so you can simply move a title's folder (`<mal id>/`)
+from one to the other, or leave a symlink behind. Outside Docker, list both in
+`LOCAL_LIBRARY_DIRS`, comma-separated.
+
+For development, set `LOCAL_LIBRARY_DIRS=/mnt/d/moonroom-library` and add `local` to
 `VIDEO_SOURCES` in `apps/api/.env`.
+
+## Running on the NAS
+
+Once the NAS is set up it runs the whole stack on its own: database, API, web, Caddy, the tunnel
+and the automatic deploys. The PC is then only needed to convert new episodes, if you want its
+faster CPU for that; nothing on the site depends on it. Nothing in the stack is PC-specific, so
+this is a move, not a rewrite.
+
+What the NAS needs: Docker with the Compose plugin set to start on boot, git, SSH access, and a shared folder for the library (say
+`/volume1/moonroom-library`; the path depends on the NAS's system). The library is plain files
+read over the local disk, so the NAS's CPU barely matters for watching.
+
+**Prepare (the site stays up on the PC):**
+
+1. On the NAS, clone the repo into a folder on its data disks, e.g.
+   `git clone https://github.com/GothHeit/MoonRoom ~/moonroom-prod`.
+2. Copy `~/moonroom-prod/deploy/.env` from the PC into the same place on the NAS. Keep every
+   secret exactly as it is: a new `JWT_SECRET` logs everyone out and a new
+   `TOKEN_ENCRYPTION_KEY` makes linked MAL accounts unreadable. Change only `LIBRARY_DIR` to the
+   NAS folder, and drop `LIBRARY_DIR_2` and `compose.library-more.yaml` unless the NAS has two.
+   `PUBLIC_URL`, `TUNNEL_TOKEN` and the MAL app stay the same, since the hostname doesn't
+   change.
+3. Copy the library to the NAS share: it is self-contained, so copy `D:\moonroom-library` as
+   is (Windows: `robocopy D:\moonroom-library \\<nas>\moonroom-library /E /MT:8`, or rsync from
+   WSL). Run it again just before switching to pick up anything new.
+4. Build the images on the NAS without starting the site: `cd ~/moonroom-prod/deploy &&
+   docker compose build`.
+
+**Switch (a few minutes of downtime):**
+
+5. On the PC, stop the automatic deploys and the site, keeping its data:
+   `systemctl --user disable --now moonroom-deploy.timer`, then
+   `cd ~/moonroom-prod/deploy && ./backup.sh && docker compose stop`. Stop it before the NAS
+   starts: two machines on the same tunnel would split visitors between two databases.
+6. Copy the new dump (`deploy/backups/moonroom-<stamp>.sql.gz`) and, to keep uploaded profile
+   pictures, the avatars volume (`docker run --rm -v moonroom_avatars:/a -v "$PWD/backups":/b
+   alpine tar czf /b/avatars.tgz -C /a .`) to the NAS's `deploy/backups/`.
+7. On the NAS, start the database alone, restore, then everything:
+
+   ```bash
+   cd ~/moonroom-prod/deploy
+   docker compose up -d db
+   gunzip -c backups/moonroom-<stamp>.sql.gz | docker compose exec -T db psql -U app app
+   docker run --rm -v moonroom_avatars:/a -v "$PWD/backups":/b alpine tar xzf /b/avatars.tgz -C /a
+   docker compose up -d
+   ```
+
+8. Check: `docker compose ps` shows everything `healthy`, the site opens on its usual address,
+   you are still signed in, and a local library episode plays.
+9. Automatic deploys and backups on the NAS: if its system has systemd user services
+   (`systemctl --user status` answers), set up the timer as in "Automatic deploys" above.
+   Otherwise schedule `deploy/auto-deploy.sh` every minute with the NAS's task scheduler or
+   cron, and `deploy/backup.sh` daily; the script needs bash, git and `flock`. Keep a copy of the backups and of `deploy/.env` off the NAS.
+
+**Afterwards:** leave the PC's stopped containers and volumes alone for a week or two as the way
+back (start them with `docker compose start` and re-enable the timer, after stopping the NAS;
+anything changed on the NAS in between is lost). Then remove them with `docker compose down -v`
+in the PC's `~/moonroom-prod/deploy`.
+
+**Converting new episodes** still works from the PC, writing straight to the NAS share: mount it
+in WSL (e.g. map it as Z: in Windows, then `sudo mkdir -p /mnt/z && sudo mount -t drvfs Z: /mnt/z`)
+and run `scan` with `--out /mnt/z/moonroom-library`. Episodes are assembled in a hidden folder
+and only appear once finished, so converting while the site serves the library is safe. The NAS
+can also run `scan` itself if it has Python and ffmpeg; it is just slower.
 
 ## Moving to a VPS later
 

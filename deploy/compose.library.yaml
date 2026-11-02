@@ -1,10 +1,11 @@
 # Adds the local library (the owner's own converted episodes) to the stack. Enable it from
 # deploy/.env with COMPOSE_FILE=compose.yaml:compose.library.yaml and add "local" to
 # VIDEO_SOURCES. The folder is a bind mount, never a Docker volume, so the video stays on the
-# disk you choose. The API only reads it; `python -m app.library ingest` fills it (see README).
+# disk you choose. The API only reads it; `python -m app.library scan` fills it (see README).
+# For a second library folder, add compose.library-more.yaml as well.
 services:
   api:
     environment:
-      LOCAL_LIBRARY_DIR: /data/library
+      LOCAL_LIBRARY_DIRS: /data/library
     volumes:
       - ${LIBRARY_DIR:-/mnt/d/moonroom-library}:/data/library:ro

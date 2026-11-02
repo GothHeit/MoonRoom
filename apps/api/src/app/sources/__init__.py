@@ -32,10 +32,10 @@ def load_sources(names: list[str]) -> dict[str, VideoSource]:
         elif name == "local":
             from app.sources.local import LocalSource
 
-            root = get_settings().local_library_dir
-            if not root:
-                raise ValueError("The local video source needs LOCAL_LIBRARY_DIR")
-            sources[name] = LocalSource(Path(root))
+            roots = get_settings().library_roots
+            if not roots:
+                raise ValueError("The local video source needs LOCAL_LIBRARY_DIRS")
+            sources[name] = LocalSource([Path(r) for r in roots])
         else:
             raise ValueError(f"Unknown video source: {name}")
     return sources

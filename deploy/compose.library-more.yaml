@@ -1,0 +1,10 @@
+# A second library folder, for when titles live on two disks (say, D: and a NAS share). Add it
+# after compose.library.yaml: COMPOSE_FILE=compose.yaml:compose.library.yaml:compose.library-more.yaml
+# and set LIBRARY_DIR_2. A title is served from whichever folder holds it. The folder is mounted
+# at the same path inside the container, so symlinks from LIBRARY_DIR into it keep working.
+services:
+  api:
+    environment:
+      LOCAL_LIBRARY_DIRS: /data/library,${LIBRARY_DIR_2:?set LIBRARY_DIR_2 in deploy/.env}
+    volumes:
+      - ${LIBRARY_DIR_2}:${LIBRARY_DIR_2}:ro

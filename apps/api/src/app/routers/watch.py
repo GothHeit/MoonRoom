@@ -444,13 +444,14 @@ LOCAL_CACHE = "private, max-age=3600"
 
 def _serve_local(url: str, viewer: str) -> Response:
     """A file from the local library: playlists rewritten like remote ones, the rest as is
-    (with Range support, for seeking). Blocking: a playlist checks every segment on disk, and
-    the library may sit on a slow mount, so run it in a thread."""
-    path = hls.local_path(url)
-    if path is None:
+    (with Range support, for seeking). Blocking, and the library may sit on a network mount,
+    so it runs in a thread; each request costs one resolve and one stat."""
+    found = hls.local_file(url)
+    if found is None:
         raise ApiError(404, "not_available", "This episode isn't available any more")
+    path, info = found
     if path.suffix == ".m3u8":
-        if path.stat().st_size > hls.MAX_PLAYLIST_BYTES:
+        if info.st_size > hls.MAX_PLAYLIST_BYTES:
             raise ApiError(502, "upstream_failed", "Playlist is too large")
         return Response(
             hls.rewrite_playlist(path.read_text(encoding="utf-8"), url, "", viewer),
@@ -461,6 +462,7 @@ def _serve_local(url: str, viewer: str) -> Response:
         path,
         media_type=hls.local_media_type(path),
         headers={"cache-control": LOCAL_CACHE, "x-content-type-options": "nosniff"},
+        stat_result=info,
     )
 
 

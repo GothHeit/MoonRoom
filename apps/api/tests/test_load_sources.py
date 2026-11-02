@@ -20,7 +20,8 @@ def test_local_source_needs_a_library_folder(monkeypatch, tmp_path) -> None:
     from app.sources.local import LocalSource
 
     monkeypatch.setattr(get_settings(), "local_library_dir", "")
-    with pytest.raises(ValueError, match="LOCAL_LIBRARY_DIR"):
+    monkeypatch.setattr(get_settings(), "local_library_dirs", "")
+    with pytest.raises(ValueError, match="LOCAL_LIBRARY_DIRS"):
         load_sources(["local"])
     monkeypatch.setattr(get_settings(), "local_library_dir", str(tmp_path))
     assert isinstance(load_sources(["local"])["local"], LocalSource)

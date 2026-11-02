@@ -9,12 +9,13 @@ import respx
 
 from app import hls
 from app.config import get_settings
-from app.library import EPISODE_META, read_json
+from app.library import EPISODE_META, read_json, write_json
 from app.library.fonts import font_names
 from app.library.ingest import (
     IngestError,
     Manifest,
     Options,
+    audio_codec_tag,
     chapter_skips,
     clean_vtt,
     codec_tag,
@@ -26,6 +27,7 @@ from app.library.ingest import (
     pick_audio,
     subtitle_order,
 )
+from app.library.scan import scan, write_log
 from app.main import app as fastapi_app
 from app.mal.client import API_BASE
 from app.sources.local import LocalSource
@@ -229,14 +231,19 @@ def library(tmp_path_factory) -> Path:
     make_episode(originals, "[EmmidSubs] Clannad - 01 [BD 1080p].mkv", make_font("Test Sans"))
     root = tmp_path_factory.mktemp("library")
     manifest = Manifest(mal_id=2167, title="Clannad", default_subtitle="Emmid")
-    assert ingest(originals, root, manifest, Options(preset="ultrafast"), log=lambda _: None) == 1
+    result = ingest(originals, root, manifest, Options(preset="ultrafast"), log=lambda _: None)
+    assert result.converted == 1
     return root
 
 
 @needs_ffmpeg
 def test_ingest_writes_both_variants_subtitles_fonts_and_skips(library: Path):
     title = library / "2167" / "sub"
-    assert read_json(title / "title.json") == {"title": "Clannad"}
+    assert read_json(title / "title.json") == {
+        "title": "Clannad",
+        "episodes": [1],
+        "thumbnails": [1],
+    }
     episode = title / "1"
     master = (episode / "master.m3u8").read_text()
     assert 'CODECS="hvc1.2.' in master and 'CODECS="avc1.' in master
@@ -265,10 +272,20 @@ def test_ingest_skips_converted_episodes_until_forced(library: Path, tmp_path: P
     make_episode(originals, "Clannad - 01.mkv", make_font("Test Sans"))
     manifest = Manifest(mal_id=1)
     options = Options(preset="ultrafast")
-    assert ingest(originals, tmp_path / "lib", manifest, options, log=lambda _: None) == 1
-    assert ingest(originals, tmp_path / "lib", manifest, options, log=lambda _: None) == 0
-    forced = Options(preset="ultrafast", force=True)
-    assert ingest(originals, tmp_path / "lib", manifest, forced, log=lambda _: None) == 1
+
+    def run(opts: Options, manifest: Manifest = manifest):
+        return ingest(originals, tmp_path / "lib", manifest, opts, log=lambda _: None)
+
+    assert run(options).converted == 1
+    again = run(options)
+    assert (again.converted, again.skipped) == (0, 1)
+    assert run(Options(preset="ultrafast", force=True)).converted == 1
+    # No title anywhere: the folder name, kept by later runs once one was given.
+    title = tmp_path / "lib" / "1" / "sub" / "title.json"
+    assert read_json(title)["title"] == "Clannad"
+    run(options, Manifest(mal_id=1, title="Clannad TV"))
+    run(options)
+    assert read_json(title)["title"] == "Clannad TV"
 
 
 def proxied(link: str) -> str:
@@ -279,7 +296,7 @@ def proxied(link: str) -> str:
 @needs_ffmpeg
 @respx.mock
 async def test_local_episode_plays_through_the_proxy(client, session, library, monkeypatch):
-    monkeypatch.setattr(get_settings(), "local_library_dir", str(library))
+    monkeypatch.setattr(get_settings(), "local_library_dirs", str(library))
     fastapi_app.state.sources = {"local": LocalSource(library)}
     _, headers = await make_user(session, "kafka")
     respx.get(f"{API_BASE}/anime/2167").mock(
@@ -331,7 +348,7 @@ async def test_library_links_never_leave_the_library(client, session, tmp_path, 
     )
     (root / "1" / "seg.m4s").write_bytes(b"x")
     (tmp_path / "secret.txt").write_text("secret")
-    monkeypatch.setattr(get_settings(), "local_library_dir", str(root))
+    monkeypatch.setattr(get_settings(), "local_library_dirs", str(root))
 
     assert hls.local_path((root / "1" / "seg.m4s").as_uri()) is not None
     assert hls.local_path((tmp_path / "secret.txt").as_uri()) is None
@@ -352,3 +369,127 @@ async def test_library_links_never_leave_the_library(client, session, tmp_path, 
     user_id = (await client.get("/me", headers=headers)).json()["id"]
     outside = proxied(hls.signed_link((tmp_path / "secret.txt").as_uri(), "", user_id))
     assert (await client.get(outside, headers=headers)).status_code == 404
+
+
+def test_audio_codecs_follow_the_stored_profile():
+    assert audio_codec_tag({"codec_name": "aac", "profile": "LC", "channels": 2}) == "mp4a.40.2"
+    assert audio_codec_tag({"codec_name": "aac", "profile": "HE-AAC", "channels": 2}) == "mp4a.40.5"
+    assert audio_codec_tag({"codec_name": "aac", "profile": "HE-AACv2"}) == "mp4a.40.29"
+    # Re-encoded to AAC-LC: 5.1 AAC and anything that isn't AAC.
+    assert audio_codec_tag({"codec_name": "aac", "profile": "HE-AAC", "channels": 6}) == "mp4a.40.2"
+    assert audio_codec_tag({"codec_name": "flac"}) == "mp4a.40.2"
+
+
+def test_h264_copy_defaults_to_the_slow_preset():
+    assert Options().preset == "slow"
+
+
+def make_title(root: Path, mal_id: int, episodes: list[int], listed: bool = True) -> Path:
+    """A converted title without any video, enough for listings and links."""
+    title = root / str(mal_id) / "sub"
+    for ep in episodes:
+        (title / str(ep)).mkdir(parents=True)
+        write_json(title / str(ep) / EPISODE_META, {"height": 1080, "subtitles": [], "skips": []})
+        (title / str(ep) / "master.m3u8").write_text("#EXTM3U\nh264/index.m3u8\n")
+    meta: dict = {"title": f"Title {mal_id}"}
+    if listed:
+        meta |= {"episodes": episodes, "thumbnails": []}
+    title.mkdir(parents=True, exist_ok=True)
+    write_json(title / "title.json", meta)
+    return title
+
+
+async def test_titles_come_from_any_library_folder_and_are_cached(tmp_path: Path):
+    first, second = tmp_path / "d", tmp_path / "nas"
+    make_title(first, 1, [1, 2])
+    make_title(second, 2, [3])
+    # Converted before title.json listed episodes: the folder is walked instead.
+    make_title(second, 3, [1], listed=False)
+    source = LocalSource([first, second])
+
+    async def listed(mal_id: int) -> list[int] | None:
+        found = await source.episodes({"id": mal_id}, "sub")
+        return found.episodes if found else None
+
+    assert await listed(1) == [1, 2]
+    two = await source.episodes({"id": 2}, "sub")
+    assert two is not None and (two.episodes, two.source_title) == ([3], "Title 2")
+    assert await listed(3) == [1]
+    assert await listed(4) is None
+    stream = await source.stream({"id": 2}, 3, "sub")
+    assert stream is not None
+    assert stream.url == (second / "2" / "sub" / "3" / "master.m3u8").as_uri()
+
+    # Answers are reused for a while, misses included, so nothing touches the disk again.
+    shutil.rmtree(first / "1")
+    make_title(first, 4, [1])
+    assert await listed(1) == [1, 2]
+    assert await listed(4) is None
+    source._cache.clear()
+    assert await listed(1) is None
+    assert await listed(4) == [1]
+
+
+def test_library_links_may_point_into_any_library_folder(tmp_path: Path, monkeypatch):
+    disk, nas = tmp_path / "d", tmp_path / "nas"
+    make_title(nas, 7, [1])
+    (nas / "7" / "sub" / "1" / "seg.m4s").write_bytes(b"x")
+    disk.mkdir()
+    # Moved to the NAS and linked back: served once the NAS folder is listed too.
+    (disk / "7").symlink_to(nas / "7")
+    link = (disk / "7" / "sub" / "1" / "seg.m4s").as_uri()
+    monkeypatch.setattr(get_settings(), "local_library_dir", "")
+    monkeypatch.setattr(get_settings(), "local_library_dirs", str(disk))
+    assert hls.local_path(link) is None
+    monkeypatch.setattr(get_settings(), "local_library_dirs", f"{disk}, {nas}")
+    assert hls.local_path(link) == (nas / "7" / "sub" / "1" / "seg.m4s").resolve()
+    assert hls.local_file((nas / "7" / "sub" / "1").as_uri()) is None  # a folder
+
+    # Playlist links are judged by their path alone, without touching each file.
+    assert hls.in_library((disk / "7" / "sub" / "1" / "missing.m4s").as_uri())
+    assert not hls.in_library(f"{(disk / '7').as_uri()}/../../secret.txt")
+    assert not hls.in_library((tmp_path / "dx" / "a.m4s").as_uri())
+    assert not hls.in_library("https://cdn.example/x")
+
+
+@needs_ffmpeg
+def test_scan_converts_every_folder_with_a_manifest(tmp_path: Path):
+    tree = tmp_path / "anime"
+    good = tree / "Clannad"
+    good.mkdir(parents=True)
+    make_episode(good, "Clannad - 01.mkv", make_font("Test Sans"))
+    (good / "moonroom.toml").write_text('mal_id = 2167\ntitle = "Clannad"\n')
+    broken = tree / "Broken"
+    broken.mkdir()
+    (broken / "Broken - 01.mkv").write_bytes(b"not a video")
+    (broken / "moonroom.toml").write_text("mal_id = 5\n")
+    bad_manifest = tree / "Typo"
+    bad_manifest.mkdir()
+    (bad_manifest / "moonroom.toml").write_text("mal = 5\n")
+    loose = tree / "Unsorted" / "Show"
+    loose.mkdir(parents=True)
+    (loose / "Show - 01.mkv").write_bytes(b"")
+    (tree / ".trash").mkdir()
+    (tree / ".trash" / "moonroom.toml").write_text("mal_id = 6\n")
+    library = tmp_path / "library"
+    options = Options(preset="ultrafast")
+
+    dry = scan(tree, library, options, dry_run=True, log=lambda _: None)
+    assert dry.converted == 0 and not library.exists()
+
+    report = scan(tree, library, options, log=lambda _: None)
+    assert (report.converted, report.skipped) == (1, 0)
+    failed = dict(report.failed)
+    assert set(failed) == {f"{broken} episode 1", str(bad_manifest)}
+    assert "ffprobe failed" in failed[f"{broken} episode 1"]
+    assert report.unmapped == [loose]
+    assert read_json(library / "2167" / "sub" / "title.json")["episodes"] == [1]
+    # The failed episode left nothing half-written behind.
+    assert read_json(library / "5" / "sub" / "title.json")["episodes"] == []
+    assert not list((library / "5" / "sub").glob(".*"))
+
+    again = scan(tree, library, options, log=lambda _: None)
+    assert (again.converted, again.skipped) == (0, 1)
+    log = write_log(library, tree, again).read_text()
+    assert "0 converted, 1 already done, 2 failed, 1 without moonroom.toml" in log
+    assert f"no moonroom.toml: {loose}" in log

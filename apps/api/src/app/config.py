@@ -64,13 +64,22 @@ class Settings(BaseSettings):
 
     # Video sources to enable, by name. Empty in a public deployment.
     video_sources: str = ""
-    # Converted copies of the owner's own files, for the `local` source. Made by
-    # `python -m app.library ingest`; the API only reads it.
+    # Converted copies of the owner's own files, for the `local` source, made by
+    # `python -m app.library ingest` or `scan`; the API only reads them. A comma-separated list
+    # of folders: a title is served from the first one that holds it, and files may be symlinks
+    # into any of them (say, D: plus a NAS share).
+    local_library_dirs: str = ""
+    # The single-folder form of the same setting, still read (listed first).
     local_library_dir: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def library_roots(self) -> list[str]:
+        roots = [self.local_library_dir, *self.local_library_dirs.split(",")]
+        return list(dict.fromkeys(r.strip() for r in roots if r.strip()))
 
     @property
     def video_source_names(self) -> list[str]:

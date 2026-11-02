@@ -6,16 +6,19 @@ the proxy only fetches URLs that came out of a playlist it already served (no op
 Signatures are bound to the viewer, so a copied link is useless to anyone else.
 
 The local library uses the same links with file: URLs, which are only ever served from inside
-the library folder.
+the library folders.
 """
 
 import asyncio
 import hashlib
 import hmac
 import ipaddress
+import os
 import re
 import socket
+import stat
 import time
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import quote, unquote, urljoin, urlsplit
 
@@ -154,16 +157,56 @@ LOCAL_TYPES = {
 }
 
 
+@lru_cache(maxsize=8)
+def _roots(spec: tuple[str, ...]) -> tuple[tuple[Path, ...], tuple[str, ...]]:
+    """The library folders resolved (where files really are) and as written (what links say).
+    Resolving costs a metadata call per path component, which adds up on a network mount."""
+    return tuple(Path(r).resolve() for r in spec), tuple(os.path.normpath(r) for r in spec)
+
+
+def _file_url_path(url: str) -> str | None:
+    if not url.startswith("file:"):
+        return None
+    return unquote(urlsplit(url).path)
+
+
+def local_file(url: str) -> tuple[Path, os.stat_result] | None:
+    """The library file a file: URL names and its stat; None for anything else, or anything
+    that leads outside every library folder (dot segments, symlinks to elsewhere)."""
+    spec = tuple(get_settings().library_roots)
+    raw = _file_url_path(url)
+    if not spec or raw is None:
+        return None
+    resolved, _ = _roots(spec)
+    path = Path(raw).resolve()
+    if not any(path.is_relative_to(root) for root in resolved):
+        return None
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    return (path, info) if stat.S_ISREG(info.st_mode) else None
+
+
 def local_path(url: str) -> Path | None:
-    """The library file a file: URL names; None for anything else, or anything that leads
-    outside the library folder (dot segments, symlinks)."""
-    root = get_settings().local_library_dir
-    if not root or not url.startswith("file:"):
-        return None
-    path = Path(unquote(urlsplit(url).path)).resolve()
-    if not path.is_relative_to(Path(root).resolve()) or not path.is_file():
-        return None
-    return path
+    found = local_file(url)
+    return found[0] if found else None
+
+
+def in_library(url: str) -> bool:
+    """Whether a file: URL names a path inside a library folder, judged from the text alone.
+    Used for the links inside library playlists, which can list hundreds of segments: they are
+    checked for real (symlinks included) when each one is fetched, through `local_file`."""
+    spec = tuple(get_settings().library_roots)
+    raw = _file_url_path(url)
+    if not spec or raw is None:
+        return False
+    path = os.path.normpath(raw)
+    resolved, written = _roots(spec)
+    return any(
+        path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+        for root in (*written, *map(str, resolved))
+    )
 
 
 def local_media_type(path: Path) -> str:
@@ -180,7 +223,7 @@ def rewrite_playlist(text: str, base_url: str, referer: str, viewer: str) -> str
         absolute = urljoin(base_url, target)
         # A library playlist may only point inside the library, a remote one only at the
         # internet. Refused URLs are blanked, so the player just fails to load that part.
-        allowed = local_path(absolute) is not None if local else looks_public(absolute)
+        allowed = in_library(absolute) if local else looks_public(absolute)
         return signed_link(absolute, referer, viewer) if allowed else ""
 
     lines = []
