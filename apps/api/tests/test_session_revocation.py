@@ -8,7 +8,7 @@ from app import hls
 from app.config import get_settings
 from app.main import app as fastapi_app
 from app.security import create_access_token
-from tests.conftest import make_user
+from tests.conftest import make_user, viewer_of
 from tests.test_watch import VIDEO_URL, FakeSource, mock_details, streams_alive  # noqa: F401
 
 
@@ -98,23 +98,24 @@ async def test_a_playback_link_needs_its_own_users_session(client, session):
     respx.get(VIDEO_URL).mock(return_value=httpx.Response(200, content=b"data"))
     url = (await client.post("/watch/fake/21/episodes/1/play", headers=headers)).json()["url"]
 
-    # Copied out of a log or a history: worthless without a login.
-    assert (await client.get(url)).status_code == 401
-    r = await client.get(url, headers=other)
-    assert (r.status_code, r.json()["error"]["code"]) == (403, "invalid_link")
-    assert (await client.get(url, headers=headers)).status_code == 200
+    # The link stands on its own (a TV sends no login header) but only while its session is open,
+    # and a tampered token is no use to anyone.
+    assert (await client.get(url)).status_code == 200
+    forged = url.replace("token=", "token=x")
+    assert (await client.get(forged)).status_code == 403
 
     await client.delete("/me/sessions", headers=headers)
-    assert (await client.get(url, headers=headers)).status_code == 401
+    r = await client.get(url)
+    assert (r.status_code, r.json()["error"]["code"]) == (403, "invalid_link")
 
 
 async def test_stream_links_stop_with_the_session(client, session):
     user, headers = await make_user(session, "kafka")
-    link = hls.signed_link("https://cdn.example/seg.ts", "", str(user.id), "")
+    link = hls.signed_link("https://cdn.example/seg.ts", "", viewer_of(headers), "")
     q = {k: v[0] for k, v in parse_qs(urlsplit(link).query).items()}
     await client.delete("/me/sessions", headers=headers)
-    r = await client.get("/watch/hls", params=q, headers=headers)
-    assert r.status_code == 401
+    r = await client.get("/watch/hls", params=q)
+    assert r.status_code == 403
 
 
 def test_stream_links_survive_a_secret_rotation(monkeypatch):

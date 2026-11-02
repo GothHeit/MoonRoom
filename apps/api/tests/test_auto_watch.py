@@ -6,10 +6,10 @@ from sqlalchemy import select
 from app import hls
 from app.main import app as fastapi_app
 from app.mal.client import API_BASE
-from app.models import SourceChoice, User
+from app.models import SourceChoice
 from app.probes import StreamProbes
 from app.sources.base import EpisodeList, Stream, Subtitle, Traits
-from tests.conftest import make_user
+from tests.conftest import make_user, viewer_of
 
 
 class Source:
@@ -172,7 +172,6 @@ async def test_styled_only_subtitles_are_served_as_webvtt_too(client, session, m
 
     monkeypatch.setattr(hls, "resolve_host", resolve)
     _, headers = await make_user(session, "kafka")
-    viewer = str((await session.scalars(select(User))).first().id)
     url = "https://host.example/en.ass"
     respx.get(url).mock(
         return_value=httpx.Response(
@@ -180,7 +179,7 @@ async def test_styled_only_subtitles_are_served_as_webvtt_too(client, session, m
             text="[Events]\nFormat: Start, End, Text\nDialogue: 0:00:01.00,0:00:02.00,Hello\n",
         )
     )
-    link = "/watch/" + hls.signed_link(url, "", viewer, "sub")
+    link = "/watch/" + hls.signed_link(url, "", viewer_of(headers), "sub")
     reply = await client.get(link, headers=headers)
     assert reply.status_code == 200
     assert reply.headers["content-type"].startswith("text/vtt")

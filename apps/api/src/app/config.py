@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from functools import lru_cache
 
 from pydantic import Field
@@ -25,8 +27,15 @@ class Settings(BaseSettings):
     jwt_previous_secrets: str = ""
     access_token_minutes: int = 15
     refresh_token_days: int = 30
-    # The first link of a playback; every later link is signed separately (hls.py).
-    playback_token_minutes: int = 60
+    # Stream links (the master playlist link and every segment link) are signed with a key of
+    # their own, so a leaked one can never help forge a login token. Unset, it is derived from
+    # JWT_SECRET; set it to rotate the two independently. Links signed with an old value stay
+    # valid while it is listed in STREAM_LINK_PREVIOUS_SECRETS (links live four hours at most).
+    stream_link_secret: str = ""
+    stream_link_previous_secrets: str = ""
+    # How long the link that starts a playback lives. It works without a login (a TV or AirPlay
+    # receiver can't send one), so it is short; every later link is re-signed as the player goes.
+    playback_token_minutes: int = 10
     # A refresh token that was just rotated is still accepted for this long, so a device whose
     # answer got lost can retry without it reading as a stolen token.
     refresh_grace_seconds: int = 60
@@ -97,6 +106,21 @@ class Settings(BaseSettings):
     def jwt_verification_secrets(self) -> list[str]:
         previous = [s.strip() for s in self.jwt_previous_secrets.split(",") if s.strip()]
         return [self.jwt_secret, *previous]
+
+    @property
+    def stream_link_keys(self) -> list[bytes]:
+        """Keys that sign stream links, newest first. Each is derived from a secret for this one
+        purpose, so no secret is ever used raw for two things."""
+        if self.stream_link_secret:
+            previous = [
+                s.strip() for s in self.stream_link_previous_secrets.split(",") if s.strip()
+            ]
+            secrets = [self.stream_link_secret, *previous]
+        else:
+            secrets = self.jwt_verification_secrets
+        return [
+            hmac.new(s.encode(), b"moonroom stream links", hashlib.sha256).digest() for s in secrets
+        ]
 
     @property
     def video_source_names(self) -> list[str]:

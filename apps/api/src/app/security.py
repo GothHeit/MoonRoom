@@ -88,9 +88,10 @@ def decode_mfa_token(token: str) -> uuid.UUID | None:
 def create_playback_token(
     user_id: uuid.UUID, session_id: uuid.UUID, source: str, anime_id: int, episode: int, lang: str
 ) -> str:
-    """Names the episode a /play answer picked. It rides in the URL, so it is short-lived and
-    only works together with the same user's bearer token."""
-    minutes = get_settings().playback_token_minutes
+    """Names the episode a /play answer picked and starts its playback. A TV or an AirPlay
+    receiver can't send a login, so the token stands on its own: it is signed with the stream
+    link key, lives minutes, and only works while the session it names is open."""
+    now = utcnow()
     claims = {
         "sub": str(user_id),
         "sid": str(session_id),
@@ -99,12 +100,27 @@ def create_playback_token(
         "aid": anime_id,
         "ep": episode,
         "lang": lang,
+        "iat": now,
+        "exp": now + timedelta(minutes=get_settings().playback_token_minutes),
     }
-    return _encode(claims, timedelta(minutes=minutes))
+    return jwt.encode(claims, get_settings().stream_link_keys[0], algorithm=ALGORITHM)
 
 
 def decode_playback_token(token: str) -> dict | None:
-    return _decode(token, "playback")
+    """The claims of a playback token, or None. Always carries `sub` and `sid`."""
+    for key in get_settings().stream_link_keys:
+        try:
+            claims = jwt.decode(
+                token, key, algorithms=[ALGORITHM], options={"require": ["exp", "sub", "sid"]}
+            )
+        except jwt.InvalidSignatureError:
+            continue  # maybe signed before the last rotation
+        except jwt.PyJWTError:
+            return None
+        if claims.get("typ") != "playback" or not claims.get("sid") or not claims.get("sub"):
+            return None
+        return claims
+    return None
 
 
 def new_opaque_token() -> str:

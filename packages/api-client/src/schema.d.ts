@@ -921,9 +921,11 @@ export interface paths {
         };
         /**
          * Hls Proxy
-         * @description Without `u`, the master playlist of the episode the token is for. With `u`, one
-         *     playlist, segment, subtitle or image that an earlier response linked to (signed for the
-         *     signed-in viewer, who must send their bearer token, as the web app's proxy does).
+         * @description Without `u`, the master playlist of the episode the token is for (with `subs`, listing
+         *     its subtitles in the playlist, for players that fetch it themselves). With `u`, one
+         *     playlist, segment, subtitle or image that an earlier response linked to. Neither needs a
+         *     login header: the token or the link names the user and the session, and is checked against
+         *     both.
          */
         get: operations["hls_proxy_watch_hls_get"];
         put?: never;
@@ -1238,6 +1240,29 @@ export interface paths {
         get: operations["episodes_watch__source___anime_id__episodes_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/watch/{source}/{anime_id}/episodes/{episode}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link
+         * @description A fresh link to start the episode a /play answer picked (`source` and `lang` are the
+         *     ones it reported). Asking costs nothing upstream: the stream is only looked up when the
+         *     link is opened. Used to hand the stream to a device that fetches it itself, such as an
+         *     AirPlay receiver, long after the first link has expired.
+         */
+        post: operations["link_watch__source___anime_id__episodes__episode__link_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1574,11 +1599,6 @@ export interface components {
             expires_at: string;
             /** Used */
             used: boolean;
-        };
-        /** LinkOut */
-        LinkOut: {
-            /** Auth Url */
-            auth_url: string;
         };
         /** ListEntryOut */
         ListEntryOut: {
@@ -2319,6 +2339,16 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** LinkOut */
+        app__routers__mal__LinkOut: {
+            /** Auth Url */
+            auth_url: string;
+        };
+        /** LinkOut */
+        app__routers__watch__LinkOut: {
+            /** Url */
+            url: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -3037,7 +3067,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LinkOut"];
+                    "application/json": components["schemas"]["app__routers__mal__LinkOut"];
                 };
             };
         };
@@ -3997,9 +4027,12 @@ export interface operations {
         parameters: {
             query?: {
                 token?: string | null;
+                subs?: boolean;
                 u?: string | null;
                 r?: string;
                 k?: string;
+                v?: string;
+                i?: string;
                 e?: number;
                 s?: string;
             };
@@ -4606,6 +4639,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EpisodesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_watch__source___anime_id__episodes__episode__link_post: {
+        parameters: {
+            query?: {
+                kind?: "hls" | "mp4";
+                lang?: "sub" | "dub";
+            };
+            header?: never;
+            path: {
+                source: string;
+                anime_id: number;
+                episode: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__routers__watch__LinkOut"];
                 };
             };
             /** @description Validation Error */

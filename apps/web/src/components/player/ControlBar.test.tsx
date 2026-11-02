@@ -1,11 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import messages from "../../../messages/en/player.json";
 import { ControlBar } from "./ControlBar";
 
-function setup(duration: number) {
+function setup(duration: number, airPlay?: { active: boolean; open: () => void }) {
   const noop = vi.fn();
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -18,6 +18,7 @@ function setup(duration: number) {
         fullscreen={false}
         settingsOpen={false}
         hasNext={false}
+        airPlay={airPlay}
         onSeekTo={noop}
         onTogglePlay={noop}
         onSeekBy={noop}
@@ -42,5 +43,15 @@ describe("ControlBar", () => {
     setup(1420);
     expect(screen.getByRole("slider", { name: messages.player.seek })).toBeTruthy();
     expect(screen.getByText("23:40")).toBeTruthy();
+  });
+
+  it("shows the AirPlay button only when AirPlay is available, and opens the picker", () => {
+    setup(1420);
+    expect(screen.queryByRole("button", { name: messages.player.airplay })).toBeNull();
+    cleanup();
+    const open = vi.fn();
+    setup(1420, { active: false, open });
+    fireEvent.click(screen.getByRole("button", { name: messages.player.airplay }));
+    expect(open).toHaveBeenCalledTimes(1);
   });
 });

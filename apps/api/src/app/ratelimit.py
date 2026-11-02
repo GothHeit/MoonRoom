@@ -105,6 +105,9 @@ ACTION_RULES: dict[str, tuple[int, float]] = {
     "avatar_upload": (20, 3600),
     "room_create": (20, 3600),
     "room_invite": (60, 3600),
+    # Minting a stream link, and starting a playback from one (each looks the stream up upstream).
+    "stream_link": (120, 600),
+    "stream_start": (120, 600),
     "room_chat": (40, 60),
     "room_reaction": (60, 60),
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 
 import { capLevel, levelsToDrop, qualityList } from "./qualities";
 import type { AudioTrack, Quality } from "./SettingsMenu";
+import { airPlaySupported, nativeLink } from "./useCastLink";
 
 /**
  * The audio track matching the wanted one (by name or language), else the one the stream marks as
@@ -61,6 +62,8 @@ type Options = {
   defaultAudio: string | null;
   /** The tallest quality the viewer asked for; automatic quality stays within it. */
   maxHeight?: number | null;
+  /** A fresh absolute link for a receiver (see useCastLink); AirPlay is offered once it exists. */
+  castUrl?: string | null;
   /** Called to ask for the stream again, after the original HEVC failed to decode. */
   onRetry: () => void;
   onFail: () => void;
@@ -71,9 +74,39 @@ type Options = {
  * native HLS only where it can't run, e.g. iPhone Safari. Also owns the quality and audio
  * choices, and the retry with H.264 when this device can't decode the original HEVC.
  */
-export function useHls({ video, url, kind, defaultAudio, maxHeight = null, onRetry, onFail }: Options) {
+/** Points the element at a stream the browser plays by itself, from `at` seconds in. */
+function playNatively(v: HTMLVideoElement, src: string, at: number, resume: boolean) {
+  // hls.js switches remote playback off while it feeds the page through MediaSource.
+  v.disableRemotePlayback = false;
+  v.src = src;
+  v.addEventListener(
+    "loadedmetadata",
+    () => {
+      if (at > 0) v.currentTime = at;
+      if (resume) void v.play().catch(() => undefined);
+    },
+    { once: true },
+  );
+}
+
+function seekOnLoad(v: HTMLVideoElement, at: number) {
+  v.addEventListener("loadedmetadata", () => (v.currentTime = at), { once: true });
+}
+
+type AirPlayVideo = HTMLVideoElement & {
+  webkitShowPlaybackTargetPicker?: () => void;
+  webkitCurrentPlaybackTargetIsWireless?: boolean;
+};
+
+export function useHls({ video, url, kind, defaultAudio, maxHeight = null, castUrl = null, onRetry, onFail }: Options) {
   const hlsRef = useRef<import("hls.js").default | null>(null);
   const hevcUsed = useRef(false);
+  // While the picture goes to an AirPlay receiver, the browser plays the stream natively: hls.js
+  // feeds the page through MediaSource, which the receiver cannot take over.
+  const native = useRef(false);
+  const resumeAt = useRef<number | null>(null);
+  const [epoch, setEpoch] = useState(0);
+  const [wireless, setWireless] = useState(false);
   const [qualities, setQualities] = useState<Quality[]>([]);
   const [quality, setQuality] = useState(-1);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
@@ -82,6 +115,11 @@ export function useHls({ video, url, kind, defaultAudio, maxHeight = null, onRet
   useEffect(() => {
     const v = video.current;
     if (!v || !url || kind !== "hls") return;
+    if (native.current) {
+      // Still on the receiver (the next episode, say): keep playing natively.
+      playNatively(v, nativeLink(url, kind), 0, false);
+      return;
+    }
     let hls: import("hls.js").default | undefined;
     let cancelled = false;
     void import("hls.js").then(({ default: Hls }) => {
@@ -127,13 +165,20 @@ export function useHls({ video, url, kind, defaultAudio, maxHeight = null, onRet
         });
         hls.loadSource(url);
         hls.attachMedia(v);
+        if (resumeAt.current !== null) {
+          // Back from a receiver: carry on from where it got to.
+          const at = resumeAt.current;
+          resumeAt.current = null;
+          seekOnLoad(v, at);
+        }
       } else if (v.canPlayType("application/vnd.apple.mpegurl")) {
         v.src = url;
       } else onFail();
     });
     return () => {
       cancelled = true;
-      hls?.destroy();
+      // Already destroyed when AirPlay took over.
+      if (hls && hlsRef.current === hls) hls.destroy();
       hlsRef.current = null;
       setQualities([]);
       setQuality(-1);
@@ -141,7 +186,48 @@ export function useHls({ video, url, kind, defaultAudio, maxHeight = null, onRet
     };
     // defaultAudio arrives with the url, in the same response; the callbacks only call setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, kind]);
+  }, [url, kind, epoch]);
+
+  // The picture is on a receiver, or came back from one.
+  useEffect(() => {
+    const v = video.current as AirPlayVideo | null;
+    if (!v || !airPlaySupported()) return;
+    const changed = () => {
+      const on = !!v.webkitCurrentPlaybackTargetIsWireless;
+      setWireless(on);
+      if (!on && native.current && kind === "hls") {
+        // Back on this screen: hls.js again, for the quality and audio menus.
+        native.current = false;
+        resumeAt.current = v.currentTime;
+        setEpoch((n) => n + 1);
+      }
+    };
+    v.addEventListener("webkitcurrentplaybacktargetiswirelesschanged", changed);
+    return () => v.removeEventListener("webkitcurrentplaybacktargetiswirelesschanged", changed);
+  }, [video, kind]);
+
+  /**
+   * Opens the AirPlay picker. Called from a tap, so everything happens now: the stream moves to a
+   * fresh link the receiver can fetch on its own (the one the page started with has probably
+   * expired), natively, from where the viewer is.
+   */
+  const openAirPlay = () => {
+    const v = video.current as AirPlayVideo | null;
+    if (!v || !v.webkitShowPlaybackTargetPicker) return;
+    if (!native.current && castUrl) {
+      const at = v.currentTime;
+      const wasPlaying = !v.paused;
+      native.current = true;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+        setQualities([]);
+        setAudioTracks([]);
+      }
+      playNatively(v, castUrl, at, wasPlaying);
+    }
+    v.webkitShowPlaybackTargetPicker();
+  };
 
   const chooseQuality = useCallback((index: number) => {
     setQuality(index);
@@ -154,5 +240,6 @@ export function useHls({ video, url, kind, defaultAudio, maxHeight = null, onRet
     if (hlsRef.current) hlsRef.current.audioTrack = id;
   }, []);
 
-  return { qualities, quality, chooseQuality, audioTracks, audioTrack, chooseAudio };
+  const airPlay = airPlaySupported() && castUrl ? { active: wireless, open: openAirPlay } : null;
+  return { qualities, quality, chooseQuality, audioTracks, audioTrack, chooseAudio, airPlay };
 }

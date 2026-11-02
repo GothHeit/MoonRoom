@@ -104,9 +104,9 @@ test("switches source at the same spot and remembers it for the title", async ({
   await expect(page).toHaveURL(/\/watch\/stub\/7\/1\?lang=dub$/);
 });
 
-test("seeks through the proxy with range requests", async ({ page }) => {
+test("seeks through the stream route with range requests", async ({ page }) => {
   await signIn(page);
-  const res = await page.request.get("/api/proxy/watch/video?token=ep-1-sub", { headers: { Range: "bytes=100-199" } });
+  const res = await page.request.get("/api/stream/video?token=ep-1-sub", { headers: { Range: "bytes=100-199" } });
   expect(res.status()).toBe(206);
   expect(res.headers()["content-range"]).toMatch(/^bytes 100-199\/\d+$/);
   expect((await res.body()).length).toBe(100);

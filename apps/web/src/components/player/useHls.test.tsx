@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Handler = (event: string, data: unknown) => void;
 
@@ -191,5 +191,63 @@ describe("useHls", () => {
     const { video } = setup({ kind: "mp4" });
     expect(instances).toHaveLength(0);
     expect(video.current.src).toBe("");
+  });
+
+  describe("AirPlay", () => {
+    const picker = vi.fn();
+    const proto = HTMLVideoElement.prototype as unknown as Record<string, unknown>;
+    beforeEach(() => {
+      picker.mockReset();
+      proto.webkitShowPlaybackTargetPicker = picker;
+    });
+    afterEach(() => {
+      delete proto.webkitShowPlaybackTargetPicker;
+    });
+
+    it("is offered only once a link for the receiver exists", async () => {
+      const first = setup();
+      await started();
+      expect(first.result.current.airPlay).toBeNull();
+      first.unmount();
+      const second = setup({ castUrl: "http://moon.test/api/stream/hls?token=t&subs=true" });
+      await started();
+      expect(second.result.current.airPlay).not.toBeNull();
+    });
+
+    it("is not offered where the browser has no AirPlay", async () => {
+      delete proto.webkitShowPlaybackTargetPicker;
+      const { result } = setup({ castUrl: "http://moon.test/x" });
+      await started();
+      expect(result.current.airPlay).toBeNull();
+    });
+
+    it("hands the stream to the browser, on the fresh link, before opening the picker", async () => {
+      const { result, video } = setup({ castUrl: "http://moon.test/api/stream/hls?token=fresh&subs=true" });
+      const hls = await started();
+      act(() => result.current.airPlay?.open());
+      expect(hls.destroyed).toBe(true);
+      expect(video.current.src).toBe("http://moon.test/api/stream/hls?token=fresh&subs=true");
+      expect(video.current.disableRemotePlayback).toBe(false);
+      expect(picker).toHaveBeenCalledTimes(1);
+
+      // Asking again only reopens the picker.
+      act(() => result.current.airPlay?.open());
+      expect(picker).toHaveBeenCalledTimes(2);
+      expect(instances).toHaveLength(1);
+    });
+
+    it("goes back to hls.js when the receiver is left", async () => {
+      const { result, video } = setup({ castUrl: "http://moon.test/x" });
+      await started();
+      act(() => result.current.airPlay?.open());
+      Object.assign(video.current, { webkitCurrentPlaybackTargetIsWireless: true });
+      act(() => void video.current.dispatchEvent(new Event("webkitcurrentplaybacktargetiswirelesschanged")));
+      expect(result.current.airPlay?.active).toBe(true);
+
+      Object.assign(video.current, { webkitCurrentPlaybackTargetIsWireless: false });
+      act(() => void video.current.dispatchEvent(new Event("webkitcurrentplaybacktargetiswirelesschanged")));
+      await waitFor(() => expect(instances).toHaveLength(2));
+      expect(result.current.airPlay?.active).toBe(false);
+    });
   });
 });

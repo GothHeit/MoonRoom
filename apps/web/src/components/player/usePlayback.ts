@@ -16,6 +16,15 @@ const NONE: Track[] = [];
 const NO_FONTS: Record<string, string> = {};
 const NO_SKIPS: Skip[] = [];
 
+/**
+ * The address players load the stream from: the web server's login-free route, since the link
+ * names the user and session itself. That is what lets a TV or an AirPlay receiver play it, and
+ * the same address works for the browser.
+ */
+export function streamHref(link: string) {
+  return `/api/stream${link.replace(/^\/watch/, "")}`;
+}
+
 /** What the API answered for the episode, with every link already pointing at the proxy. */
 export type Playback = {
   url: string;
@@ -56,7 +65,7 @@ export function usePlayback(source: string, animeId: number, episode: number, la
         if (cancelled) return;
         if (data)
           setPlayback({
-            url: `/api/proxy${data.url}`,
+            url: streamHref(data.url),
             kind: data.kind,
             tracks: data.subtitles ?? [],
             fonts: Object.fromEntries(Object.entries(data.fonts ?? {}).map(([name, link]) => [name, `/api/proxy${link}`])),

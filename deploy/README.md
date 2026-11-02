@@ -89,6 +89,11 @@ Rotate it if it may have leaked, or once a year. Nobody is signed out:
    already playing may need a reload.
 3. A day later, empty `JWT_PREVIOUS_SECRETS` and restart again.
 
+Video links (what a TV or an AirPlay receiver plays, which can't send a login) are signed with a key
+derived from `JWT_SECRET` for that one purpose. Set `STREAM_LINK_SECRET` to give them a secret of
+their own; rotate it the same way through `STREAM_LINK_PREVIOUS_SECRETS` (links last four hours at
+most). Such a link names the user and the login session it was made in, so signing out ends it.
+
 ## Shared cache
 
 A `redis` container keeps MAL and ani.zip answers across API restarts and workers (128 MB, no

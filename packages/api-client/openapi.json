@@ -984,19 +984,6 @@
         "title": "InviteOut",
         "type": "object"
       },
-      "LinkOut": {
-        "properties": {
-          "auth_url": {
-            "title": "Auth Url",
-            "type": "string"
-          }
-        },
-        "required": [
-          "auth_url"
-        ],
-        "title": "LinkOut",
-        "type": "object"
-      },
       "ListEntryOut": {
         "properties": {
           "linked": {
@@ -3111,6 +3098,32 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "app__routers__mal__LinkOut": {
+        "properties": {
+          "auth_url": {
+            "title": "Auth Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "auth_url"
+        ],
+        "title": "LinkOut",
+        "type": "object"
+      },
+      "app__routers__watch__LinkOut": {
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "LinkOut",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -4205,7 +4218,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LinkOut"
+                  "$ref": "#/components/schemas/app__routers__mal__LinkOut"
                 }
               }
             },
@@ -5604,7 +5617,7 @@
     },
     "/watch/hls": {
       "get": {
-        "description": "Without `u`, the master playlist of the episode the token is for. With `u`, one\nplaylist, segment, subtitle or image that an earlier response linked to (signed for the\nsigned-in viewer, who must send their bearer token, as the web app's proxy does).",
+        "description": "Without `u`, the master playlist of the episode the token is for (with `subs`, listing\nits subtitles in the playlist, for players that fetch it themselves). With `u`, one\nplaylist, segment, subtitle or image that an earlier response linked to. Neither needs a\nlogin header: the token or the link names the user and the session, and is checked against\nboth.",
         "operationId": "hls_proxy_watch_hls_get",
         "parameters": [
           {
@@ -5621,6 +5634,16 @@
                 }
               ],
               "title": "Token"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subs",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Subs",
+              "type": "boolean"
             }
           },
           {
@@ -5656,6 +5679,26 @@
             "schema": {
               "default": "",
               "title": "K",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "v",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "V",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "i",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "I",
               "type": "string"
             }
           },
@@ -5700,11 +5743,6 @@
             "description": "Validation Error"
           }
         },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
         "summary": "Hls Proxy",
         "tags": [
           "watch"
@@ -6554,11 +6592,6 @@
             "description": "Validation Error"
           }
         },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
         "summary": "Video",
         "tags": [
           "watch"
@@ -6630,6 +6663,100 @@
           }
         ],
         "summary": "Episodes",
+        "tags": [
+          "watch"
+        ]
+      }
+    },
+    "/watch/{source}/{anime_id}/episodes/{episode}/link": {
+      "post": {
+        "description": "A fresh link to start the episode a /play answer picked (`source` and `lang` are the\nones it reported). Asking costs nothing upstream: the stream is only looked up when the\nlink is opened. Used to hand the stream to a device that fetches it itself, such as an\nAirPlay receiver, long after the first link has expired.",
+        "operationId": "link_watch__source___anime_id__episodes__episode__link_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "anime_id",
+            "required": true,
+            "schema": {
+              "title": "Anime Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "title": "Episode",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "hls",
+              "enum": [
+                "hls",
+                "mp4"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "default": "sub",
+              "enum": [
+                "sub",
+                "dub"
+              ],
+              "title": "Lang",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__routers__watch__LinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Link",
         "tags": [
           "watch"
         ]

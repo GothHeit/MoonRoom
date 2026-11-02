@@ -25,6 +25,7 @@ import { activeSkip } from "./skips";
 import { AssSubtitles } from "./AssSubtitles";
 import { SubtitleOverlay } from "./SubtitleOverlay";
 import type { SubtitleStyle } from "./subtitleStyle";
+import { useCastLink } from "./useCastLink";
 import { useHls } from "./useHls";
 import { usePlayback } from "./usePlayback";
 import { usePlayerKeys } from "./usePlayerKeys";
@@ -98,7 +99,9 @@ export function Player(props: Props) {
     playbackRetry();
   }, [playbackRetry]);
   const failPlayback = useCallback(() => setError("playback_failed"), [setError]);
-  const hls = useHls({ video, url, kind, defaultAudio, maxHeight, onRetry: retry, onFail: failPlayback });
+  // A link a receiver can fetch on its own, kept ready only where AirPlay exists.
+  const castUrl = useCastLink(url !== null, answered, animeId, episode, answeredLang, kind);
+  const hls = useHls({ video, url, kind, defaultAudio, maxHeight, castUrl, onRetry: retry, onFail: failPlayback });
   const subtitles = useSubtitles(tracks, subtitleLang, props.subtitleStyle);
   const { selected, styled, style } = subtitles;
   const controls = useVideoControls(video, stage, !!url);
@@ -269,6 +272,7 @@ export function Player(props: Props) {
         src={kind === "mp4" ? (url ?? undefined) : undefined}
         autoPlay={!room}
         playsInline
+        x-webkit-airplay="allow"
         onClick={togglePlay}
         onDoubleClick={toggleFullscreen}
         onLoadedMetadata={onLoadedMetadata}
@@ -381,6 +385,7 @@ export function Player(props: Props) {
             fullscreen={fullscreen}
             settingsOpen={settingsOpen}
             hasNext={next !== undefined}
+            airPlay={hls.airPlay}
             onSeekTo={(seconds) => {
               if (video.current) video.current.currentTime = seconds;
               setCurrent(seconds);

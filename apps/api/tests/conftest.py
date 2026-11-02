@@ -98,3 +98,13 @@ async def login_token(session, user: User) -> str:
     )
     await session.commit()
     return create_access_token(user.id, family)
+
+
+def viewer_of(headers: dict):
+    """Who stream links made for these bearer headers belong to."""
+    from app import hls
+    from app.security import decode_access_token
+
+    decoded = decode_access_token(headers["Authorization"].removeprefix("Bearer "))
+    assert decoded is not None
+    return hls.Viewer(str(decoded[0]), str(decoded[1]))

@@ -10,7 +10,7 @@ from app.main import app as fastapi_app
 from app.mal.client import API_BASE
 from app.probes import StreamProbes
 from app.sources.base import EpisodeList, Stream, Subtitle
-from tests.conftest import make_user
+from tests.conftest import make_user, viewer_of
 
 MASTER = "https://host.example/p/master.m3u8"
 MEDIA = (
@@ -56,7 +56,7 @@ def test_verify_rejects_tampering_expiry_and_other_viewers():
     )
     assert expires <= time.time() + hls.SEGMENT_LIFETIME
     old = int(time.time()) - 1
-    mac = hls._mac("https://a.example/x", "https://r/", "", VIEWER, old)
+    mac = hls._mac("https://a.example/x", "https://r/", "", hls.Viewer(VIEWER), old)
     assert not hls.verify_link("https://a.example/x", "https://r/", "", VIEWER, old, mac)
 
 
@@ -183,11 +183,17 @@ async def test_hls_playback_falls_back_and_proxies_with_referer(client, session)
     assert seg.calls.last.request.headers["referer"] == "https://ref.example/"
     assert play.json()["source"] == "ok"
 
-    # Links are bound to the viewer: no token, or someone else's, gets nothing.
-    assert (await client.get(f"/watch/{segment_link}")).status_code == 401
-    _, other = await make_user(session, "friend")
-    assert (await client.get(f"/watch/{segment_link}", headers=other)).status_code == 403
     assert s.headers["x-content-type-options"] == "nosniff"
+
+    # Links name their viewer and session, so a TV or AirPlay receiver plays them with no
+    # login header; changing the viewer, or signing the session out, ends them.
+    assert (await client.get(f"/watch/{segment_link}")).status_code == 200
+    assert (await client.get(url)).status_code == 200
+    assert (await client.get(f"/watch/{segment_link}".replace("&v=", "&v=x"))).status_code == 403
+    assert (await client.get(f"/watch/{segment_link}".replace("&i=", "&i=0"))).status_code == 403
+    await client.delete("/me/sessions", headers=headers)
+    assert (await client.get(f"/watch/{segment_link}")).status_code == 403
+    assert (await client.get(url)).status_code == 403
 
 
 async def test_hls_proxy_refuses_unsigned_urls(client, session):
@@ -197,8 +203,8 @@ async def test_hls_proxy_refuses_unsigned_urls(client, session):
         "/watch/hls",
         params={"u": "http://169.254.169.254/", "r": "", "e": 9999999999, "s": "0" * 32},
     )
-    assert r.status_code == 401
-    # Signed-in but with a forged signature: refused without asking for a new session.
+    assert r.status_code == 403
+    # A forged signature is refused with or without a login.
     r = await client.get(
         "/watch/hls",
         params={"u": "http://169.254.169.254/", "r": "", "e": 9999999999, "s": "0" * 32},
@@ -250,7 +256,7 @@ async def test_names_resolving_to_private_addresses_are_refused(monkeypatch):
     assert not await hls.is_public_target("https://rebind.example/x")
 
 
-def signed(url: str, viewer: str) -> str:
+def signed(url: str, viewer: hls.Viewer) -> str:
     return "/watch/" + hls.signed_link(url, "https://ref.example/", viewer)
 
 
@@ -260,14 +266,16 @@ async def test_proxy_refuses_signed_internal_urls_and_internal_redirects(client,
     user, headers = await make_user(session, "kafka")
     internal = respx.get("http://127.0.0.1:8000/secret").mock(return_value=httpx.Response(200))
 
-    direct = await client.get(signed("http://127.0.0.1:8000/secret", str(user.id)), headers=headers)
+    direct = await client.get(
+        signed("http://127.0.0.1:8000/secret", viewer_of(headers)), headers=headers
+    )
     assert direct.status_code == 502
 
     respx.get("https://host.example/redir.ts").mock(
         return_value=httpx.Response(302, headers={"location": "http://127.0.0.1:8000/secret"})
     )
     redirected = await client.get(
-        signed("https://host.example/redir.ts", str(user.id)), headers=headers
+        signed("https://host.example/redir.ts", viewer_of(headers)), headers=headers
     )
     assert redirected.status_code == 502
     assert not internal.called
@@ -282,14 +290,16 @@ async def test_proxy_follows_public_redirects_but_not_forever(client, session):
     )
     respx.get("https://cdn.example/a.ts").mock(return_value=httpx.Response(200, content=b"seg"))
     assert (
-        await client.get(signed("https://host.example/a.ts", str(user.id)), headers=headers)
+        await client.get(signed("https://host.example/a.ts", viewer_of(headers)), headers=headers)
     ).content == b"seg"
 
     respx.get("https://host.example/loop.ts").mock(
         return_value=httpx.Response(302, headers={"location": "https://host.example/loop.ts"})
     )
     assert (
-        await client.get(signed("https://host.example/loop.ts", str(user.id)), headers=headers)
+        await client.get(
+            signed("https://host.example/loop.ts", viewer_of(headers)), headers=headers
+        )
     ).status_code == 502
 
 
@@ -300,7 +310,9 @@ async def test_oversized_playlists_are_cut_off(client, session):
     big = "#EXTM3U\n" + "#EXTINF:1,\nhttps://seg.example/s.ts\n" * 80_000
     respx.get("https://host.example/big.m3u8").mock(return_value=httpx.Response(200, text=big))
     assert len(big) > hls.MAX_PLAYLIST_BYTES
-    r = await client.get(signed("https://host.example/big.m3u8", str(user.id)), headers=headers)
+    r = await client.get(
+        signed("https://host.example/big.m3u8", viewer_of(headers)), headers=headers
+    )
     assert r.status_code == 502
     assert r.json()["error"]["code"] == "upstream_failed"
 

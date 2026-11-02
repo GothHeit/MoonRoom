@@ -18,6 +18,8 @@ type Props = {
   fullscreen: boolean;
   settingsOpen: boolean;
   hasNext: boolean;
+  /** Present only where AirPlay exists and a link for the receiver is ready. */
+  airPlay?: { active: boolean; open: () => void } | null;
   onSeekTo: (seconds: number) => void;
   onTogglePlay: () => void;
   onSeekBy: (delta: number) => void;
@@ -30,7 +32,7 @@ type Props = {
 
 /** The seek bar and the buttons under it. */
 export function ControlBar(props: Props) {
-  const { current, duration, playing, muted, volume, fullscreen, settingsOpen, hasNext } = props;
+  const { current, duration, playing, muted, volume, fullscreen, settingsOpen, hasNext, airPlay } = props;
   const t = useTranslations("player");
   // Until the stream says how long it is, "0:00 / 0:00" reads as frozen: keep the row's
   // space so nothing moves, but show it only once the length is known.
@@ -84,6 +86,17 @@ export function ControlBar(props: Props) {
           className="hidden w-24 cursor-pointer accent-accent sm:block"
         />
         <span className="flex-1" />
+        {airPlay && (
+          <button
+            type="button"
+            onClick={airPlay.open}
+            aria-label={t("airplay")}
+            aria-pressed={airPlay.active}
+            className={`${iconButton} ${airPlay.active ? "text-accent" : ""}`}
+          >
+            <PlayerIcon name="airplay" />
+          </button>
+        )}
         <button
           type="button"
           onClick={props.onToggleSettings}

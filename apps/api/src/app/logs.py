@@ -8,7 +8,7 @@ import logging
 import re
 
 # Query parameters whose values are credentials or signatures.
-SECRET_PARAMS = ("token", "s", "sig", "code", "state", "refresh_token", "access_token")
+SECRET_PARAMS = ("token", "s", "i", "sig", "code", "state", "refresh_token", "access_token")
 
 _SECRET_QUERY = re.compile(r"([?&](?:" + "|".join(SECRET_PARAMS) + r")=)[^&#\s]*")
 

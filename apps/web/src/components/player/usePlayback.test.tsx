@@ -11,7 +11,7 @@ const { useSubtitles } = await import("./useSubtitles");
 const { useSkips } = await import("./useSkips");
 
 const PLAY = {
-  url: "/watch/stream/abc.m3u8",
+  url: "/watch/hls?token=abc",
   kind: "hls",
   source: "zoko",
   subtitles: [{ lang: "en", label: "English", url: "/s/en.vtt", ass_url: "/s/en.ass" }],
@@ -27,10 +27,10 @@ beforeEach(() => {
 });
 
 describe("usePlayback", () => {
-  it("keeps what the API answered, with links through the proxy", async () => {
+  it("keeps what the API answered: the stream through the login-free route, the rest through the proxy", async () => {
     post.mockResolvedValue({ data: { ...PLAY, source: "animesdigital" } });
     const { result } = renderHook(() => usePlayback("zoko", 1, 3, "sub"));
-    await waitFor(() => expect(result.current.url).toBe("/api/proxy/watch/stream/abc.m3u8"));
+    await waitFor(() => expect(result.current.url).toBe("/api/stream/hls?token=abc"));
     expect(post).toHaveBeenCalledWith("/watch/{source}/{anime_id}/episodes/{episode}/play", {
       params: { path: { source: "zoko", anime_id: 1, episode: 3 }, query: { lang: "sub" } },
     });

@@ -17,8 +17,8 @@ from tests.test_ratelimit import Clock
 
 def test_redact_hides_tokens_signatures_and_oauth_codes():
     assert redact("/watch/hls?token=abc.def&x=1") == "/watch/hls?token=[redacted]&x=1"
-    assert redact("/watch/hls?u=https%3A%2F%2Fh&e=9&s=f00d") == (
-        "/watch/hls?u=https%3A%2F%2Fh&e=9&s=[redacted]"
+    assert redact("/watch/hls?u=https%3A%2F%2Fh&i=sess&e=9&s=f00d") == (
+        "/watch/hls?u=https%3A%2F%2Fh&i=[redacted]&e=9&s=[redacted]"
     )
     assert redact("/mal/callback?code=c1&state=s1") == (
         "/mal/callback?code=[redacted]&state=[redacted]"

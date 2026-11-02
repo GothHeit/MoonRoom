@@ -6,15 +6,14 @@ from typing import Annotated, Literal
 
 import httpx
 from cachetools import TTLCache
-from fastapi import APIRouter, Depends, Path, Query, Request
+from fastapi import APIRouter, Path, Query, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import hls
 from app.choose import Picked, audio_to_start, resolve_auto, union_episodes
-from app.deps import CurrentSessionId, CurrentUser, Session, bearer_identity
+from app.deps import CurrentSessionId, CurrentUser, Session, session_check, throttle
 from app.errors import ApiError
 from app.models import PlayerPreferences, SourceChoice
 from app.probes import Gone, HostError, Master, StreamProbes
@@ -44,7 +43,6 @@ router = APIRouter(prefix="/watch", tags=["watch"])
 AUDIO_LANG = r"^(original|[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,4})?)$"
 # The pseudo-source that lets the API pick the best version for the viewer (app.ranking).
 AUTO = "auto"
-_bearer = HTTPBearer(auto_error=False)
 
 # How long the player's source menu waits on each source before leaving it out.
 OPTION_PROBE_TIMEOUT = 8.0
@@ -256,7 +254,7 @@ async def sources(request: Request, user: CurrentUser):
     return list(request.app.state.sources)
 
 
-def episodes_out(source: str, result: EpisodeList, viewer: str) -> EpisodesOut:
+def episodes_out(source: str, result: EpisodeList, viewer: hls.Viewer) -> EpisodesOut:
     return EpisodesOut(
         source=source,
         source_title=result.source_title,
@@ -270,7 +268,12 @@ def episodes_out(source: str, result: EpisodeList, viewer: str) -> EpisodesOut:
 
 @router.get("/{source}/{anime_id}/episodes", response_model=EpisodesOut)
 async def episodes(
-    request: Request, source: str, anime_id: int, user: CurrentUser, lang: Lang = "sub"
+    request: Request,
+    source: str,
+    anime_id: int,
+    user: CurrentUser,
+    sid: CurrentSessionId,
+    lang: Lang = "sub",
 ):
     anime = await request.app.state.mal.visible_details(anime_id, user.show_nsfw)
     if source == AUTO:
@@ -279,7 +282,7 @@ async def episodes(
         result = await _upstream(_source(request, source).episodes(anime, lang))
     if result is None:
         raise ApiError(404, "not_available", "This anime isn't available from this source")
-    return episodes_out(source, result, str(user.id))
+    return episodes_out(source, result, hls.Viewer(str(user.id), str(sid)))
 
 
 @router.get("/options/{anime_id}/{episode}", response_model=list[StreamOption])
@@ -447,6 +450,34 @@ async def put_preferences(body: PlayerPreferencesIn, user: CurrentUser, session:
     return PlayerPreferencesIO.model_validate(saved, from_attributes=True)
 
 
+class LinkOut(BaseModel):
+    url: str
+
+
+@router.post(
+    "/{source}/{anime_id}/episodes/{episode}/link",
+    response_model=LinkOut,
+    dependencies=[throttle("stream_link")],
+)
+async def link(
+    request: Request,
+    source: str,
+    anime_id: int,
+    episode: int,
+    user: CurrentUser,
+    sid: CurrentSessionId,
+    kind: Literal["hls", "mp4"] = "hls",
+    lang: Lang = "sub",
+):
+    """A fresh link to start the episode a /play answer picked (`source` and `lang` are the
+    ones it reported). Asking costs nothing upstream: the stream is only looked up when the
+    link is opened. Used to hand the stream to a device that fetches it itself, such as an
+    AirPlay receiver, long after the first link has expired."""
+    _source(request, source)
+    token = create_playback_token(user.id, sid, source, anime_id, episode, lang)
+    return LinkOut(url=f"/watch/{'video' if kind == 'mp4' else 'hls'}?token={token}")
+
+
 @router.post("/{source}/{anime_id}/episodes/{episode}/play", response_model=PlaybackOut)
 async def play(
     request: Request,
@@ -483,7 +514,7 @@ async def play(
     token = create_playback_token(user.id, sid, used, anime_id, episode, lang)
     path = "video" if stream.kind == "mp4" else "hls"
     referer = stream.upstream_headers.get("Referer", "")
-    viewer = str(user.id)
+    viewer = hls.Viewer(str(user.id), str(sid))
     resolution = stream.resolution
     master = request.app.state.probes.peek(stream.url, referer) if stream.kind == "hls" else None
     if resolution is None and master:
@@ -521,29 +552,27 @@ async def play(
     )
 
 
-async def _playback_claims(
-    request: Request,
-    session: AsyncSession,
-    credentials: HTTPAuthorizationCredentials | None,
-    token: str | None,
-) -> dict:
-    """The claims of a playback token, which only its own user's open session may use: a link
-    copied out of a log or a browser history is worthless on its own."""
-    user_id, _ = await bearer_identity(request, session, credentials)
+async def _playback_claims(request: Request, session: AsyncSession, token: str | None) -> dict:
+    """The claims of a playback token. The token stands on its own, since the devices that play
+    it can't send a login, but it only works while the login session it was made in is open, so
+    signing out stops it."""
     claims = decode_playback_token(token) if token else None
-    if claims is None or claims["sub"] != str(user_id):
+    if claims is None or not await _session_open(request, session, claims["sub"], claims["sid"]):
         raise ApiError(403, "invalid_link", "Invalid or expired playback token")
     return claims
 
 
+async def _session_open(request: Request, session: AsyncSession, user: str, sid: str) -> bool:
+    try:
+        ids = uuid.UUID(user), uuid.UUID(sid)
+    except ValueError:
+        return False
+    return await session_check(request).is_open(session, *ids)
+
+
 @router.get("/video")
-async def video(
-    request: Request,
-    session: Session,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-    token: Annotated[str, Query()],
-):
-    claims = await _playback_claims(request, session, credentials, token)
+async def video(request: Request, session: Session, token: Annotated[str, Query()]):
+    claims = await _playback_claims(request, session, token)
     await session.commit()  # the stream below can run for hours: don't hold a connection
 
     src = _source(request, claims["src"])
@@ -600,7 +629,7 @@ async def video(
 LOCAL_CACHE = "private, max-age=3600"
 
 
-def _serve_local(url: str, viewer: str) -> Response:
+def _serve_local(url: str, viewer: hls.Viewer) -> Response:
     """A file from the local library: playlists rewritten like remote ones, the rest as is
     (with Range support, for seeking). Blocking, and the library may sit on a network mount,
     so it runs in a thread; each request costs one resolve and one stat."""
@@ -628,35 +657,50 @@ def _serve_local(url: str, viewer: str) -> Response:
 async def hls_proxy(
     request: Request,
     session: Session,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     token: Annotated[str | None, Query()] = None,
+    subs: Annotated[bool, Query()] = False,
     u: Annotated[str | None, Query()] = None,
     r: Annotated[str, Query()] = "",
     k: Annotated[str, Query()] = "",
+    v: Annotated[str, Query()] = "",
+    i: Annotated[str, Query()] = "",
     e: Annotated[int, Query()] = 0,
     s: Annotated[str, Query()] = "",
 ):
-    """Without `u`, the master playlist of the episode the token is for. With `u`, one
-    playlist, segment, subtitle or image that an earlier response linked to (signed for the
-    signed-in viewer, who must send their bearer token, as the web app's proxy does)."""
+    """Without `u`, the master playlist of the episode the token is for (with `subs`, listing
+    its subtitles in the playlist, for players that fetch it themselves). With `u`, one
+    playlist, segment, subtitle or image that an earlier response linked to. Neither needs a
+    login header: the token or the link names the user and the session, and is checked against
+    both."""
     if u is None:
-        claims = await _playback_claims(request, session, credentials, token)
+        claims = await _playback_claims(request, session, token)
+        # A token can be replayed for its few minutes: don't let that hammer the scrapers.
+        request.app.state.action_limits.hit("stream_start", claims["sub"])
         await session.commit()  # the scraper call below can be slow
         src = _source(request, claims["src"])
         anime = await request.app.state.mal.details(claims["aid"])
         stream = await _upstream(src.stream(anime, claims["ep"], claims["lang"]))
         if stream is None or stream.kind != "hls":
             raise ApiError(404, "not_available", "This episode isn't available any more")
-        url, referer, viewer = stream.url, stream.upstream_headers.get("Referer", ""), claims["sub"]
+        url, referer = stream.url, stream.upstream_headers.get("Referer", "")
+        viewer = hls.Viewer(claims["sub"], claims["sid"])
+        tracks = [(t.lang, t.label, t.url) for t in stream.subtitles] if subs else []
     else:
-        # These come several times a second: the session check is answered from its cache.
-        user_id, _ = await bearer_identity(request, session, credentials)
-        await session.commit()
-        viewer = str(user_id)
+        viewer = hls.Viewer(v, i)
+        # The signature first: it costs nothing and keeps strangers away from the database.
         # 403, not 401: a stale or foreign link can't be fixed by refreshing the session.
-        if not hls.verify_link(u, r, k, viewer, e, s):
+        if not hls.verify_link(u, r, k, viewer, e, s) or not await _session_open(
+            request, session, v, i
+        ):
             raise ApiError(403, "invalid_link", "Invalid or expired stream link")
-        url, referer = u, r
+        await session.commit()
+        url, referer, tracks = u, r, []
+    if u is not None and k == "subpl":
+        return Response(
+            hls.subtitle_playlist(url, referer, viewer),
+            media_type="application/vnd.apple.mpegurl",
+            headers={"cache-control": "no-store"},
+        )
 
     if url.startswith("file:"):
         return await asyncio.to_thread(_serve_local, url, viewer)
@@ -664,7 +708,12 @@ async def hls_proxy(
         # Usually already fetched when playback checked the stream: no trip to the host.
         master = await _master(request.app.state.probes, url, referer)
         return Response(
-            hls.rewrite_playlist(master.text, master.url, referer, viewer),
+            hls.add_subtitles(
+                hls.rewrite_playlist(master.text, master.url, referer, viewer),
+                tracks,
+                referer,
+                viewer,
+            ),
             media_type="application/vnd.apple.mpegurl",
             headers={"cache-control": "no-store"},
         )

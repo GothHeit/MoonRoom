@@ -5,8 +5,9 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request
 
+from app import hls
 from app.choose import union_episodes
-from app.deps import CurrentUser, Session
+from app.deps import CurrentSessionId, CurrentUser, Session
 from app.errors import ApiError
 from app.mal.client import MalClient, is_safe
 from app.mal.genres import GENRE_IDS, GENRES
@@ -133,7 +134,9 @@ async def details(
 
 
 @router.get("/{anime_id}/sources", response_model=SourcesOut)
-async def sources(request: Request, anime_id: int, user: CurrentUser, session: Session):
+async def sources(
+    request: Request, anime_id: int, user: CurrentUser, sid: CurrentSessionId, session: Session
+):
     """Which sources can play this title. Separate from the details so a slow scraper never
     holds the title page back."""
     raw = await _mal(request).visible_details(anime_id, user.show_nsfw)
@@ -143,7 +146,9 @@ async def sources(request: Request, anime_id: int, user: CurrentUser, session: S
     choice = None
     if saved is not None and saved.source in available:
         choice = StreamOption(source=saved.source, lang="dub" if saved.lang == "dub" else "sub")
-    stream, listing = await _first_listing(request, raw, available, choice, str(user.id))
+    stream, listing = await _first_listing(
+        request, raw, available, choice, hls.Viewer(str(user.id), str(sid))
+    )
     return SourcesOut(sources=available, choice=choice, stream=stream, listing=listing)
 
 
@@ -231,7 +236,7 @@ async def _first_listing(
     anime: dict,
     available: list[str],
     choice: StreamOption | None,
-    viewer: str,
+    viewer: hls.Viewer,
 ) -> tuple[StreamOption | None, EpisodesOut | None]:
     """The episodes of the stream the title page plays from: the saved pick, else the automatic
     choice. A pick that lists nothing falls through to the default."""

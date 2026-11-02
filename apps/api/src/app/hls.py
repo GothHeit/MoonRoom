@@ -20,6 +20,7 @@ import stat
 import time
 from functools import lru_cache
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import quote, unquote, urljoin, urlsplit
 
 from cachetools import TTLCache
@@ -38,7 +39,8 @@ INTERNAL_SUFFIXES = (".localhost", ".local", ".internal", ".lan", ".home", ".cor
 # What a signed link points at, when the proxy can't tell from the upstream answer:
 # "" a playlist or segment, "sub" WebVTT subtitles, "img" a still image, "ass" styled
 # subtitles and "font" a font for them (both local library only).
-KINDS = ("", "sub", "img", "ass", "font")
+# "subpl" is a one-segment playlist wrapping a WebVTT file, which is how HLS carries subtitles.
+KINDS = ("", "sub", "img", "ass", "font", "subpl")
 SAFE_IMAGES = ("image/jpeg", "image/png", "image/webp", "image/gif", "image/avif")
 
 _public_hosts: TTLCache[str, bool] = TTLCache(maxsize=1024, ttl=DNS_TTL)
@@ -96,37 +98,54 @@ async def is_public_target(url: str) -> bool:
     return verdict
 
 
-def _link_key(secret: str) -> bytes:
-    # A key of its own, derived from the main secret: a stream-link signature can never be
-    # mistaken for, or help forge, a login token.
-    return hmac.new(secret.encode(), b"moonroom stream links", hashlib.sha256).digest()
+class Viewer(NamedTuple):
+    """Who a stream link is for: the user and the login session it was made in. The link names
+    both, so it works without a login header (a TV or AirPlay receiver sends none), and it stops
+    working the moment that session is signed out."""
+
+    user: str
+    sid: str = ""
 
 
-def _mac(url: str, referer: str, kind: str, viewer: str, expires: int, secret: str = "") -> str:
-    key = _link_key(secret or get_settings().jwt_secret)
-    msg = f"hls\n{url}\n{referer}\n{kind}\n{viewer}\n{expires}".encode()
+def _who(viewer: "Viewer | str") -> Viewer:
+    return viewer if isinstance(viewer, Viewer) else Viewer(viewer)
+
+
+def _mac(
+    url: str, referer: str, kind: str, viewer: Viewer, expires: int, key: bytes | None = None
+) -> str:
+    key = key or get_settings().stream_link_keys[0]
+    msg = f"hls\n{url}\n{referer}\n{kind}\n{viewer.user}\n{viewer.sid}\n{expires}".encode()
     return hmac.new(key, msg, hashlib.sha256).hexdigest()[:32]
 
 
-def signed_link(url: str, referer: str, viewer: str, kind: str = "") -> str:
-    """`viewer` is the user id the link is for; the proxy only serves it to that user."""
+def signed_link(
+    url: str, referer: str, viewer: "Viewer | str", kind: str = "", lifetime: int = SEGMENT_LIFETIME
+) -> str:
+    """A link the proxy serves to the user it is for, for `lifetime` seconds."""
     # Relative to /watch/hls on purpose: it resolves under whatever prefix the client
-    # reaches the API through (the web app proxies it under /api/proxy).
-    expires = int(time.time()) + SEGMENT_LIFETIME
+    # reaches the API through (the web app serves it under /api/stream and /api/proxy).
+    who = _who(viewer)
+    expires = int(time.time()) + lifetime
     kind_param = f"&k={kind}" if kind else ""
     return (
         f"hls?u={quote(url, safe='')}&r={quote(referer, safe='')}{kind_param}"
-        f"&e={expires}&s={_mac(url, referer, kind, viewer, expires)}"
+        f"&v={who.user}&i={who.sid}&e={expires}&s={_mac(url, referer, kind, who, expires)}"
     )
 
 
-def verify_link(url: str, referer: str, kind: str, viewer: str, expires: int, sig: str) -> bool:
+def verify_link(
+    url: str, referer: str, kind: str, viewer: "Viewer | str", expires: int, sig: str
+) -> bool:
+    """Whether the link is genuine and unexpired. Whether its session is still open is the
+    caller's question."""
+    who = _who(viewer)
     if kind not in KINDS or expires <= time.time():
         return False
-    # Links signed before a JWT_SECRET rotation keep working until they expire.
+    # Links signed before a key rotation keep working until they expire.
     return any(
-        hmac.compare_digest(sig, _mac(url, referer, kind, viewer, expires, secret))
-        for secret in get_settings().jwt_verification_secrets
+        hmac.compare_digest(sig, _mac(url, referer, kind, who, expires, key))
+        for key in get_settings().stream_link_keys
     )
 
 
@@ -246,7 +265,7 @@ def audio_tracks(master: str) -> list[tuple[str, str]]:
     return found
 
 
-def rewrite_playlist(text: str, base_url: str, referer: str, viewer: str) -> str:
+def rewrite_playlist(text: str, base_url: str, referer: str, viewer: "Viewer | str") -> str:
     local = base_url.startswith("file:")
 
     def link(target: str) -> str:
@@ -270,3 +289,45 @@ def rewrite_playlist(text: str, base_url: str, referer: str, viewer: str) -> str
         elif target := link(stripped):
             lines.append(target)
     return "\n".join(lines) + "\n"
+
+
+# A subtitle file covers the whole episode; HLS wants it as a playlist of one long segment.
+SUBTITLE_SPAN = 4 * 3600
+
+
+def _attr(value: str) -> str:
+    return re.sub(r'["\r\n,]', " ", value).strip()
+
+
+def add_subtitles(
+    master: str, tracks: list[tuple[str, str, str]], referer: str, viewer: "Viewer | str"
+) -> str:
+    """Lists the (language, label, WebVTT url) subtitles in an already rewritten master playlist,
+    so a player that plays the stream natively (AirPlay hands it to the TV, which fetches the
+    playlist itself) gets them without any help from our page. A media playlist has nowhere to
+    attach them and is returned as is."""
+    lines = master.splitlines()
+    if not tracks or not any(line.startswith("#EXT-X-STREAM-INF:") for line in lines):
+        return master
+    media = [
+        '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",'
+        f'NAME="{_attr(label) or _attr(lang)}",LANGUAGE="{_attr(lang)}",DEFAULT=NO,AUTOSELECT=NO,'
+        f'URI="{signed_link(url, referer, viewer, "subpl")}"'
+        for lang, label, url in tracks
+    ]
+    out: list[str] = []
+    for line in lines:
+        if line.startswith("#EXT-X-STREAM-INF:") and "SUBTITLES=" not in line:
+            line += ',SUBTITLES="subs"'
+        out.append(line)
+        if line.startswith("#EXTM3U"):
+            out.extend(media)
+    return "\n".join(out) + "\n"
+
+
+def subtitle_playlist(url: str, referer: str, viewer: "Viewer | str") -> str:
+    return (
+        "#EXTM3U\n#EXT-X-VERSION:3\n"
+        f"#EXT-X-TARGETDURATION:{SUBTITLE_SPAN}\n#EXT-X-PLAYLIST-TYPE:VOD\n"
+        f"#EXTINF:{SUBTITLE_SPAN}.0,\n{signed_link(url, referer, viewer, 'sub')}\n#EXT-X-ENDLIST\n"
+    )

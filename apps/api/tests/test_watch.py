@@ -69,8 +69,8 @@ async def test_episodes_and_playback_through_proxy(client, session):
             206, content=b"0123", headers={"content-range": "bytes 0-3/100", "content-length": "4"}
         )
     )
-    # The token names the episode; the same user's bearer token must come with it.
-    video = await client.get(url, headers={**headers, "Range": "bytes=0-3"})
+    # The token names the episode and the session: no login header needed (a TV sends none).
+    video = await client.get(url, headers={"Range": "bytes=0-3"})
     assert video.status_code == 206
     assert video.content == b"0123"
     assert video.headers["content-range"] == "bytes 0-3/100"
@@ -83,14 +83,14 @@ async def test_video_proxy_rejects_missing_or_bad_tokens(client, session):
     fastapi_app.state.sources = {"fake": FakeSource()}
     assert (await client.get("/watch/video")).status_code == 422
     r = await client.get("/watch/video", params={"token": "garbage"})
-    assert r.status_code == 401
+    assert r.status_code == 403
 
 
 async def test_access_token_cannot_be_used_as_playback_token(client, session):
     fastapi_app.state.sources = {"fake": FakeSource()}
     _, headers = await make_user(session, "kafka")
     access = headers["Authorization"].removeprefix("Bearer ")
-    assert (await client.get("/watch/video", params={"token": access})).status_code == 401
+    assert (await client.get("/watch/video", params={"token": access})).status_code == 403
 
 
 @respx.mock

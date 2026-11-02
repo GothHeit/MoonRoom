@@ -31,7 +31,7 @@ from app.library.scan import scan, write_log
 from app.main import app as fastapi_app
 from app.mal.client import API_BASE
 from app.sources.local import LocalSource
-from tests.conftest import make_user
+from tests.conftest import make_user, viewer_of
 
 needs_ffmpeg = pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg is not installed")
 
@@ -319,8 +319,11 @@ async def test_local_episode_plays_through_the_proxy(client, session, library, m
     variants = [line for line in master.text.splitlines() if line.startswith("hls?u=file")]
     assert len(variants) == 2
 
-    # Library links need the viewer's session, like remote ones.
-    assert (await client.get(proxied(variants[0]))).status_code == 401
+    # Library links stand on their own, like remote ones: a TV sends no login header. They name
+    # the session they were made in, so a link with another user's name on it is refused.
+    assert (await client.get(proxied(variants[0]))).status_code == 200
+    forged = proxied(variants[0]).replace("&v=", "&v=x")
+    assert (await client.get(forged)).status_code == 403
     playlist = (await client.get(proxied(variants[0]), headers=headers)).text
     init = playlist.split('URI="')[1].split('"')[0]
     segment = next(line for line in playlist.splitlines() if line.startswith("hls?u="))
@@ -366,9 +369,8 @@ async def test_library_links_never_leave_the_library(client, session, tmp_path, 
     assert "file" not in remote
 
     _, headers = await make_user(session, "kafka")
-    user_id = (await client.get("/me", headers=headers)).json()["id"]
-    outside = proxied(hls.signed_link((tmp_path / "secret.txt").as_uri(), "", user_id))
-    assert (await client.get(outside, headers=headers)).status_code == 404
+    outside = proxied(hls.signed_link((tmp_path / "secret.txt").as_uri(), "", viewer_of(headers)))
+    assert (await client.get(outside)).status_code == 404
 
 
 def test_audio_codecs_follow_the_stored_profile():
