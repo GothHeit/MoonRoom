@@ -11,6 +11,7 @@ from app.db import get_session, utcnow
 from app.errors import ApiError
 from app.models import RefreshToken, User
 from app.security import decode_access_token, sha256
+from app.sessions import SessionCheck
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 
@@ -21,16 +22,32 @@ ACCESS_COOKIE = "mr_access"
 REFRESH_COOKIE = "mr_refresh"
 
 
-async def current_user(
-    session: Session,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-) -> User:
+def session_check(request: Request) -> SessionCheck:
+    return request.app.state.session_check
+
+
+async def bearer_identity(
+    request: Request, db: AsyncSession, credentials: HTTPAuthorizationCredentials | None
+) -> tuple[uuid.UUID, uuid.UUID]:
+    """(user id, session id) of a valid bearer token whose login session is still open."""
     if credentials is None:
         raise ApiError(401, "not_authenticated", "Missing bearer token")
     decoded = decode_access_token(credentials.credentials)
     if decoded is None:
         raise ApiError(401, "invalid_token", "Invalid or expired token")
-    user = await session.get(User, decoded[0])
+    # A signed-out device or revoked session stops here, not when the token expires.
+    if not await session_check(request).is_open(db, *decoded):
+        raise ApiError(401, "invalid_token", "This session was signed out")
+    return decoded
+
+
+async def current_user(
+    request: Request,
+    session: Session,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> User:
+    user_id, _ = await bearer_identity(request, session, credentials)
+    user = await session.get(User, user_id)
     if user is None:
         raise ApiError(401, "invalid_token", "User no longer exists")
     # End the read transaction now: it would otherwise hold a pooled connection until the
@@ -46,13 +63,14 @@ CurrentUser = Annotated[User, Depends(current_user)]
 async def current_session_id(
     user: CurrentUser,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-) -> uuid.UUID | None:
-    """The login session the request belongs to; None for tokens that predate sessions."""
+) -> uuid.UUID:
+    """The login session the request belongs to (current_user already checked the token)."""
     decoded = decode_access_token(credentials.credentials) if credentials else None
-    return decoded[1] if decoded else None
+    assert decoded is not None
+    return decoded[1]
 
 
-CurrentSessionId = Annotated[uuid.UUID | None, Depends(current_session_id)]
+CurrentSessionId = Annotated[uuid.UUID, Depends(current_session_id)]
 
 
 async def current_admin(user: CurrentUser) -> User:
@@ -69,7 +87,7 @@ async def browser_user_id(request: Request, session: AsyncSession) -> uuid.UUID 
     reaches directly (the MAL callback) instead of through the web server's proxy."""
     access = request.cookies.get(ACCESS_COOKIE)
     decoded = decode_access_token(access) if access else None
-    if decoded is not None:
+    if decoded is not None and await session_check(request).is_open(session, *decoded):
         return decoded[0]
     refresh = request.cookies.get(REFRESH_COOKIE)
     if not refresh:

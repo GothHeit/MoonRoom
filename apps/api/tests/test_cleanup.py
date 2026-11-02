@@ -9,7 +9,7 @@ from tests.conftest import make_user
 
 
 async def test_prune_drops_only_long_dead_rows(client, session):
-    user, _ = await make_user(session, "kafka")
+    user, _ = await make_user(session, "kafka", login=False)
     now = utcnow()
     for name, expires, revoked in [
         ("live", now + timedelta(days=1), None),

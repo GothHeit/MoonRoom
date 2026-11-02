@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import uuid
 from collections.abc import Awaitable
 from typing import Annotated, Literal
 
@@ -10,14 +9,15 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import hls
-from app.deps import CurrentUser, Session
+from app.deps import CurrentSessionId, CurrentUser, Session, bearer_identity
 from app.errors import ApiError
-from app.models import PlayerPreferences, SourceChoice, User
+from app.models import PlayerPreferences, SourceChoice
 from app.probes import Gone, HostError, Master, StreamProbes
 from app.schemas import EpisodesOut, StreamOption
-from app.security import create_playback_token, decode_access_token, decode_playback_token
+from app.security import create_playback_token, decode_playback_token
 from app.singleflight import SingleFlight
 from app.source_hints import lacks_subbed
 from app.sources.base import EpisodeList, Lang, SkipKind, Stream, VideoSource
@@ -82,8 +82,8 @@ class PlaybackOut(BaseModel):
     source: str
     kind: str
     resolution: int | None
-    # Relative to the API base URL. Carries a token scoped to this one episode, because
-    # <video> and native players can't send an Authorization header.
+    # Relative to the API base URL. Carries a short-lived token naming this episode; fetching it
+    # also needs the same user's bearer token (the web app's proxy adds it from the cookie).
     url: str
     subtitles: list[SubtitleOut] = []
     skips: list[SkipOut] = []
@@ -359,6 +359,7 @@ async def play(
     anime_id: int,
     episode: int,
     user: CurrentUser,
+    sid: CurrentSessionId,
     lang: Lang = "sub",
     fresh: Annotated[
         bool, Query(description="Check the stream again instead of trusting a recent check")
@@ -369,7 +370,7 @@ async def play(
     if resolved is None:
         raise ApiError(404, "not_available", "This episode isn't available from this source")
     used, stream = resolved
-    token = create_playback_token(user.id, used, anime_id, episode, lang)
+    token = create_playback_token(user.id, sid, used, anime_id, episode, lang)
     path = "video" if stream.kind == "mp4" else "hls"
     referer = stream.upstream_headers.get("Referer", "")
     viewer = str(user.id)
@@ -405,11 +406,29 @@ async def play(
     )
 
 
+async def _playback_claims(
+    request: Request,
+    session: AsyncSession,
+    credentials: HTTPAuthorizationCredentials | None,
+    token: str | None,
+) -> dict:
+    """The claims of a playback token, which only its own user's open session may use: a link
+    copied out of a log or a browser history is worthless on its own."""
+    user_id, _ = await bearer_identity(request, session, credentials)
+    claims = decode_playback_token(token) if token else None
+    if claims is None or claims["sub"] != str(user_id):
+        raise ApiError(403, "invalid_link", "Invalid or expired playback token")
+    return claims
+
+
 @router.get("/video")
-async def video(request: Request, session: Session, token: Annotated[str, Query()]):
-    claims = decode_playback_token(token)
-    if claims is None or await session.get(User, uuid.UUID(claims["sub"])) is None:
-        raise ApiError(401, "invalid_token", "Invalid or expired playback token")
+async def video(
+    request: Request,
+    session: Session,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    token: Annotated[str, Query()],
+):
+    claims = await _playback_claims(request, session, credentials, token)
     await session.commit()  # the stream below can run for hours: don't hold a connection
 
     src = _source(request, claims["src"])
@@ -506,9 +525,7 @@ async def hls_proxy(
     playlist, segment, subtitle or image that an earlier response linked to (signed for the
     signed-in viewer, who must send their bearer token, as the web app's proxy does)."""
     if u is None:
-        claims = decode_playback_token(token) if token else None
-        if claims is None or await session.get(User, uuid.UUID(claims["sub"])) is None:
-            raise ApiError(401, "invalid_token", "Invalid or expired playback token")
+        claims = await _playback_claims(request, session, credentials, token)
         await session.commit()  # the scraper call below can be slow
         src = _source(request, claims["src"])
         anime = await request.app.state.mal.details(claims["aid"])
@@ -517,11 +534,10 @@ async def hls_proxy(
             raise ApiError(404, "not_available", "This episode isn't available any more")
         url, referer, viewer = stream.url, stream.upstream_headers.get("Referer", ""), claims["sub"]
     else:
-        # Only the token is checked, not the database: these come several times a second.
-        decoded = decode_access_token(credentials.credentials) if credentials else None
-        if decoded is None:
-            raise ApiError(401, "not_authenticated", "Missing or expired bearer token")
-        viewer = str(decoded[0])
+        # These come several times a second: the session check is answered from its cache.
+        user_id, _ = await bearer_identity(request, session, credentials)
+        await session.commit()
+        viewer = str(user_id)
         # 403, not 401: a stale or foreign link can't be fixed by refreshing the session.
         if not hls.verify_link(u, r, k, viewer, e, s):
             raise ApiError(403, "invalid_link", "Invalid or expired stream link")

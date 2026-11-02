@@ -44,7 +44,7 @@ async def login(client, username, password):
 
 
 async def test_repeated_failed_logins_for_one_user_are_throttled(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     limit = get_settings().login_user_limit
     for _ in range(limit):
         assert (await login(client, "kafka", "wrong-password")).status_code == 401
@@ -55,7 +55,7 @@ async def test_repeated_failed_logins_for_one_user_are_throttled(client, session
 
 
 async def test_successful_login_clears_the_user_counter(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     limit = get_settings().login_user_limit
     for _ in range(limit - 1):
         await login(client, "kafka", "wrong-password")
@@ -79,7 +79,7 @@ async def test_concurrent_refreshes_with_one_token_leave_one_live_token(client, 
 
     from app.models import RefreshToken
 
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     refresh_token = (await login(client, "kafka", "password123")).json()["refresh_token"]
     results = await asyncio.gather(
         *(client.post("/auth/refresh", json={"refresh_token": refresh_token}) for _ in range(8))
@@ -94,7 +94,7 @@ async def test_concurrent_refreshes_with_one_token_leave_one_live_token(client, 
 
 
 async def test_a_burst_of_concurrent_wrong_guesses_is_counted(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     limit = get_settings().login_user_limit
     results = await asyncio.gather(
         *(login(client, "kafka", "wrong-password") for _ in range(limit + 6))
@@ -104,14 +104,14 @@ async def test_a_burst_of_concurrent_wrong_guesses_is_counted(client, session):
 
 
 async def test_successful_logins_do_not_use_up_the_ip_limit(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     for _ in range(get_settings().login_ip_limit + 3):
         assert (await login(client, "kafka", "password123")).status_code == 200
 
 
 async def test_a_strangers_guesses_do_not_lock_the_real_user_out(client, session, monkeypatch):
     monkeypatch.setattr(get_settings(), "trust_proxy_headers", True)
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     for _ in range(get_settings().login_user_limit):
         r = await client.post(
             "/auth/login",

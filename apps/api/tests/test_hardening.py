@@ -91,15 +91,15 @@ async def test_api_docs_can_be_turned_off(monkeypatch):
 
 def test_tokens_signed_before_a_rotation_stay_valid(monkeypatch):
     settings = get_settings()
-    user_id = uuid.uuid4()
-    old_token = create_access_token(user_id)
+    user_id, sid = uuid.uuid4(), uuid.uuid4()
+    old_token = create_access_token(user_id, sid)
     old_secret = settings.jwt_secret
     monkeypatch.setattr(settings, "jwt_secret", "a-brand-new-secret-of-at-least-32-chars")
     assert decode_access_token(old_token) is None
     monkeypatch.setattr(settings, "jwt_previous_secrets", old_secret)
-    assert decode_access_token(old_token) == (user_id, None)
+    assert decode_access_token(old_token) == (user_id, sid)
     # New tokens are signed with the new secret only.
-    new = create_access_token(user_id)
+    new = create_access_token(user_id, sid)
     assert jwt.decode(new, settings.jwt_secret, algorithms=[ALGORITHM])["sub"] == str(user_id)
 
 

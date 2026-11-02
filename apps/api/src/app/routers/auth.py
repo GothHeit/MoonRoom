@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from app.avatars import AvatarOut, avatar_out
 from app.config import get_settings
 from app.db import utcnow
-from app.deps import ClientIp, CurrentSessionId, CurrentUser, Session
+from app.deps import ClientIp, CurrentSessionId, CurrentUser, Session, session_check
 from app.errors import ApiError
 from app.models import Invite, MalLink, RefreshToken, User
 from app.security import (
@@ -246,6 +246,7 @@ async def refresh(body: RefreshIn, session: Session, request: Request, ip: Clien
             .values(revoked_at=utcnow(), expires_at=utcnow())
         )
         await session.commit()
+        session_check(request).closed_for_user(token.user_id)
         audit.warning("refresh token replayed, all sessions ended user=%s ip=%s", token.user_id, ip)
         raise ApiError(401, "invalid_refresh_token", "Refresh token was already used")
 
@@ -259,16 +260,19 @@ async def refresh(body: RefreshIn, session: Session, request: Request, ip: Clien
 
 
 @router.post("/auth/logout", status_code=204)
-async def logout(body: RefreshIn, session: Session):
-    await session.execute(
+async def logout(body: RefreshIn, session: Session, request: Request):
+    family = await session.scalar(
         update(RefreshToken)
         .where(
             RefreshToken.token_hash == sha256(body.refresh_token),
             RefreshToken.revoked_at.is_(None),
         )
         .values(revoked_at=utcnow(), expires_at=utcnow())
+        .returning(RefreshToken.family_id)
     )
     await session.commit()
+    if family is not None:
+        session_check(request).closed(family)
 
 
 @router.get("/me", response_model=MeOut)
@@ -322,19 +326,23 @@ async def list_sessions(user: CurrentUser, session: Session, current: CurrentSes
 
 
 @router.delete("/me/sessions/{session_id}", status_code=204)
-async def revoke_session(session_id: uuid.UUID, user: CurrentUser, session: Session):
+async def revoke_session(
+    session_id: uuid.UUID, user: CurrentUser, session: Session, request: Request
+):
     result = await session.execute(_revoke(user, only=session_id))
     await session.commit()
     if result.rowcount == 0:  # type: ignore[attr-defined]
         raise ApiError(404, "session_not_found", "No such session")
+    session_check(request).closed(session_id)
     audit.info("session revoked user=%s session=%s", user.id, session_id)
 
 
 @router.delete("/me/sessions", status_code=204)
-async def revoke_all_sessions(user: CurrentUser, session: Session):
+async def revoke_all_sessions(user: CurrentUser, session: Session, request: Request):
     """Signs the user out everywhere, this device included."""
     await session.execute(_revoke(user))
     await session.commit()
+    session_check(request).closed_for_user(user.id)
     audit.info("all sessions revoked user=%s", user.id)
 
 
@@ -358,4 +366,5 @@ async def change_password(
     # Every other device must sign in again; this one keeps its session.
     await session.execute(_revoke(user, keep=current))
     await session.commit()
+    session_check(request).closed_for_user(user.id, keep=current)
     audit.info("password changed user=%s", user.id)

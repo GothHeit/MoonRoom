@@ -5936,6 +5936,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Video",
         "tags": [
           "watch"

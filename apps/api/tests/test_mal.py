@@ -6,7 +6,7 @@ import respx
 from app.db import utcnow
 from app.mal.client import API_BASE, current_season, filter_nsfw, rank_search_results
 from app.models import MalLink
-from tests.conftest import make_user
+from tests.conftest import login_token, make_user
 
 
 def test_current_season():
@@ -181,7 +181,6 @@ async def test_mal_callback_refuses_a_browser_signed_in_as_someone_else(client, 
     from sqlalchemy import select
 
     from app.models import MalLink, MalOAuthState
-    from app.security import create_access_token
 
     starter, _ = await make_user(session, "kafka")
     victim, _ = await make_user(session, "friend")
@@ -196,7 +195,7 @@ async def test_mal_callback_refuses_a_browser_signed_in_as_someone_else(client, 
         return_value=httpx.Response(200, json={"name": "victim"})
     )
 
-    client.cookies.set("mr_access", create_access_token(victim.id))
+    client.cookies.set("mr_access", await login_token(session, victim))
     r = await client.get("/mal/callback", params={"code": "c", "state": "abc"})
     assert r.headers["location"].endswith("/en/settings?mal=failed")
     assert not token.called
@@ -208,7 +207,6 @@ async def test_mal_callback_links_for_the_signed_in_browser(client, session):
     from sqlalchemy import select
 
     from app.models import MalLink, MalOAuthState
-    from app.security import create_access_token
 
     user, _ = await make_user(session, "kafka")
     session.add(MalOAuthState(state="abc", user_id=user.id, verifier="v", locale="en"))
@@ -222,7 +220,7 @@ async def test_mal_callback_links_for_the_signed_in_browser(client, session):
         return_value=httpx.Response(200, json={"name": "kafka"})
     )
 
-    client.cookies.set("mr_access", create_access_token(user.id))
+    client.cookies.set("mr_access", await login_token(session, user))
     r = await client.get("/mal/callback", params={"code": "c", "state": "abc"})
     assert r.headers["location"].endswith("/en/settings?mal=linked")
     assert await session.scalar(select(MalLink.user_id)) == user.id

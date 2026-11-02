@@ -69,8 +69,8 @@ async def test_episodes_and_playback_through_proxy(client, session):
             206, content=b"0123", headers={"content-range": "bytes 0-3/100", "content-length": "4"}
         )
     )
-    # No Authorization header: the playback token in the URL is enough.
-    video = await client.get(url, headers={"Range": "bytes=0-3"})
+    # The token names the episode; the same user's bearer token must come with it.
+    video = await client.get(url, headers={**headers, "Range": "bytes=0-3"})
     assert video.status_code == 206
     assert video.content == b"0123"
     assert video.headers["content-range"] == "bytes 0-3/100"
@@ -118,12 +118,12 @@ async def test_video_proxy_passes_range_not_satisfiable_through(client, session)
     respx.get(VIDEO_URL).mock(
         return_value=httpx.Response(416, headers={"content-range": "bytes */100"})
     )
-    video = await client.get(url, headers={"Range": "bytes=500-"})
+    video = await client.get(url, headers={**headers, "Range": "bytes=500-"})
     assert video.status_code == 416
     assert video.headers["content-range"] == "bytes */100"
 
     respx.get(VIDEO_URL).mock(return_value=httpx.Response(403))
-    assert (await client.get(url)).status_code == 502
+    assert (await client.get(url, headers=headers)).status_code == 502
 
 
 @respx.mock
@@ -403,10 +403,10 @@ async def test_source_and_video_host_failures_answer_upstream_failed(client, ses
     source.down = True
     eps = await client.get("/watch/fake/21/episodes", headers=headers)
     assert (eps.status_code, eps.json()["error"]["code"]) == (502, "upstream_failed")
-    video = await client.get(url)
+    video = await client.get(url, headers=headers)
     assert (video.status_code, video.json()["error"]["code"]) == (502, "upstream_failed")
 
     source.down = False
     respx.get(VIDEO_URL).mock(side_effect=httpx.ConnectTimeout("stalled"))
-    video = await client.get(url)
+    video = await client.get(url, headers=headers)
     assert (video.status_code, video.json()["error"]["code"]) == (502, "upstream_failed")

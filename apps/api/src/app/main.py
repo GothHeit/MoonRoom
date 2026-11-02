@@ -32,6 +32,7 @@ from app.routers import (
     rooms,
     watch,
 )
+from app.sessions import SessionCheck
 from app.source_hints import new_source_hints
 from app.sources import load_sources
 
@@ -42,12 +43,15 @@ EPISODE_CHECK_FIRST_RUN_SECONDS = 120
 PRUNE_INTERVAL_SECONDS = 6 * 3600
 
 
-async def _sweep(limits: AuthLimits, actions: ActionLimits, rooms: Rooms) -> None:
+async def _sweep(
+    limits: AuthLimits, actions: ActionLimits, sessions: SessionCheck, rooms: Rooms
+) -> None:
     # Idle rate-limit keys are otherwise only dropped when the same key is seen again.
     while True:
         await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
         limits.sweep()
         actions.sweep()
+        sessions.sweep()
         rooms.sweep()
 
 
@@ -89,13 +93,19 @@ async def lifespan(app: FastAPI):
             app.state.pt_synopses = PtSynopses(http)
         app.state.auth_limits = AuthLimits(settings)
         app.state.action_limits = ActionLimits()
+        app.state.session_check = SessionCheck()
         app.state.rooms = Rooms(settings.max_rooms_per_host)
         app.state.source_hints = new_source_hints()
         app.state.probes = StreamProbes(http)
         app.state.watch = watch.WatchCaches()
         app.state.sources = load_sources(settings.video_source_names)
         sweeper = asyncio.create_task(
-            _sweep(app.state.auth_limits, app.state.action_limits, app.state.rooms)
+            _sweep(
+                app.state.auth_limits,
+                app.state.action_limits,
+                app.state.session_check,
+                app.state.rooms,
+            )
         )
         pruner = asyncio.create_task(_prune())
         checker = (

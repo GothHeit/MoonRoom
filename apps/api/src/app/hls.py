@@ -96,8 +96,14 @@ async def is_public_target(url: str) -> bool:
     return verdict
 
 
-def _mac(url: str, referer: str, kind: str, viewer: str, expires: int) -> str:
-    key = get_settings().jwt_secret.encode()
+def _link_key(secret: str) -> bytes:
+    # A key of its own, derived from the main secret: a stream-link signature can never be
+    # mistaken for, or help forge, a login token.
+    return hmac.new(secret.encode(), b"moonroom stream links", hashlib.sha256).digest()
+
+
+def _mac(url: str, referer: str, kind: str, viewer: str, expires: int, secret: str = "") -> str:
+    key = _link_key(secret or get_settings().jwt_secret)
     msg = f"hls\n{url}\n{referer}\n{kind}\n{viewer}\n{expires}".encode()
     return hmac.new(key, msg, hashlib.sha256).hexdigest()[:32]
 
@@ -115,10 +121,12 @@ def signed_link(url: str, referer: str, viewer: str, kind: str = "") -> str:
 
 
 def verify_link(url: str, referer: str, kind: str, viewer: str, expires: int, sig: str) -> bool:
-    return (
-        kind in KINDS
-        and expires > time.time()
-        and hmac.compare_digest(sig, _mac(url, referer, kind, viewer, expires))
+    if kind not in KINDS or expires <= time.time():
+        return False
+    # Links signed before a JWT_SECRET rotation keep working until they expire.
+    return any(
+        hmac.compare_digest(sig, _mac(url, referer, kind, viewer, expires, secret))
+        for secret in get_settings().jwt_verification_secrets
     )
 
 

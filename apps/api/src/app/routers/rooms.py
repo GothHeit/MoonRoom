@@ -9,13 +9,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from app import db
-from app.deps import CurrentUser, Session, throttle
+from app.deps import CurrentUser, Session, bearer_identity, throttle
 from app.errors import ApiError
 from app.models import User
 from app.notifications import notify
 from app.rooms import REACTIONS, Room, Rooms
 from app.routers.friends import friend_ids
-from app.security import decode_access_token
 
 router = APIRouter(prefix="/watch/rooms", tags=["rooms"])
 _bearer = HTTPBearer(auto_error=False)
@@ -186,17 +185,14 @@ async def lock(code: str, body: LockIn, request: Request, user: CurrentUser):
 
 
 async def _stream_user(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> User:
     # Not CurrentUser: that holds a database connection until the response ends, and this
     # response lasts as long as the viewer stays in the room.
-    if credentials is None:
-        raise ApiError(401, "not_authenticated", "Missing bearer token")
-    decoded = decode_access_token(credentials.credentials)
-    if decoded is None:
-        raise ApiError(401, "invalid_token", "Invalid or expired token")
     async with db.new_session() as session:
-        user = await session.get(User, decoded[0])
+        user_id, _ = await bearer_identity(request, session, credentials)
+        user = await session.get(User, user_id)
     if user is None:
         raise ApiError(401, "invalid_token", "User no longer exists")
     return user

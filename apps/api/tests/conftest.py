@@ -58,7 +58,10 @@ async def invite_code(session):
     return invite.code
 
 
-async def make_user(session, username="kafka", admin=False, nsfw=False) -> tuple[User, dict]:
+async def make_user(
+    session, username="kafka", admin=False, nsfw=False, login=True
+) -> tuple[User, dict]:
+    """A user and, unless `login` is False, bearer headers for a fresh login session."""
     from app.security import hash_password
 
     user = User(
@@ -69,4 +72,29 @@ async def make_user(session, username="kafka", admin=False, nsfw=False) -> tuple
     )
     session.add(user)
     await session.commit()
-    return user, {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    if not login:
+        return user, {}
+    return user, {"Authorization": f"Bearer {await login_token(session, user)}"}
+
+
+async def login_token(session, user: User) -> str:
+    """An access token for a fresh login session, as /auth/login would issue."""
+    import uuid
+    from datetime import timedelta
+
+    from app.db import utcnow
+    from app.models import RefreshToken
+    from app.security import new_opaque_token, sha256
+
+    family = uuid.uuid4()
+    session.add(
+        RefreshToken(
+            user_id=user.id,
+            token_hash=sha256(new_opaque_token()),
+            expires_at=utcnow() + timedelta(days=1),
+            family_id=family,
+            started_at=utcnow(),
+        )
+    )
+    await session.commit()
+    return create_access_token(user.id, family)

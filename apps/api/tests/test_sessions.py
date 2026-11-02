@@ -17,7 +17,7 @@ async def login(client, username="kafka", password="password123", agent="Firefox
 
 
 async def test_sessions_list_marks_the_current_one(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     _, laptop = await login(client, agent="Firefox/130 Linux")
     await login(client, agent="Safari iPhone")
     r = await client.get("/me/sessions", headers=laptop)
@@ -28,7 +28,7 @@ async def test_sessions_list_marks_the_current_one(client, session):
 
 
 async def test_refresh_keeps_the_same_session(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     tokens, headers = await login(client)
     before = (await client.get("/me/sessions", headers=headers)).json()
     rotated = (
@@ -41,7 +41,7 @@ async def test_refresh_keeps_the_same_session(client, session):
 
 
 async def test_revoking_a_session_ends_its_refresh_token(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     _, laptop = await login(client)
     phone_tokens, _ = await login(client, agent="Safari iPhone")
     rows = (await client.get("/me/sessions", headers=laptop)).json()
@@ -53,8 +53,8 @@ async def test_revoking_a_session_ends_its_refresh_token(client, session):
 
 
 async def test_users_cannot_revoke_each_others_sessions(client, session):
-    await make_user(session, "kafka")
-    await make_user(session, "ana")
+    await make_user(session, "kafka", login=False)
+    await make_user(session, "ana", login=False)
     kafka_tokens, kafka = await login(client)
     _, ana = await login(client, "ana")
     sid = (await client.get("/me/sessions", headers=kafka)).json()[0]["id"]
@@ -64,18 +64,20 @@ async def test_users_cannot_revoke_each_others_sessions(client, session):
 
 
 async def test_revoke_all_signs_out_everywhere(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     first, headers = await login(client)
     second, _ = await login(client)
     assert (await client.delete("/me/sessions", headers=headers)).status_code == 204
     for tokens in (first, second):
         r = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
         assert r.status_code == 401
-    assert (await client.get("/me/sessions", headers=headers)).json() == []
+    # The access token of this device stops working at once too.
+    r = await client.get("/me/sessions", headers=headers)
+    assert (r.status_code, r.json()["error"]["code"]) == (401, "invalid_token")
 
 
 async def test_change_password_keeps_this_device_and_drops_the_others(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     mine, headers = await login(client)
     other, _ = await login(client, agent="Safari iPhone")
     r = await client.post(
@@ -133,7 +135,7 @@ async def test_wrong_current_passwords_are_throttled(client, session):
 
 
 async def test_every_token_belongs_to_a_session(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     await login(client)
     tokens = (await session.scalars(select(RefreshToken))).all()
     assert tokens and all(t.family_id and t.started_at for t in tokens)

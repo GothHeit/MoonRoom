@@ -314,7 +314,7 @@ async def test_local_episode_plays_through_the_proxy(client, session, library, m
 
     play = (await client.post("/watch/local/2167/episodes/1/play", headers=headers)).json()
     assert play["kind"] == "hls"
-    master = await client.get(play["url"])
+    master = await client.get(play["url"], headers=headers)
     assert master.headers["content-type"] == "application/vnd.apple.mpegurl"
     variants = [line for line in master.text.splitlines() if line.startswith("hls?u=file")]
     assert len(variants) == 2

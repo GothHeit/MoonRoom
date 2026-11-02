@@ -165,7 +165,7 @@ async def test_hls_playback_falls_back_and_proxies_with_referer(client, session)
             200, content=b"\x47data", headers={"content-type": "image/jpeg"}
         )
     )
-    r = await client.get(url)
+    r = await client.get(url, headers=headers)
     assert r.status_code == 200
     assert master.calls.last.request.headers["referer"] == "https://ref.example/"
     variant = r.text.splitlines()[2]
@@ -388,7 +388,7 @@ async def test_play_reads_the_master_once_for_check_quality_and_proxy(client, se
     play = await client.post("/watch/plain/21/episodes/1/play", headers=headers)
     # The source didn't say; the master's best variant does.
     assert play.json()["resolution"] == 1080
-    r = await client.get(play.json()["url"])
+    r = await client.get(play.json()["url"], headers=headers)
     assert r.status_code == 200
     assert "hls?u=" in r.text.splitlines()[2]
     # Playing again soon reuses the same copy too.
@@ -407,7 +407,7 @@ async def test_a_master_gone_since_the_check_is_a_clean_error(client, session):
 
     fastapi_app.state.probes = StreamProbes(fastapi_app.state.http)
     respx.get(MASTER).mock(return_value=httpx.Response(404))
-    r = await client.get(url)
+    r = await client.get(url, headers=headers)
     assert r.status_code == 502
     assert r.json()["error"]["code"] == "upstream_failed"
 

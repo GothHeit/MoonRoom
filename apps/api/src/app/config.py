@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     jwt_previous_secrets: str = ""
     access_token_minutes: int = 15
     refresh_token_days: int = 30
-    playback_token_minutes: int = 360
+    # The first link of a playback; every later link is signed separately (hls.py).
+    playback_token_minutes: int = 60
     # A refresh token that was just rotated is still accepted for this long, so a device whose
     # answer got lost can retry without it reading as a stolen token.
     refresh_grace_seconds: int = 60

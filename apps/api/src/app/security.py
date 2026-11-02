@@ -57,30 +57,30 @@ def _decode(token: str, kind: str) -> dict | None:
     return None
 
 
-def create_access_token(user_id: uuid.UUID, session_id: uuid.UUID | None = None) -> str:
+def create_access_token(user_id: uuid.UUID, session_id: uuid.UUID) -> str:
     minutes = get_settings().access_token_minutes
-    claims: dict = {"sub": str(user_id), "typ": "access"}
-    if session_id is not None:
-        claims["sid"] = str(session_id)
+    claims = {"sub": str(user_id), "typ": "access", "sid": str(session_id)}
     return _encode(claims, timedelta(minutes=minutes))
 
 
-def decode_access_token(token: str) -> tuple[uuid.UUID, uuid.UUID | None] | None:
-    """The user id and, for tokens issued by a login, the id of the session they belong to."""
+def decode_access_token(token: str) -> tuple[uuid.UUID, uuid.UUID] | None:
+    """The user id and the id of the login session the token belongs to. Tokens without a
+    session can't be revoked, so they are refused."""
     claims = _decode(token, "access")
-    if not claims:
+    if not claims or not claims.get("sid"):
         return None
-    sid = claims.get("sid")
-    return uuid.UUID(claims["sub"]), uuid.UUID(sid) if sid else None
+    return uuid.UUID(claims["sub"]), uuid.UUID(claims["sid"])
 
 
 def create_playback_token(
-    user_id: uuid.UUID, source: str, anime_id: int, episode: int, lang: str
+    user_id: uuid.UUID, session_id: uuid.UUID, source: str, anime_id: int, episode: int, lang: str
 ) -> str:
-    """A token scoped to one episode, for players that can't send an Authorization header."""
+    """Names the episode a /play answer picked. It rides in the URL, so it is short-lived and
+    only works together with the same user's bearer token."""
     minutes = get_settings().playback_token_minutes
     claims = {
         "sub": str(user_id),
+        "sid": str(session_id),
         "typ": "playback",
         "src": source,
         "aid": anime_id,

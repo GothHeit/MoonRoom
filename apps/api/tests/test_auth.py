@@ -41,7 +41,7 @@ async def test_register_consumes_the_invite(client, invite_code, session):
 
 
 async def test_usernames_are_case_insensitive(client, invite_code, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     r = await register(client, invite_code, username="KAFKA")
     assert r.status_code == 409
 
@@ -52,7 +52,7 @@ async def test_register_validates_input(client, invite_code):
 
 
 async def test_login(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     ok = await client.post("/auth/login", json={"username": "Kafka", "password": "password123"})
     assert ok.status_code == 200
     bad = await client.post("/auth/login", json={"username": "kafka", "password": "wrong"})
@@ -67,7 +67,7 @@ async def test_missing_token_is_401_not_422(client):
 
 
 async def test_refresh_rotates_and_detects_reuse(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     first = (
         await client.post("/auth/login", json={"username": "kafka", "password": "password123"})
     ).json()
@@ -91,7 +91,7 @@ async def test_refresh_rotates_and_detects_reuse(client, session):
 
 
 async def test_a_lost_refresh_response_can_be_retried(client, session):
-    _, _ = await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     first = (
         await client.post("/auth/login", json={"username": "kafka", "password": "password123"})
     ).json()
@@ -110,7 +110,7 @@ async def test_a_lost_refresh_response_can_be_retried(client, session):
 
 
 async def test_logout_revokes_refresh_token(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     tokens = (
         await client.post("/auth/login", json={"username": "kafka", "password": "password123"})
     ).json()
@@ -142,7 +142,7 @@ async def test_only_admins_create_invites(client, session):
 async def test_losing_a_registration_race_is_a_conflict(client, invite_code, session, monkeypatch):
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     real_scalar = AsyncSession.scalar
 
     async def blind_to_users(self, statement, *args, **kwargs):
@@ -207,7 +207,7 @@ async def _rotated(client):
 
 
 async def test_an_ended_session_cannot_be_revived_through_the_grace_window(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     first, second = await _rotated(client)
     await client.post("/auth/logout", json={"refresh_token": second["refresh_token"]})
     revived = await client.post("/auth/refresh", json={"refresh_token": first["refresh_token"]})
@@ -215,7 +215,7 @@ async def test_an_ended_session_cannot_be_revived_through_the_grace_window(clien
 
 
 async def test_revoking_a_session_blocks_its_just_rotated_token(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     first, second = await _rotated(client)
     headers = {"Authorization": f"Bearer {second['access_token']}"}
     assert (await client.delete("/me/sessions", headers=headers)).status_code == 204
@@ -225,7 +225,7 @@ async def test_revoking_a_session_blocks_its_just_rotated_token(client, session)
 
 
 async def test_changing_the_password_blocks_other_devices_just_rotated_token(client, session):
-    await make_user(session, "kafka")
+    await make_user(session, "kafka", login=False)
     first, _ = await _rotated(client)
     other = (
         await client.post("/auth/login", json={"username": "kafka", "password": "password123"})
