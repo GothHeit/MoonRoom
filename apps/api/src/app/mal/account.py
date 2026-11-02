@@ -203,6 +203,29 @@ class MalAccounts:
             raise ApiError(502, "mal_update_failed", f"MyAnimeList answered {response.status_code}")
         return response.json()
 
+    async def sync_finished_episode(
+        self, session: AsyncSession, user: User, anime_id: int, episode: int, total: int
+    ) -> None:
+        """Mirror a finished episode on the user's MAL list.
+
+        Starts the title as watching (from not listed, plan to watch or on hold) and moves the
+        watched count forward, never back. Dropped and completed titles are left as they are."""
+        if episode < 1 or not await self.is_linked(session, user):
+            return
+        entry = await self.entry(session, user, anime_id) or {}
+        if entry.get("status") in ("dropped", "completed"):
+            return
+        watched = max(entry.get("num_episodes_watched") or 0, episode)
+        if watched == (entry.get("num_episodes_watched") or 0) and entry.get("status"):
+            return
+        finished = total > 0 and watched >= total
+        await self.update_entry(
+            session,
+            user,
+            anime_id,
+            {"status": "completed" if finished else "watching", "num_watched_episodes": watched},
+        )
+
     async def remove_entry(self, session: AsyncSession, user: User, anime_id: int) -> None:
         token = await self._valid_token(session, user)
         try:

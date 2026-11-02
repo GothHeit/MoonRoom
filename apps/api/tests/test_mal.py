@@ -257,3 +257,86 @@ async def test_mal_calls_are_capped_in_flight(client):
         mal = MalClient("id", http)
         await asyncio.gather(*(mal.details(i) for i in range(1, 40)))
     assert peak <= MAX_CONCURRENT_CALLS
+
+
+async def _linked_accounts(session):
+    from app.config import get_settings
+    from app.mal.account import MalAccounts
+
+    user, _ = await make_user(session, "kafka")
+    session.add(
+        MalLink(
+            user_id=user.id,
+            access_token="a",
+            refresh_token="r",
+            expires_at=utcnow() + timedelta(hours=1),
+        )
+    )
+    await session.commit()
+    return user, MalAccounts(get_settings(), httpx.AsyncClient())
+
+
+def _entry(anime_id, **status):
+    body = {"id": anime_id, "my_list_status": status} if status else {"id": anime_id}
+    return respx.get(f"{API_BASE}/anime/{anime_id}").mock(
+        return_value=httpx.Response(200, json=body)
+    )
+
+
+def _patch(anime_id):
+    return respx.patch(f"{API_BASE}/anime/{anime_id}/my_list_status").mock(
+        return_value=httpx.Response(200, json={})
+    )
+
+
+@respx.mock
+async def test_finishing_an_episode_starts_the_title_as_watching(session):
+    user, accounts = await _linked_accounts(session)
+    _entry(7)
+    patch = _patch(7)
+    await accounts.sync_finished_episode(session, user, 7, 1, 12)
+    assert b"status=watching" in patch.calls.last.request.content
+    assert b"num_watched_episodes=1" in patch.calls.last.request.content
+
+
+@respx.mock
+async def test_finishing_the_last_episode_completes_the_title(session):
+    user, accounts = await _linked_accounts(session)
+    _entry(7, status="watching", num_episodes_watched=11)
+    patch = _patch(7)
+    await accounts.sync_finished_episode(session, user, 7, 12, 12)
+    assert b"status=completed" in patch.calls.last.request.content
+
+
+@respx.mock
+async def test_sync_never_goes_back_or_overrides_a_parked_title(session):
+    user, accounts = await _linked_accounts(session)
+    _entry(1, status="watching", num_episodes_watched=5)
+    _entry(2, status="dropped", num_episodes_watched=1)
+    _entry(3, status="completed", num_episodes_watched=12)
+    patches = [_patch(i) for i in (1, 2, 3)]
+    await accounts.sync_finished_episode(session, user, 1, 3, 12)
+    await accounts.sync_finished_episode(session, user, 2, 4, 12)
+    await accounts.sync_finished_episode(session, user, 3, 1, 12)
+    assert [p.called for p in patches] == [False, False, False]
+
+
+async def test_sync_does_nothing_without_a_mal_link(session):
+    from app.config import get_settings
+    from app.mal.account import MalAccounts
+
+    user, _ = await make_user(session, "kafka")
+    await MalAccounts(get_settings(), httpx.AsyncClient()).sync_finished_episode(
+        session, user, 7, 1, 12
+    )
+
+
+@respx.mock
+async def test_on_hold_and_plan_to_watch_titles_move_to_watching(session):
+    user, accounts = await _linked_accounts(session)
+    _entry(4, status="on_hold", num_episodes_watched=2)
+    _entry(5, status="plan_to_watch", num_episodes_watched=0)
+    patches = [_patch(4), _patch(5)]
+    await accounts.sync_finished_episode(session, user, 4, 3, 12)
+    await accounts.sync_finished_episode(session, user, 5, 1, 12)
+    assert all(b"status=watching" in p.calls.last.request.content for p in patches)
