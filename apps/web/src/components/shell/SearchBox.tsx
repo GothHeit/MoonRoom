@@ -5,21 +5,36 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
-import { animeHref, captionOf, posterOf, type AnimeCard } from "@/lib/catalog";
+import { animeHref, captionOf, posterOf } from "@/lib/catalog";
+import { coverOf, mangaCaption, mangaHref } from "@/lib/manga";
+
+import { searchHrefFor, type Mode } from "./nav-items";
 
 const MIN_CHARS = 2;
 const DEBOUNCE_MS = 250;
 const MAX_SUGGESTIONS = 6;
 
-/** Search field with an instant results dropdown. Enter opens the full results page. */
-export function SearchBox() {
+type Suggestion = { id: number; href: string; title: string; image: string | null; caption: string };
+
+/** The active catalog's search, shaped the same way whichever it is. */
+async function suggest(mode: Mode, q: string, signal: AbortSignal): Promise<Suggestion[]> {
+  if (mode === "manga") {
+    const { data } = await api.GET("/manga/search", { params: { query: { q } }, signal });
+    return (data?.data ?? []).map((m) => ({ id: m.id, href: mangaHref(m.id), title: m.title, image: coverOf(m), caption: mangaCaption(m) }));
+  }
+  const { data } = await api.GET("/anime/search", { params: { query: { q } }, signal });
+  return (data?.data ?? []).map((a) => ({ id: a.id, href: animeHref(a.id), title: a.title, image: posterOf(a), caption: captionOf(a) }));
+}
+
+/** Search field with an instant results dropdown. Enter opens the full results page of the active catalog. */
+export function SearchBox({ mode = "anime" }: { mode?: Mode }) {
   const t = useTranslations("nav");
   const tSearch = useTranslations("search");
   const router = useRouter();
   const listId = useId();
   const root = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<AnimeCard[]>([]);
+  const [results, setResults] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
 
@@ -30,8 +45,7 @@ export function SearchBox() {
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const { data } = await api.GET("/anime/search", { params: { query: { q } }, signal: controller.signal });
-        setResults((data?.data ?? []).slice(0, MAX_SUGGESTIONS));
+        setResults((await suggest(mode, q, controller.signal)).slice(0, MAX_SUGGESTIONS));
         setActive(-1);
       } catch {
         // aborted by a newer keystroke, or the API is down: keep what is shown
@@ -41,7 +55,7 @@ export function SearchBox() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [q]);
+  }, [q, mode]);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
@@ -77,8 +91,8 @@ export function SearchBox() {
         role="search"
         onSubmit={(e) => {
           e.preventDefault();
-          if (active >= 0 && shown[active]) go(animeHref(shown[active].id));
-          else if (q) go({ pathname: "/search", query: { q } });
+          if (active >= 0 && shown[active]) go(shown[active].href);
+          else if (q) go({ pathname: searchHrefFor(mode), query: { q } });
         }}
       >
         <input
@@ -97,7 +111,7 @@ export function SearchBox() {
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
           aria-label={t("search")}
-          placeholder={t("searchPlaceholder")}
+          placeholder={mode === "manga" ? t("searchManga") : t("searchPlaceholder")}
           className="h-9 w-40 rounded-full border border-line bg-surface px-4 text-sm placeholder:text-muted focus:w-64 focus:border-accent lg:w-56"
         />
       </form>
@@ -112,15 +126,15 @@ export function SearchBox() {
         {shown.map((a, i) => (
           <li key={a.id} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
             <Link
-              href={animeHref(a.id)}
+              href={a.href}
               onClick={() => setOpen(false)}
               className={`flex items-center gap-3 px-3 py-2 hover:bg-bg ${i === active ? "bg-bg" : ""}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- posters come from remote catalogs */}
-              {posterOf(a) && <img src={posterOf(a)!} alt="" width={32} height={48} loading="lazy" decoding="async" className="h-12 w-8 shrink-0 rounded-ui object-cover" />}
+              {a.image && <img src={a.image} alt="" width={32} height={48} loading="lazy" decoding="async" className="h-12 w-8 shrink-0 rounded-ui object-cover" />}
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium">{a.title}</span>
-                <span className="block text-xs text-muted">{captionOf(a)}</span>
+                <span className="block text-xs text-muted">{a.caption}</span>
               </span>
             </Link>
           </li>
@@ -128,7 +142,7 @@ export function SearchBox() {
         {q && (
           <li role="none" className="border-t border-line">
             <Link
-              href={{ pathname: "/search", query: { q } }}
+              href={{ pathname: searchHrefFor(mode), query: { q } }}
               onClick={() => setOpen(false)}
               className="block px-3 py-2 text-sm font-bold text-accent hover:bg-bg"
             >

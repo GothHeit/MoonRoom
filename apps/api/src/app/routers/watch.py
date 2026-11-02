@@ -561,12 +561,12 @@ async def _playback_claims(request: Request, session: AsyncSession, token: str |
     it can't send a login, but it only works while the login session it was made in is open, so
     signing out stops it."""
     claims = decode_playback_token(token) if token else None
-    if claims is None or not await _session_open(request, session, claims["sub"], claims["sid"]):
+    if claims is None or not await session_open(request, session, claims["sub"], claims["sid"]):
         raise ApiError(403, "invalid_link", "Invalid or expired playback token")
     return claims
 
 
-async def _session_open(request: Request, session: AsyncSession, user: str, sid: str) -> bool:
+async def session_open(request: Request, session: AsyncSession, user: str, sid: str) -> bool:
     try:
         ids = uuid.UUID(user), uuid.UUID(sid)
     except ValueError:
@@ -695,7 +695,7 @@ async def hls_proxy(
         viewer = hls.Viewer(v, i)
         # The signature first: it costs nothing and keeps strangers away from the database.
         # 403, not 401: a stale or foreign link can't be fixed by refreshing the session.
-        if not hls.verify_link(u, r, k, viewer, e, s) or not await _session_open(
+        if not hls.verify_link(u, r, k, viewer, e, s) or not await session_open(
             request, session, v, i
         ):
             raise ApiError(403, "invalid_link", "Invalid or expired stream link")

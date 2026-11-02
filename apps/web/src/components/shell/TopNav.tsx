@@ -9,7 +9,8 @@ import { APP_NAME } from "@/lib/brand";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { Logo } from "./Logo";
 import { NotificationBell } from "./NotificationBell";
-import { isActive, NAV_ITEMS } from "./nav-items";
+import { ModeSwitch } from "./ModeSwitch";
+import { isActive, modeOf, navItemsFor } from "./nav-items";
 import { SearchBox } from "./SearchBox";
 import type { AvatarInfo } from "@/lib/avatar";
 
@@ -19,6 +20,7 @@ import { UserMenu } from "./UserMenu";
 export function TopNav({ userId, username, avatar, isAdmin, pending = 0 }: { userId: string; username: string; avatar: AvatarInfo; isAdmin: boolean; pending?: number }) {
   const t = useTranslations("nav");
   const pathname = usePathname();
+  const mode = modeOf(pathname);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -33,12 +35,13 @@ export function TopNav({ userId, username, avatar, isAdmin, pending = 0 }: { use
       data-scrolled={scrolled}
       className={`fixed inset-x-0 top-0 z-40 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] border-b bg-bg transition-colors ${scrolled ? "border-line" : "border-transparent"}`}
     >
-      <nav aria-label={t("main")} className="flex h-16 items-center gap-8 px-4 sm:h-20 sm:px-8">
-        <Link href="/" aria-label={APP_NAME}>
+      <nav aria-label={t("main")} className="flex h-16 items-center gap-3 px-4 sm:h-20 sm:gap-6 sm:px-8 lg:gap-8">
+        <Link href={mode === "manga" ? "/manga" : "/"} aria-label={APP_NAME} className="shrink-0">
           <Logo />
         </Link>
+        <ModeSwitch mode={mode} />
         <ul className="hidden items-center gap-6 md:flex">
-          {NAV_ITEMS.map(({ href, key }) => {
+          {navItemsFor(mode).map(({ href, key }) => {
             const active = isActive(pathname, href);
             return (
               <li key={href}>
@@ -55,7 +58,7 @@ export function TopNav({ userId, username, avatar, isAdmin, pending = 0 }: { use
         </ul>
         <div className="ml-auto flex items-center gap-3">
           <div className="hidden md:block">
-            <SearchBox />
+            <SearchBox mode={mode} />
           </div>
           <NotificationBell />
           <div className="hidden md:block">

@@ -13,6 +13,12 @@
     "signOut": "Sign out",
     "joinRoom": "Join a room",
     "friends": "Friends",
-    "profile": "Profile"
+    "profile": "Profile",
+    "catalog": "Catalog",
+    "mode": {
+      "anime": "Anime",
+      "manga": "Manga"
+    },
+    "searchManga": "Search manga"
   }
 }

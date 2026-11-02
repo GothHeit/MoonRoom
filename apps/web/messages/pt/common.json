@@ -58,7 +58,9 @@
     "invalid_mfa_token": "Essa entrada expirou. Comece de novo.",
     "two_factor_enabled": "O login em dois fatores já está ativo.",
     "two_factor_disabled": "O login em dois fatores está desativado.",
-    "two_factor_not_started": "Comece pela configuração."
+    "two_factor_not_started": "Comece pela configuração.",
+    "manga_not_found": "Mangá não encontrado.",
+    "upstream_failed": "A fonte não respondeu. Tente de novo."
   },
   "row": {
     "previous": "Rolar para a esquerda",

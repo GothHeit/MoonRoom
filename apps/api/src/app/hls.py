@@ -120,16 +120,22 @@ def _mac(
 
 
 def signed_link(
-    url: str, referer: str, viewer: "Viewer | str", kind: str = "", lifetime: int = SEGMENT_LIFETIME
+    url: str,
+    referer: str,
+    viewer: "Viewer | str",
+    kind: str = "",
+    lifetime: int = SEGMENT_LIFETIME,
+    endpoint: str = "hls",
 ) -> str:
-    """A link the proxy serves to the user it is for, for `lifetime` seconds."""
+    """A link the proxy serves to the user it is for, for `lifetime` seconds. `endpoint` is the
+    route that serves it (the manga page proxy signs its links the same way)."""
     # Relative to /watch/hls on purpose: it resolves under whatever prefix the client
     # reaches the API through (the web app serves it under /api/stream and /api/proxy).
     who = _who(viewer)
     expires = int(time.time()) + lifetime
     kind_param = f"&k={kind}" if kind else ""
     return (
-        f"hls?u={quote(url, safe='')}&r={quote(referer, safe='')}{kind_param}"
+        f"{endpoint}?u={quote(url, safe='')}&r={quote(referer, safe='')}{kind_param}"
         f"&v={who.user}&i={who.sid}&e={expires}&s={_mac(url, referer, kind, who, expires)}"
     )
 

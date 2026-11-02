@@ -453,6 +453,34 @@
         "title": "AnimeListOut",
         "type": "object"
       },
+      "Author": {
+        "properties": {
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          }
+        },
+        "title": "Author",
+        "type": "object"
+      },
       "AvatarOut": {
         "properties": {
           "kind": {
@@ -580,6 +608,139 @@
           "buffering"
         ],
         "title": "BufferingIn",
+        "type": "object"
+      },
+      "ChapterOut": {
+        "properties": {
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "lang": {
+            "title": "Lang",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "lang"
+        ],
+        "title": "ChapterOut",
+        "type": "object"
+      },
+      "ChaptersOut": {
+        "properties": {
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/ChapterOut"
+            },
+            "title": "Chapters",
+            "type": "array"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Languages",
+            "type": "array"
+          },
+          "progress": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MangaProgressOut"
+            },
+            "title": "Progress",
+            "type": "object"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_title": {
+            "title": "Source Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "source_id",
+          "source_title"
+        ],
+        "title": "ChaptersOut",
         "type": "object"
       },
       "ChatIn": {
@@ -1347,6 +1508,514 @@
         "title": "MalStatusOut",
         "type": "object"
       },
+      "MangaBrowseOut": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/MangaCard"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "has_next": {
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "page",
+          "has_next"
+        ],
+        "title": "MangaBrowseOut",
+        "type": "object"
+      },
+      "MangaCard": {
+        "description": "What a cover needs.",
+        "properties": {
+          "alternative_titles": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlternativeTitles"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "genres": {
+            "items": {
+              "$ref": "#/components/schemas/Genre"
+            },
+            "title": "Genres",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "main_picture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Picture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "num_chapters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Chapters"
+          },
+          "num_volumes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Volumes"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MangaCard",
+        "type": "object"
+      },
+      "MangaDetailsOut": {
+        "properties": {
+          "alternative_titles": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlternativeTitles"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "authors": {
+            "items": {
+              "$ref": "#/components/schemas/Author"
+            },
+            "title": "Authors",
+            "type": "array"
+          },
+          "background": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "genres": {
+            "items": {
+              "$ref": "#/components/schemas/Genre"
+            },
+            "title": "Genres",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "main_picture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Picture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "num_chapters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Chapters"
+          },
+          "num_list_users": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num List Users"
+          },
+          "num_volumes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Volumes"
+          },
+          "pictures": {
+            "items": {
+              "$ref": "#/components/schemas/Picture"
+            },
+            "title": "Pictures",
+            "type": "array"
+          },
+          "popularity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Popularity"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "recommendations": {
+            "items": {
+              "$ref": "#/components/schemas/MangaRecommendation"
+            },
+            "title": "Recommendations",
+            "type": "array"
+          },
+          "related_manga": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedManga"
+            },
+            "title": "Related Manga",
+            "type": "array"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "synopsis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synopsis"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MangaDetailsOut",
+        "type": "object"
+      },
+      "MangaHomeItem": {
+        "properties": {
+          "manga": {
+            "$ref": "#/components/schemas/MangaCard"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MangaProgressOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "manga"
+        ],
+        "title": "MangaHomeItem",
+        "type": "object"
+      },
+      "MangaHomeOut": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MangaHomeRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "title": "MangaHomeOut",
+        "type": "object"
+      },
+      "MangaHomeRow": {
+        "properties": {
+          "id": {
+            "enum": [
+              "continue_reading",
+              "top",
+              "popular",
+              "manhwa",
+              "manhua"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MangaHomeItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "items"
+        ],
+        "title": "MangaHomeRow",
+        "type": "object"
+      },
+      "MangaListOut": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/MangaCard"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "MangaListOut",
+        "type": "object"
+      },
+      "MangaProgressIn": {
+        "properties": {
+          "completed": {
+            "default": false,
+            "title": "Completed",
+            "type": "boolean"
+          },
+          "page": {
+            "maximum": 5000.0,
+            "minimum": 0.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "pages": {
+            "maximum": 5000.0,
+            "minimum": 1.0,
+            "title": "Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "pages"
+        ],
+        "title": "MangaProgressIn",
+        "type": "object"
+      },
+      "MangaProgressOut": {
+        "properties": {
+          "chapter": {
+            "title": "Chapter",
+            "type": "string"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "boolean"
+          },
+          "manga_id": {
+            "title": "Manga Id",
+            "type": "integer"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "pages": {
+            "title": "Pages",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "manga_id",
+          "chapter",
+          "page",
+          "pages",
+          "completed",
+          "updated_at"
+        ],
+        "title": "MangaProgressOut",
+        "type": "object"
+      },
+      "MangaRecommendation": {
+        "properties": {
+          "manga": {
+            "$ref": "#/components/schemas/MangaCard"
+          },
+          "num_recommendations": {
+            "title": "Num Recommendations",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "manga",
+          "num_recommendations"
+        ],
+        "title": "MangaRecommendation",
+        "type": "object"
+      },
       "MeOut": {
         "properties": {
           "avatar": {
@@ -1683,6 +2352,61 @@
           "unread"
         ],
         "title": "NotificationsOut",
+        "type": "object"
+      },
+      "PagesOut": {
+        "properties": {
+          "chapter": {
+            "$ref": "#/components/schemas/ChapterOut"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChapterOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChapterOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MangaProgressOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "chapter",
+          "pages"
+        ],
+        "title": "PagesOut",
         "type": "object"
       },
       "PasswordIn": {
@@ -2368,6 +3092,28 @@
           "anime"
         ],
         "title": "RelatedAnime",
+        "type": "object"
+      },
+      "RelatedManga": {
+        "properties": {
+          "manga": {
+            "$ref": "#/components/schemas/MangaCard"
+          },
+          "relation_type": {
+            "title": "Relation Type",
+            "type": "string"
+          },
+          "relation_type_formatted": {
+            "title": "Relation Type Formatted",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relation_type",
+          "relation_type_formatted",
+          "manga"
+        ],
+        "title": "RelatedManga",
         "type": "object"
       },
       "RequestIn": {
@@ -4249,6 +4995,509 @@
         "summary": "Start Link",
         "tags": [
           "mal"
+        ]
+      }
+    },
+    "/manga/browse": {
+      "get": {
+        "operationId": "browse_manga_browse_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "row",
+            "required": false,
+            "schema": {
+              "default": "top",
+              "enum": [
+                "top",
+                "popular",
+                "manhwa",
+                "manhua",
+                "oneshots"
+              ],
+              "title": "Row",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaBrowseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Browse",
+        "tags": [
+          "manga"
+        ]
+      }
+    },
+    "/manga/home": {
+      "get": {
+        "operationId": "home_manga_home_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaHomeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Home",
+        "tags": [
+          "manga"
+        ]
+      }
+    },
+    "/manga/page": {
+      "get": {
+        "description": "One page image, by a link that `pages` signed. The link names the reader and their\nlogin session and expires, like a stream link; the picture is kept on disk for the next\nreader. Only public hosts are fetched (never anything on our own network).",
+        "operationId": "page_manga_page_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "u",
+            "required": true,
+            "schema": {
+              "title": "U",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "v",
+            "required": true,
+            "schema": {
+              "title": "V",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "e",
+            "required": true,
+            "schema": {
+              "title": "E",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "s",
+            "required": true,
+            "schema": {
+              "title": "S",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "r",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "R",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "i",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "I",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "k",
+            "required": false,
+            "schema": {
+              "default": "img",
+              "title": "K",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Page",
+        "tags": [
+          "manga"
+        ]
+      }
+    },
+    "/manga/search": {
+      "get": {
+        "operationId": "search_manga_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Search",
+        "tags": [
+          "manga"
+        ]
+      }
+    },
+    "/manga/{manga_id}": {
+      "get": {
+        "operationId": "details_manga__manga_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaDetailsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Details",
+        "tags": [
+          "manga"
+        ]
+      }
+    },
+    "/manga/{manga_id}/chapters": {
+      "get": {
+        "description": "The chapter list, with where the user is in each chapter. Separate from the details so\na slow source never holds the title page back.",
+        "operationId": "chapters_manga__manga_id__chapters_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 10,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChaptersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Chapters",
+        "tags": [
+          "manga"
+        ]
+      }
+    },
+    "/manga/{manga_id}/progress/{chapter}": {
+      "put": {
+        "operationId": "put_progress_manga__manga_id__progress__chapter__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "chapter",
+            "required": true,
+            "schema": {
+              "maxLength": 16,
+              "minLength": 1,
+              "title": "Chapter",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MangaProgressIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaProgressOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Put Progress",
+        "tags": [
+          "manga"
+        ]
+      }
+    },
+    "/manga/{manga_id}/read/{source}/{chapter_id}": {
+      "get": {
+        "description": "The page links of one chapter, plus its neighbours in the same language. The source's\npage links are short-lived, so they are resolved here, when the reader opens the chapter.",
+        "operationId": "pages_manga__manga_id__read__source___chapter_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "chapter_id",
+            "required": true,
+            "schema": {
+              "title": "Chapter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 10,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Pages",
+        "tags": [
+          "manga"
         ]
       }
     },

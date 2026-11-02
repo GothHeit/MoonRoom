@@ -110,6 +110,25 @@ class WatchProgress(Base):
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 
 
+class MangaProgress(Base):
+    """Where a user stopped in one chapter. Keyed by MAL manga id and the chapter's number as
+    the source writes it ("12", "12.5"), so it survives a change of source."""
+
+    __tablename__ = "manga_progress"
+    __table_args__ = (Index("ix_manga_progress_user_updated", "user_id", "updated_at"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    manga_id: Mapped[int] = mapped_column(primary_key=True)
+    chapter: Mapped[str] = mapped_column(String(16), primary_key=True)
+    # Zero-based page the reader was on, and how many the chapter has.
+    page: Mapped[int]
+    pages: Mapped[int]
+    completed: Mapped[bool] = mapped_column(default=False)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+
 class ContinueHidden(Base):
     """A title the user removed from Continue watching. Their watch history is left alone.
 

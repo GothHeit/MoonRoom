@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request
@@ -121,7 +121,7 @@ async def details(
     related = raw.get("related_anime") or []
     recommended = raw.get("recommendations") or []
     if not user.show_nsfw:
-        related, recommended = await _only_safe(mal, related, recommended)
+        related, recommended = await only_safe(mal, related, recommended)
     return AnimeDetailsOut.model_validate(
         {
             **raw,
@@ -189,15 +189,21 @@ def _track[T: asyncio.Future](task: T) -> T:
     return task
 
 
-async def _only_safe(mal: MalClient, *groups: list[dict]) -> tuple[list[dict], ...]:
+async def only_safe(
+    mal: MalClient,
+    *groups: list[dict],
+    fetch: Callable[[int], Awaitable[dict]] | None = None,
+) -> tuple[list[dict], ...]:
     """Keeps the entries whose details say they are safe. A title that can't be checked, or
-    isn't checked within the budget, is dropped rather than shown."""
+    isn't checked within the budget, is dropped rather than shown. `fetch` reads one entry's
+    details (anime by default; the manga section passes its own)."""
     gate = asyncio.Semaphore(SAFE_CHECK_CONCURRENCY)
+    read = fetch or mal.details
 
     async def check(entry: dict) -> bool:
         async with gate:
             try:
-                return is_safe(await mal.details(entry["node"]["id"]))
+                return is_safe(await read(entry["node"]["id"]))
             except ApiError:
                 return False
 

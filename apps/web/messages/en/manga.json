@@ -1,0 +1,107 @@
+{
+  "manga": {
+    "title": "Manga",
+    "chapterShort": "Ch. {n}",
+    "rows": {
+      "continue_reading": "Continue reading",
+      "top": "Top rated manga",
+      "popular": "Most popular",
+      "manhwa": "Manhwa",
+      "manhua": "Manhua"
+    },
+    "empty": "Nothing to show yet. Try again in a moment.",
+    "browse": {
+      "title": "Browse manga",
+      "rows": "Rankings",
+      "top": "Top rated",
+      "popular": "Popular",
+      "manhwa": "Manhwa",
+      "manhua": "Manhua",
+      "oneshots": "One-shots",
+      "empty": "No titles here."
+    },
+    "search": {
+      "title": "Search manga",
+      "resultsFor": "Manga for “{q}”",
+      "prompt": "Type a title to search.",
+      "empty": "No manga found for “{q}”."
+    },
+    "page": {
+      "coverAlt": "Cover of {title}",
+      "score": "Score {score}",
+      "chapters": "{count, plural, one {# chapter} other {# chapters}}",
+      "volumes": "{count, plural, one {# volume} other {# volumes}}",
+      "authors": "Authors",
+      "genres": "Genres",
+      "synopsis": "Synopsis",
+      "noSynopsis": "No synopsis yet.",
+      "related": "Related",
+      "recommended": "Recommended",
+      "readHere": "Read here",
+      "trackingOnly": "Not available here",
+      "trackingOnlyHint": "No source has this title yet.",
+      "chapterList": "Chapters",
+      "language": "Language",
+      "from": "From {source}",
+      "start": "Start reading",
+      "continue": "Continue · Ch. {n}",
+      "next": "Read Ch. {n}",
+      "readAgain": "Read again",
+      "noChapters": "No chapters in this language yet.",
+      "chapter": "Ch. {n}",
+      "oneShot": "One-shot",
+      "volume": "Vol. {n}",
+      "read": "Read",
+      "pageOf": "Page {page} of {pages}",
+      "latest": "Latest",
+      "mediaType": {
+        "manga": "Manga",
+        "manhwa": "Manhwa",
+        "manhua": "Manhua",
+        "one_shot": "One-shot",
+        "doujinshi": "Doujinshi",
+        "novel": "Novel",
+        "light_novel": "Light novel",
+        "oel": "Comic"
+      },
+      "status": {
+        "finished": "Finished",
+        "currently_publishing": "Ongoing",
+        "on_hiatus": "On hiatus",
+        "discontinued": "Discontinued",
+        "not_yet_published": "Not yet published"
+      }
+    }
+  },
+  "reader": {
+    "back": "Back to {title}",
+    "pageOf": "Page {page} of {pages}",
+    "page": "Page",
+    "mode": {
+      "label": "Reading mode",
+      "page": "One page",
+      "strip": "Strip"
+    },
+    "direction": {
+      "label": "Direction",
+      "rtl": "Right to left",
+      "ltr": "Left to right"
+    },
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "previousChapter": "Previous chapter",
+    "nextChapter": "Next chapter",
+    "chapter": "Ch. {n}",
+    "oneShot": "One-shot",
+    "end": "End of the chapter",
+    "endOfTitle": "You're up to date with every chapter here.",
+    "readNext": "Next: Ch. {n}",
+    "backToTitle": "Back to the title",
+    "pageFailed": "This page didn't load.",
+    "retry": "Try again",
+    "controls": "Reader controls",
+    "showControls": "Show controls",
+    "hideControls": "Hide controls",
+    "pageAlt": "Page {page}"
+  }
+}

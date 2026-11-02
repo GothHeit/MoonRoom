@@ -199,3 +199,131 @@ class HomeHero(BaseModel):
 class HomeOut(BaseModel):
     heroes: list[HomeHero]
     rows: list[HomeRow]
+
+
+# Manga. The catalog is MAL's manga database; chapters and pages come from a MangaSource.
+
+
+class Author(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+class MangaCard(BaseModel):
+    """What a cover needs."""
+
+    id: int
+    title: str
+    alternative_titles: AlternativeTitles | None = None
+    main_picture: Picture | None = None
+    mean: float | None = None
+    # manga, manhwa, manhua, one_shot, doujinshi, novel, light_novel, oel
+    media_type: str | None = None
+    status: str | None = None
+    num_chapters: int | None = None
+    num_volumes: int | None = None
+    start_date: str | None = None
+    genres: list[Genre] = Field(default_factory=list)
+
+    @classmethod
+    def from_node(cls, node: dict[str, Any]) -> "MangaCard":
+        return cls.model_validate(node)
+
+
+class MangaListOut(BaseModel):
+    data: list[MangaCard]
+
+
+class MangaBrowseOut(MangaListOut):
+    page: int
+    has_next: bool
+
+
+class RelatedManga(BaseModel):
+    relation_type: str
+    relation_type_formatted: str
+    manga: MangaCard
+
+
+class MangaRecommendation(BaseModel):
+    manga: MangaCard
+    num_recommendations: int
+
+
+class MangaDetailsOut(MangaCard):
+    synopsis: str | None = None
+    background: str | None = None
+    end_date: str | None = None
+    rank: int | None = None
+    popularity: int | None = None
+    num_list_users: int | None = None
+    authors: list[Author] = Field(default_factory=list)
+    pictures: list[Picture] = Field(default_factory=list)
+    related_manga: list[RelatedManga] = Field(default_factory=list)
+    recommendations: list[MangaRecommendation] = Field(default_factory=list)
+
+
+class ChapterOut(BaseModel):
+    id: str
+    number: str
+    volume: str | None = None
+    title: str | None = None
+    lang: str
+    group: str | None = None
+    published_at: str | None = None
+    pages: int | None = None
+
+
+class MangaProgressIn(BaseModel):
+    page: int = Field(ge=0, le=5000)
+    pages: int = Field(ge=1, le=5000)
+    completed: bool = False
+
+
+class MangaProgressOut(BaseModel):
+    manga_id: int
+    chapter: str
+    page: int
+    pages: int
+    completed: bool
+    updated_at: datetime
+
+
+class ChaptersOut(BaseModel):
+    # The source the chapters come from, and its id and name for the title.
+    source: str
+    source_id: str
+    source_title: str
+    # The language listed, and every language the source has the title in.
+    lang: str | None = None
+    languages: list[str] = Field(default_factory=list)
+    chapters: list[ChapterOut] = Field(default_factory=list)
+    # Chapter number -> where the user is in it.
+    progress: dict[str, MangaProgressOut] = Field(default_factory=dict)
+
+
+class PagesOut(BaseModel):
+    source: str
+    chapter: ChapterOut
+    # Signed links to the page images, in reading order, served by the page proxy.
+    pages: list[str]
+    # Neighbours in the same language, when there are any.
+    previous: ChapterOut | None = None
+    next: ChapterOut | None = None
+    # Where the user stopped in this chapter, when they opened it before.
+    progress: MangaProgressOut | None = None
+
+
+class MangaHomeItem(BaseModel):
+    manga: MangaCard
+    # Set on the continue-reading row only.
+    progress: MangaProgressOut | None = None
+
+
+class MangaHomeRow(BaseModel):
+    id: Literal["continue_reading", "top", "popular", "manhwa", "manhua"]
+    items: list[MangaHomeItem]
+
+
+class MangaHomeOut(BaseModel):
+    rows: list[MangaHomeRow]

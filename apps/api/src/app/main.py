@@ -15,6 +15,7 @@ from app.errors import install_error_handlers
 from app.logs import install_logging
 from app.mal.account import MalAccounts
 from app.mal.client import MalClient
+from app.manga import load_manga_sources
 from app.notifications import check_new_episodes
 from app.probes import StreamProbes
 from app.ratelimit import ActionLimits, AuthLimits
@@ -27,6 +28,7 @@ from app.routers import (
     home,
     invites,
     mal,
+    manga,
     notifications,
     progress,
     rooms,
@@ -103,6 +105,12 @@ async def lifespan(app: FastAPI):
         app.state.probes = StreamProbes(http)
         app.state.watch = watch.WatchCaches()
         app.state.sources = load_sources(settings.video_source_names)
+        app.state.manga_sources = load_manga_sources(
+            settings.manga_source_names, app.state.shared_cache
+        )
+        app.state.page_cache = manga.new_page_cache(
+            settings.manga_cache_dir, settings.manga_cache_max_mb
+        )
         sweeper = asyncio.create_task(
             _sweep(
                 app.state.auth_limits,
@@ -126,7 +134,7 @@ async def lifespan(app: FastAPI):
                 task.cancel()
             if checker is not None:
                 checker.cancel()
-            for source in app.state.sources.values():
+            for source in (*app.state.sources.values(), *app.state.manga_sources.values()):
                 if hasattr(source, "aclose"):
                     await source.aclose()
             await app.state.shared_cache.aclose()
@@ -165,6 +173,7 @@ def create_app() -> FastAPI:
         friends,
         invites,
         anime,
+        manga,
         mal,
         rooms,
         watch,

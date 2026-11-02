@@ -48,11 +48,18 @@ services:
       MAL_REDIRECT_URI: ${PUBLIC_URL}/mal/callback
       REDIS_URL: redis://redis:6379/0
       VIDEO_SOURCES: ${VIDEO_SOURCES:-}
+      MANGA_SOURCES: ${MANGA_SOURCES:-mangadex}
+      MANGA_CACHE_DIR: /data/manga-pages
+      MANGA_CACHE_MAX_MB: ${MANGA_CACHE_MAX_MB:-20480}
       PT_SYNOPSIS_SCRAPE: ${PT_SYNOPSIS_SCRAPE:-false}
       # Only Caddy can reach the API, and it writes the real client address.
       TRUST_PROXY_HEADERS: "true"
       API_DOCS: "false"
-    volumes: [avatars:/data/avatars]
+    volumes:
+      - avatars:/data/avatars
+      # Chapter pages read so far, up to MANGA_CACHE_MAX_MB. A bind mount on the data disk, so
+      # the system disk never fills up.
+      - ${MANGA_CACHE_DIR:-/mnt/d/moonroom-manga-pages}:/data/manga-pages
     depends_on:
       db: {condition: service_healthy}
     healthcheck:

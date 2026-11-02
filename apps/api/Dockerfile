@@ -9,8 +9,8 @@ RUN uv sync --frozen --no-dev
 
 ENV PATH="/srv/.venv/bin:$PATH"
 RUN useradd --system --no-create-home app \
-    && mkdir -p /data/avatars && chown app /data/avatars
-ENV AVATAR_DIR=/data/avatars
+    && mkdir -p /data/avatars /data/manga-pages && chown app /data/avatars /data/manga-pages
+ENV AVATAR_DIR=/data/avatars MANGA_CACHE_DIR=/data/manga-pages
 USER app
 EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]

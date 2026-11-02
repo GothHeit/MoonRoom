@@ -29,6 +29,25 @@ DETAIL_FIELDS = (
     "recommendations,studios,statistics"
 )
 
+MANGA_LIST_FIELDS = (
+    "alternative_titles,main_picture,mean,media_type,num_chapters,num_volumes,status,"
+    "start_date,genres,num_list_users"
+)
+MANGA_DETAIL_FIELDS = (
+    "title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,"
+    "num_list_users,num_scoring_users,nsfw,media_type,status,genres,num_volumes,num_chapters,"
+    "authors{first_name,last_name},pictures,background,related_manga,recommendations,"
+    "serialization{name}"
+)
+# What MAL calls its manga rankings, by the row the app shows them in.
+MANGA_RANKINGS = {
+    "top": "manga",
+    "popular": "bypopularity",
+    "manhwa": "manhwa",
+    "manhua": "manhua",
+    "oneshots": "oneshots",
+}
+
 LIST_TTL = 600  # seconds
 DETAILS_TTL = 1800
 MAX_CONCURRENT_CALLS = 8  # in-flight calls to MAL across all requests
@@ -98,7 +117,8 @@ class MalClient:
         # Cold-cache bursts (home, profiles) would otherwise fire dozens of calls at once and
         # get answered with 429/403.
         self._slots = asyncio.Semaphore(MAX_CONCURRENT_CALLS)
-        self._details: TTLCache[int, dict] = TTLCache(maxsize=2048, ttl=DETAILS_TTL)
+        # Keyed by anime id; manga details share the cache under ("manga", id).
+        self._details: TTLCache[Any, dict] = TTLCache(maxsize=2048, ttl=DETAILS_TTL)
         # Listing pages (seasonal, top, search, browse pools) change slowly: a short TTL keeps
         # the home page from hitting MAL on every load.
         self._pages: TTLCache[tuple, dict] = TTLCache(maxsize=512, ttl=LIST_TTL)
@@ -123,7 +143,9 @@ class MalClient:
 
         return await self._flights.run(key, load)
 
-    async def _fetch(self, path: str, params: dict[str, Any]) -> dict:
+    async def _fetch(
+        self, path: str, params: dict[str, Any], not_found: str = "anime_not_found"
+    ) -> dict:
         try:
             async with self._slots:
                 response = await self._http.get(
@@ -132,7 +154,7 @@ class MalClient:
         except httpx.HTTPError as exc:
             raise ApiError(502, "mal_unavailable", f"MyAnimeList request failed: {exc}") from exc
         if response.status_code == 404:
-            raise ApiError(404, "anime_not_found", "Anime not found")
+            raise ApiError(404, not_found, "Title not found")
         if response.status_code != 200:
             raise ApiError(502, "mal_unavailable", f"MyAnimeList answered {response.status_code}")
         return response.json()
@@ -247,6 +269,62 @@ class MalClient:
             pool = [n for n in pool if any(g.get("id") == genre for g in n.get("genres") or [])]
         start = (page - 1) * page_size
         return pool[start : start + page_size], len(pool) > start + page_size
+
+    # Manga: the same catalog, read through MAL's /manga endpoints.
+
+    async def manga_search(self, query: str, allow_nsfw: bool) -> list[dict]:
+        data = await self._get(
+            "/manga",
+            {
+                "q": query,
+                "limit": 20,
+                "fields": MANGA_LIST_FIELDS,
+                "nsfw": str(allow_nsfw).lower(),
+            },
+        )
+        items = filter_nsfw(data.get("data", []), allow_nsfw)
+        return [i["node"] for i in rank_search_results(query, items, limit=20)]
+
+    async def manga_ranking(
+        self, row: str, allow_nsfw: bool, limit: int = 20, offset: int = 0
+    ) -> tuple[list[dict], bool]:
+        data = await self._get(
+            "/manga/ranking",
+            {
+                "ranking_type": MANGA_RANKINGS[row],
+                "limit": limit,
+                "offset": offset,
+                "fields": MANGA_LIST_FIELDS,
+                "nsfw": str(allow_nsfw).lower(),
+            },
+        )
+        nodes = [i["node"] for i in filter_nsfw(data.get("data", []), allow_nsfw)]
+        return nodes, bool((data.get("paging") or {}).get("next"))
+
+    async def manga_details(self, manga_id: int) -> dict:
+        cached = self._details.get(("manga", manga_id))
+        if cached is not None:
+            return cached
+
+        async def load() -> dict:
+            shared = await self._shared.get("mal-manga", manga_id)
+            if shared is not None:
+                self._details[("manga", manga_id)] = shared
+                return shared
+            data = await self._fetch(
+                f"/manga/{manga_id}", {"fields": MANGA_DETAIL_FIELDS}, "manga_not_found"
+            )
+            self._details[("manga", manga_id)] = data
+            await self._shared.set("mal-manga", manga_id, data, DETAILS_TTL)
+            return data
+
+        return await self._flights.run(("manga", manga_id), load)
+
+    async def visible_manga(self, manga_id: int, allow_nsfw: bool) -> dict:
+        raw = await self.manga_details(manga_id)
+        if not allow_nsfw and not is_safe(raw):
+            raise ApiError(404, "manga_not_found", "Manga not found")
+        return raw
 
     async def visible_details(self, anime_id: int, allow_nsfw: bool) -> dict:
         """Details of a title the user may see: NSFW ones look like they don't exist."""

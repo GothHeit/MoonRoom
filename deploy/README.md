@@ -109,6 +109,15 @@ logs one warning and uses its in-process cache. Flush it with `docker compose ex
   Cloudflare, so this works behind the tunnel. Set it to `false` only to try the stack over plain
   http on your own network.
 
+## Manga sources
+
+`MANGA_SOURCES` lists where chapters come from, in fallback order; `mangadex` (the public MangaDex
+API, fan translations in many languages) is the first. Titles, covers and synopses come from
+MyAnimeList as for anime, and a title is matched to the source by its MAL link or title. Page
+images go through the API (the browser never talks to the source) and are kept in
+`MANGA_CACHE_DIR` on the data disk, at most `MANGA_CACHE_MAX_MB`, oldest-read first out. Create
+that folder before the first start so the API (which runs unprivileged) can write to it.
+
 ## Video sources
 
 `VIDEO_SOURCES` lists unlicensed sources and is meant for this private deployment only. Leave it

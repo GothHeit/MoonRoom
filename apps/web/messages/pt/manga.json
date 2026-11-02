@@ -1,0 +1,107 @@
+{
+  "manga": {
+    "title": "Mangá",
+    "chapterShort": "Cap. {n}",
+    "rows": {
+      "continue_reading": "Continuar lendo",
+      "top": "Mangás mais bem avaliados",
+      "popular": "Mais populares",
+      "manhwa": "Manhwa",
+      "manhua": "Manhua"
+    },
+    "empty": "Nada para mostrar ainda. Tente de novo em instantes.",
+    "browse": {
+      "title": "Explorar mangás",
+      "rows": "Rankings",
+      "top": "Mais bem avaliados",
+      "popular": "Populares",
+      "manhwa": "Manhwa",
+      "manhua": "Manhua",
+      "oneshots": "One-shots",
+      "empty": "Nenhum título aqui."
+    },
+    "search": {
+      "title": "Buscar mangá",
+      "resultsFor": "Mangás para “{q}”",
+      "prompt": "Digite um título para buscar.",
+      "empty": "Nenhum mangá encontrado para “{q}”."
+    },
+    "page": {
+      "coverAlt": "Capa de {title}",
+      "score": "Nota {score}",
+      "chapters": "{count, plural, one {# capítulo} other {# capítulos}}",
+      "volumes": "{count, plural, one {# volume} other {# volumes}}",
+      "authors": "Autores",
+      "genres": "Gêneros",
+      "synopsis": "Sinopse",
+      "noSynopsis": "Ainda sem sinopse.",
+      "related": "Relacionados",
+      "recommended": "Recomendados",
+      "readHere": "Leia aqui",
+      "trackingOnly": "Indisponível aqui",
+      "trackingOnlyHint": "Nenhuma fonte tem este título ainda.",
+      "chapterList": "Capítulos",
+      "language": "Idioma",
+      "from": "De {source}",
+      "start": "Começar a ler",
+      "continue": "Continuar · Cap. {n}",
+      "next": "Ler cap. {n}",
+      "readAgain": "Ler de novo",
+      "noChapters": "Ainda não há capítulos neste idioma.",
+      "chapter": "Cap. {n}",
+      "oneShot": "One-shot",
+      "volume": "Vol. {n}",
+      "read": "Lido",
+      "pageOf": "Página {page} de {pages}",
+      "latest": "Mais recente",
+      "mediaType": {
+        "manga": "Mangá",
+        "manhwa": "Manhwa",
+        "manhua": "Manhua",
+        "one_shot": "One-shot",
+        "doujinshi": "Doujinshi",
+        "novel": "Romance",
+        "light_novel": "Light novel",
+        "oel": "Quadrinho"
+      },
+      "status": {
+        "finished": "Concluído",
+        "currently_publishing": "Em publicação",
+        "on_hiatus": "Em hiato",
+        "discontinued": "Cancelado",
+        "not_yet_published": "Ainda não publicado"
+      }
+    }
+  },
+  "reader": {
+    "back": "Voltar para {title}",
+    "pageOf": "Página {page} de {pages}",
+    "page": "Página",
+    "mode": {
+      "label": "Modo de leitura",
+      "page": "Uma página",
+      "strip": "Tira"
+    },
+    "direction": {
+      "label": "Direção",
+      "rtl": "Direita para esquerda",
+      "ltr": "Esquerda para direita"
+    },
+    "previousPage": "Página anterior",
+    "nextPage": "Próxima página",
+    "previousChapter": "Capítulo anterior",
+    "nextChapter": "Próximo capítulo",
+    "chapter": "Cap. {n}",
+    "oneShot": "One-shot",
+    "end": "Fim do capítulo",
+    "endOfTitle": "Você está em dia com todos os capítulos daqui.",
+    "readNext": "Próximo: Cap. {n}",
+    "backToTitle": "Voltar ao título",
+    "pageFailed": "Esta página não carregou.",
+    "retry": "Tentar de novo",
+    "controls": "Controles do leitor",
+    "showControls": "Mostrar controles",
+    "hideControls": "Esconder controles",
+    "pageAlt": "Página {page}"
+  }
+}

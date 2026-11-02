@@ -1,6 +1,7 @@
 // Minimal stand-in for the API, so the web e2e tests need no database.
 import { createServer } from "node:http";
 
+import { handleManga } from "./fake-manga.mjs";
 import { choiceFor, handleWatch, streamFor } from "./fake-watch.mjs";
 
 // The saved subtitle choice, like the real account setting.
@@ -199,6 +200,11 @@ createServer(async (req, res) => {
     const token = req.headers.authorization?.replace("Bearer ", "");
     if (!token || !accessTokens.has(token)) return send(401, error("not_authenticated"));
     return send(401, error("mal_session_expired"));
+  }
+  if (url.pathname.startsWith("/manga/")) {
+    if (!["/manga/page", "/manga/__reset"].includes(url.pathname) && !authed) return send(401, error("not_authenticated"));
+    const handled = handleManga(url, req, send, res, body);
+    if (handled !== false) return handled;
   }
   if (url.pathname.startsWith("/anime/") || url.pathname === "/home") {
     const token = req.headers.authorization?.replace("Bearer ", "");

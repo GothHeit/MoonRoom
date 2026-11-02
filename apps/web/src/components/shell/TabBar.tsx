@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 
 import { Icon } from "./Icon";
-import { isActive, NAV_ITEMS } from "./nav-items";
+import { isActive, modeOf, navItemsFor, searchHrefFor } from "./nav-items";
 import type { AvatarInfo } from "@/lib/avatar";
 
 import { UserMenu } from "./UserMenu";
@@ -16,7 +16,8 @@ const item = "press flex min-h-14 flex-1 flex-col items-center justify-center ga
 export function TabBar({ userId, username, avatar, isAdmin, pending = 0 }: { userId: string; username: string; avatar: AvatarInfo; isAdmin: boolean; pending?: number }) {
   const t = useTranslations("nav");
   const pathname = usePathname();
-  const tabs = [...NAV_ITEMS, { href: "/search" as const, key: "search" as const, icon: "search" as const }];
+  const mode = modeOf(pathname);
+  const tabs = [...navItemsFor(mode), { href: searchHrefFor(mode), key: "search" as const, icon: "search" as const }];
 
   return (
     <nav

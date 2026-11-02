@@ -93,6 +93,13 @@ class Settings(BaseSettings):
     # The single-folder form of the same setting, still read (listed first).
     local_library_dir: str = ""
 
+    # Manga sources to enable, by name and in order of preference (e.g. "mangadex").
+    manga_sources: str = ""
+    # Chapter pages fetched once are kept here, up to MANGA_CACHE_MAX_MB, oldest-read first out.
+    # Mount a volume (a data disk, never the system one) to keep them across restarts.
+    manga_cache_dir: str = "data/manga-pages"
+    manga_cache_max_mb: int = 2048
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -125,6 +132,10 @@ class Settings(BaseSettings):
     @property
     def video_source_names(self) -> list[str]:
         return [s.strip() for s in self.video_sources.split(",") if s.strip()]
+
+    @property
+    def manga_source_names(self) -> list[str]:
+        return [s.strip() for s in self.manga_sources.split(",") if s.strip()]
 
 
 @lru_cache

@@ -414,6 +414,155 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/manga/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Browse */
+        get: operations["browse_manga_browse_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/manga/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Home */
+        get: operations["home_manga_home_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/manga/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Page
+         * @description One page image, by a link that `pages` signed. The link names the reader and their
+         *     login session and expires, like a stream link; the picture is kept on disk for the next
+         *     reader. Only public hosts are fetched (never anything on our own network).
+         */
+        get: operations["page_manga_page_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/manga/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search */
+        get: operations["search_manga_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/manga/{manga_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Details */
+        get: operations["details_manga__manga_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/manga/{manga_id}/chapters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Chapters
+         * @description The chapter list, with where the user is in each chapter. Separate from the details so
+         *     a slow source never holds the title page back.
+         */
+        get: operations["chapters_manga__manga_id__chapters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/manga/{manga_id}/progress/{chapter}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Progress */
+        put: operations["put_progress_manga__manga_id__progress__chapter__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/manga/{manga_id}/read/{source}/{chapter_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pages
+         * @description The page links of one chapter, plus its neighbours in the same language. The source's
+         *     page links are short-lived, so they are resolved here, when the reader opens the chapter.
+         */
+        get: operations["pages_manga__manga_id__read__source___chapter_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -1418,6 +1567,13 @@ export interface components {
             /** Data */
             data: components["schemas"]["AnimeCard"][];
         };
+        /** Author */
+        Author: {
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+        };
         /** AvatarOut */
         AvatarOut: {
             /**
@@ -1460,6 +1616,44 @@ export interface components {
         BufferingIn: {
             /** Buffering */
             buffering: boolean;
+        };
+        /** ChapterOut */
+        ChapterOut: {
+            /** Group */
+            group?: string | null;
+            /** Id */
+            id: string;
+            /** Lang */
+            lang: string;
+            /** Number */
+            number: string;
+            /** Pages */
+            pages?: number | null;
+            /** Published At */
+            published_at?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Volume */
+            volume?: string | null;
+        };
+        /** ChaptersOut */
+        ChaptersOut: {
+            /** Chapters */
+            chapters?: components["schemas"]["ChapterOut"][];
+            /** Lang */
+            lang?: string | null;
+            /** Languages */
+            languages?: string[];
+            /** Progress */
+            progress?: {
+                [key: string]: components["schemas"]["MangaProgressOut"];
+            };
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id: string;
+            /** Source Title */
+            source_title: string;
         };
         /** ChatIn */
         ChatIn: {
@@ -1716,6 +1910,145 @@ export interface components {
             mal_username?: string | null;
             statistics?: components["schemas"]["MalStatistics"] | null;
         };
+        /** MangaBrowseOut */
+        MangaBrowseOut: {
+            /** Data */
+            data: components["schemas"]["MangaCard"][];
+            /** Has Next */
+            has_next: boolean;
+            /** Page */
+            page: number;
+        };
+        /**
+         * MangaCard
+         * @description What a cover needs.
+         */
+        MangaCard: {
+            alternative_titles?: components["schemas"]["AlternativeTitles"] | null;
+            /** Genres */
+            genres?: components["schemas"]["Genre"][];
+            /** Id */
+            id: number;
+            main_picture?: components["schemas"]["Picture"] | null;
+            /** Mean */
+            mean?: number | null;
+            /** Media Type */
+            media_type?: string | null;
+            /** Num Chapters */
+            num_chapters?: number | null;
+            /** Num Volumes */
+            num_volumes?: number | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** MangaDetailsOut */
+        MangaDetailsOut: {
+            alternative_titles?: components["schemas"]["AlternativeTitles"] | null;
+            /** Authors */
+            authors?: components["schemas"]["Author"][];
+            /** Background */
+            background?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Genres */
+            genres?: components["schemas"]["Genre"][];
+            /** Id */
+            id: number;
+            main_picture?: components["schemas"]["Picture"] | null;
+            /** Mean */
+            mean?: number | null;
+            /** Media Type */
+            media_type?: string | null;
+            /** Num Chapters */
+            num_chapters?: number | null;
+            /** Num List Users */
+            num_list_users?: number | null;
+            /** Num Volumes */
+            num_volumes?: number | null;
+            /** Pictures */
+            pictures?: components["schemas"]["Picture"][];
+            /** Popularity */
+            popularity?: number | null;
+            /** Rank */
+            rank?: number | null;
+            /** Recommendations */
+            recommendations?: components["schemas"]["MangaRecommendation"][];
+            /** Related Manga */
+            related_manga?: components["schemas"]["RelatedManga"][];
+            /** Start Date */
+            start_date?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Synopsis */
+            synopsis?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** MangaHomeItem */
+        MangaHomeItem: {
+            manga: components["schemas"]["MangaCard"];
+            progress?: components["schemas"]["MangaProgressOut"] | null;
+        };
+        /** MangaHomeOut */
+        MangaHomeOut: {
+            /** Rows */
+            rows: components["schemas"]["MangaHomeRow"][];
+        };
+        /** MangaHomeRow */
+        MangaHomeRow: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "continue_reading" | "top" | "popular" | "manhwa" | "manhua";
+            /** Items */
+            items: components["schemas"]["MangaHomeItem"][];
+        };
+        /** MangaListOut */
+        MangaListOut: {
+            /** Data */
+            data: components["schemas"]["MangaCard"][];
+        };
+        /** MangaProgressIn */
+        MangaProgressIn: {
+            /**
+             * Completed
+             * @default false
+             */
+            completed: boolean;
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+        };
+        /** MangaProgressOut */
+        MangaProgressOut: {
+            /** Chapter */
+            chapter: string;
+            /** Completed */
+            completed: boolean;
+            /** Manga Id */
+            manga_id: number;
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** MangaRecommendation */
+        MangaRecommendation: {
+            manga: components["schemas"]["MangaCard"];
+            /** Num Recommendations */
+            num_recommendations: number;
+        };
         /** MeOut */
         MeOut: {
             avatar: components["schemas"]["AvatarOut"];
@@ -1829,6 +2162,17 @@ export interface components {
             items: components["schemas"]["NotificationOut"][];
             /** Unread */
             unread: number;
+        };
+        /** PagesOut */
+        PagesOut: {
+            chapter: components["schemas"]["ChapterOut"];
+            next?: components["schemas"]["ChapterOut"] | null;
+            /** Pages */
+            pages: string[];
+            previous?: components["schemas"]["ChapterOut"] | null;
+            progress?: components["schemas"]["MangaProgressOut"] | null;
+            /** Source */
+            source: string;
         };
         /** PasswordIn */
         PasswordIn: {
@@ -2061,6 +2405,14 @@ export interface components {
         /** RelatedAnime */
         RelatedAnime: {
             anime: components["schemas"]["AnimeCard"];
+            /** Relation Type */
+            relation_type: string;
+            /** Relation Type Formatted */
+            relation_type_formatted: string;
+        };
+        /** RelatedManga */
+        RelatedManga: {
+            manga: components["schemas"]["MangaCard"];
             /** Relation Type */
             relation_type: string;
             /** Relation Type Formatted */
@@ -3076,6 +3428,261 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__routers__mal__LinkOut"];
+                };
+            };
+        };
+    };
+    browse_manga_browse_get: {
+        parameters: {
+            query?: {
+                row?: "top" | "popular" | "manhwa" | "manhua" | "oneshots";
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MangaBrowseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    home_manga_home_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MangaHomeOut"];
+                };
+            };
+        };
+    };
+    page_manga_page_get: {
+        parameters: {
+            query: {
+                u: string;
+                v: string;
+                e: number;
+                s: string;
+                r?: string;
+                i?: string;
+                k?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_manga_search_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MangaListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    details_manga__manga_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                manga_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MangaDetailsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chapters_manga__manga_id__chapters_get: {
+        parameters: {
+            query?: {
+                lang?: string | null;
+            };
+            header?: never;
+            path: {
+                manga_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChaptersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_progress_manga__manga_id__progress__chapter__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                manga_id: number;
+                chapter: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MangaProgressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MangaProgressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pages_manga__manga_id__read__source___chapter_id__get: {
+        parameters: {
+            query?: {
+                lang?: string | null;
+            };
+            header?: never;
+            path: {
+                manga_id: number;
+                source: string;
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

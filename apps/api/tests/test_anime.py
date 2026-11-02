@@ -284,7 +284,7 @@ async def test_safe_check_leaves_out_slow_titles_after_the_budget(monkeypatch):
             return {"id": anime_id, "rating": "pg_13"}
 
     entries = [{"node": {"id": 1}}, {"node": {"id": 2}}]
-    (kept,) = await router._only_safe(cast(MalClient, Mal()), entries)
+    (kept,) = await router.only_safe(cast(MalClient, Mal()), entries)
     assert [e["node"]["id"] for e in kept] == [1]
 
 
