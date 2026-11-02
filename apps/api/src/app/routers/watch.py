@@ -792,30 +792,45 @@ _STARTS: TTLCache[str, int | None] = TTLCache(maxsize=256, ttl=3600)
 
 
 async def _video_start(request: Request, master: Master, referer: str) -> int | None:
-    """Where the stream's own clock starts (90 kHz), read from its first segment, so subtitles
-    can be placed against it. Best effort: without it they are served as they are."""
+    """Where the stream's own clock starts (90 kHz), read from the first segment of its video and
+    of its default audio (a master may keep them apart), so subtitles can be placed against it.
+    Best effort: without it they are served as they are."""
     if master.url in _STARTS:
         return _STARTS[master.url]
-    start = None
-    try:
-        http: httpx.AsyncClient = request.app.state.http
-        headers = {"Referer": referer} if referer else {}
-        entries = [x.strip() for x in master.text.splitlines() if x.strip()]
-        media_url = master.url
-        if any(x.startswith("#EXT-X-STREAM-INF") for x in entries):
-            media_url = urljoin(master.url, next(x for x in entries if not x.startswith("#")))
-            if not hls.looks_public(media_url):
+    http: httpx.AsyncClient = request.app.state.http
+    headers = {"Referer": referer} if referer else {}
+    if referer and (site := urlsplit(referer)).scheme and site.netloc:
+        headers["Origin"] = f"{site.scheme}://{site.netloc}"
+    lines = [x.strip() for x in master.text.splitlines() if x.strip()]
+    if any(x.startswith("#EXT-X-STREAM-INF") for x in lines):
+        playlists = []
+        variant = next((x for x in lines if not x.startswith("#")), None)
+        if variant:
+            playlists.append(variant)
+        audio = [x for x in lines if x.startswith("#EXT-X-MEDIA:TYPE=AUDIO") and 'URI="' in x]
+        audio.sort(key=lambda x: "DEFAULT=YES" not in x)
+        if audio:
+            playlists.append(audio[0].split('URI="')[1].split('"')[0])
+        playlists = [urljoin(master.url, x) for x in playlists]
+    else:
+        playlists = [master.url]
+
+    async def first_pts(url: str) -> int | None:
+        try:
+            if not hls.looks_public(url):
                 return None
-            media = (await http.get(media_url, headers=headers)).text
-        else:
-            media = master.text
-        first = next(x.strip() for x in media.splitlines() if x.strip() and not x.startswith("#"))
-        seg = urljoin(media_url, first)
-        if hls.looks_public(seg):
+            text = master.text if url == master.url else (await http.get(url, headers=headers)).text
+            entry = next(x.strip() for x in text.splitlines() if x.strip() and x[0] != "#")
+            seg = urljoin(url, entry)
+            if not hls.looks_public(seg):
+                return None
             got = await http.get(seg, headers={**headers, "Range": "bytes=0-65535"})
-            start = hls.ts_start(got.content[:65536]) if got.status_code < 300 else None
-    except (httpx.HTTPError, StopIteration, TimeoutError):
-        start = None
+            return hls.ts_start(got.content[:65536]) if got.status_code < 300 else None
+        except (httpx.HTTPError, StopIteration, TimeoutError):
+            return None
+
+    found = [x for x in await asyncio.gather(*(first_pts(u) for u in playlists)) if x is not None]
+    start = min(found) if found else None
     _STARTS[master.url] = start
     return start
 

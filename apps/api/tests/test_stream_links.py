@@ -91,8 +91,14 @@ async def test_native_players_get_subtitles_in_the_playlist_and_a_fresh_link(cli
     respx.get("https://host.example/p/1080/index.m3u8").mock(
         return_value=httpx.Response(200, text="#EXTM3U\n#EXTINF:5,\nseg0.ts\n")
     )
+    respx.get("https://host.example/p/audio/a.m3u8").mock(
+        return_value=httpx.Response(200, text="#EXTM3U\n#EXTINF:5,\naseg0.ts\n")
+    )
+    respx.get("https://host.example/p/audio/aseg0.ts").mock(
+        return_value=httpx.Response(206, content=_pes(0xC0, 126_000))
+    )
     respx.get("https://host.example/p/1080/seg0.ts").mock(
-        return_value=httpx.Response(206, content=_pes(0xE0, 126_000))
+        return_value=httpx.Response(206, content=_pes(0xE0, 133_200))
     )
 
     play = (await client.post("/watch/ok/21/episodes/1/play", headers=headers)).json()
