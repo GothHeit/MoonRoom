@@ -85,6 +85,7 @@ def build_offer(
         soft_subs=soft,
         hard_sub=None if hard == "und" else hard,
         resolution=resolution,
+        machine_translated=stream.machine_translated,
     )
 
 

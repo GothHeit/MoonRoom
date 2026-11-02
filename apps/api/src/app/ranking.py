@@ -8,6 +8,7 @@ The order, strongest rule first. A later rule only decides between versions the 
 rate the same:
 
 1. Playable. A version whose file was checked and exists beats one that couldn't be checked.
+   Then a version with machine-translated subtitles loses to every other one.
 2. Audio. The preferred dub language beats the original audio, which beats everything else.
    "Original" as the preference puts the original audio first.
 3. Subtitles. Skipped when the preferred dub plays (nothing to read). Otherwise a track in the
@@ -118,6 +119,8 @@ class Offer:
     resolution: int | None = None
     # False when the host couldn't say whether the file exists.
     verified: bool = True
+    # Machine-translated subtitles: better than nothing, worse than any human translation.
+    machine_translated: bool = False
 
 
 def audio_fit(offer: Offer, prefs: Prefs) -> int:
@@ -170,6 +173,7 @@ def sort_key(offer: Offer, prefs: Prefs) -> tuple:
     """Higher is better; ties are impossible for two different (source, lang) pairs."""
     return (
         offer.verified,
+        not offer.machine_translated,
         audio_fit(offer, prefs),
         subtitle_fit(offer, prefs),
         resolution_fit(offer, prefs),
@@ -191,6 +195,7 @@ def is_ideal(offer: Offer, prefs: Prefs) -> bool:
     top = bucket(prefs.resolution) if prefs.resolution else BUCKETS[2]
     return (
         offer.verified
+        and not offer.machine_translated
         and audio_fit(offer, prefs) == best_audio(prefs)
         and subtitle_fit(offer, prefs) == best_subtitle(prefs)
         and bucket(offer.resolution) >= min(top, BUCKETS[2])

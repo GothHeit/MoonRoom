@@ -52,6 +52,8 @@ class Stream:
     default_audio: str | None = None
     # Font name (lower case) -> file, for the ASS subtitles. Fetched only when a script uses it.
     fonts: dict[str, str] = field(default_factory=dict)
+    # Subtitles made by machine translation. The ranking puts such a version below any other.
+    machine_translated: bool = False
 
 
 @dataclass(frozen=True)

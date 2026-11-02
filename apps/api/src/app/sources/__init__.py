@@ -29,6 +29,14 @@ def load_sources(names: list[str]) -> dict[str, VideoSource]:
             from app.sources.animedrive import AnimeDriveSource
 
             sources[name] = AnimeDriveSource()
+        elif name == "animesonlinecc":
+            from app.sources.animesonlinecc import AnimesOnlineCCSource
+
+            sources[name] = AnimesOnlineCCSource()
+        elif name == "animefire":
+            from app.sources.animefire import AnimeFireSource
+
+            sources[name] = AnimeFireSource()
         elif name == "kaa":
             from app.sources.kaa import KaaSource
 
