@@ -136,6 +136,13 @@ class PlayerPreferences(Base):
     subtitle_color: Mapped[str] = mapped_column(String(16), default="white")
     subtitle_background: Mapped[str] = mapped_column(String(16), default="outline")
     subtitle_position: Mapped[str] = mapped_column(String(16), default="bottom")
+    # What the automatic source choice looks for (see app.ranking): "original" audio or the
+    # language of a dub, soft subtitles over burned-in ones, and an optional height limit.
+    audio_lang: Mapped[str] = mapped_column(
+        String(8), default="original", server_default="original"
+    )
+    prefer_soft_subs: Mapped[bool] = mapped_column(default=True, server_default="true")
+    max_resolution: Mapped[int | None] = mapped_column(default=None)
 
 
 class Friendship(Base):

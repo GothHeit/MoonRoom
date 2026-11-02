@@ -21,7 +21,7 @@ import httpx
 from cachetools import TTLCache
 
 from app import hls
-from app.sources.base import EpisodeList, Lang, Stream
+from app.sources.base import EpisodeList, Lang, Stream, Traits
 from app.sources.matching import Candidate, match, same_season, search_queries
 
 BASE = "https://animesdrive.cloud"
@@ -187,6 +187,7 @@ def parse_servers(page: str, dubbed: bool) -> list[Server]:
 
 class AnimeDriveSource:
     name = "animedrive"
+    traits = Traits(hard_sub_lang="pt-BR", dub_audio_lang="pt-BR")
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
         self._owns_client = client is None

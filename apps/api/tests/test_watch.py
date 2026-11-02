@@ -229,6 +229,9 @@ async def test_player_preferences_default_then_saved_per_user(client, session):
         "subtitle_color": "white",
         "subtitle_background": "outline",
         "subtitle_position": "bottom",
+        "audio_lang": "original",
+        "prefer_soft_subs": True,
+        "max_resolution": None,
     }
     body = {
         "subtitle_size": "large",
@@ -236,8 +239,9 @@ async def test_player_preferences_default_then_saved_per_user(client, session):
         "subtitle_background": "solid",
         "subtitle_position": "raised",
     }
-    assert (await client.put("/watch/preferences", json=body, headers=headers)).json() == body
-    assert (await client.get("/watch/preferences", headers=headers)).json() == body
+    saved = {**body, "audio_lang": "original", "prefer_soft_subs": True, "max_resolution": None}
+    assert (await client.put("/watch/preferences", json=body, headers=headers)).json() == saved
+    assert (await client.get("/watch/preferences", headers=headers)).json() == saved
     assert (await client.get("/watch/preferences", headers=other)).json()[
         "subtitle_size"
     ] == "medium"
@@ -280,6 +284,7 @@ async def test_options_list_each_source_and_lang_with_the_episode(client, sessio
 
     two = await client.get("/watch/options/21/2", headers=headers)
     assert two.json() == [
+        {"source": "auto", "lang": "sub"},
         {"source": "fake", "lang": "sub"},
         {"source": "fake", "lang": "dub"},
         {"source": "dubs", "lang": "sub"},
@@ -311,6 +316,7 @@ async def test_options_are_kept_per_episode_and_skip_sources_without_the_title(c
     first = await client.get("/watch/options/21/2", headers=headers)
     # Its dub is still asked for: the title page never looked at dubs.
     assert first.json() == [
+        {"source": "auto", "lang": "sub"},
         {"source": "fake", "lang": "sub"},
         {"source": "fake", "lang": "dub"},
         {"source": "absent", "lang": "dub"},
@@ -331,7 +337,7 @@ async def test_options_still_ask_a_source_that_only_failed_on_the_title_page(cli
     fastapi_app.state.source_hints[("fake", 21)] = (False, SOURCE_FAILURE_TTL)
 
     r = await client.get("/watch/options/21/2", headers=headers)
-    assert [o["source"] for o in r.json()] == ["fake", "fake"]
+    assert [o["source"] for o in r.json()] == ["auto", "fake", "fake"]
 
 
 @respx.mock
@@ -344,7 +350,7 @@ async def test_a_picked_source_is_remembered_per_user_and_title(client, session)
     first = await client.get("/anime/21/sources", headers=headers)
     assert first.json()["sources"] == ["fake", "dubs"]
     assert first.json()["choice"] is None
-    assert first.json()["stream"] == {"source": "fake", "lang": "sub"}
+    assert first.json()["stream"] == {"source": "auto", "lang": "sub"}
     assert first.json()["listing"]["episodes"] == [1, 2, 3]
 
     for lang in ("sub", "dub"):

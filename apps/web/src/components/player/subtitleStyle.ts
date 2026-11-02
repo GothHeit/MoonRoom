@@ -1,7 +1,13 @@
 import type { components } from "@app/api-client";
 import type { CSSProperties } from "react";
 
-export type SubtitleStyle = components["schemas"]["PlayerPreferencesIO"];
+type Preferences = components["schemas"]["PlayerPreferencesIO"];
+
+/** How the captions look: the part of the player preferences the player itself saves. */
+export type SubtitleStyle = Pick<
+  Preferences,
+  "subtitle_size" | "subtitle_color" | "subtitle_background" | "subtitle_position"
+>;
 
 export const DEFAULT_STYLE: SubtitleStyle = {
   subtitle_size: "medium",
@@ -9,6 +15,16 @@ export const DEFAULT_STYLE: SubtitleStyle = {
   subtitle_background: "outline",
   subtitle_position: "bottom",
 };
+
+/** The caption look out of the saved preferences, so saving it never sends the other choices back. */
+export function styleOf(saved: Partial<Preferences> | undefined): SubtitleStyle {
+  return {
+    subtitle_size: saved?.subtitle_size ?? DEFAULT_STYLE.subtitle_size,
+    subtitle_color: saved?.subtitle_color ?? DEFAULT_STYLE.subtitle_color,
+    subtitle_background: saved?.subtitle_background ?? DEFAULT_STYLE.subtitle_background,
+    subtitle_position: saved?.subtitle_position ?? DEFAULT_STYLE.subtitle_position,
+  };
+}
 
 export const SIZES = ["small", "medium", "large", "huge"] as const;
 export const COLORS = ["white", "yellow", "cyan", "green"] as const;

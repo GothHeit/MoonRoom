@@ -17,7 +17,7 @@ import httpx
 from cachetools import TTLCache
 
 from app.singleflight import SingleFlight
-from app.sources.base import EpisodeList, Lang, Skip, Stream, Subtitle
+from app.sources.base import EpisodeList, Lang, Skip, Stream, Subtitle, Traits
 
 EMBED = "https://zokoanime.video"
 KEY = b"otaku-embed-v1"
@@ -124,6 +124,7 @@ def decode_blob(blob: str) -> dict | None:
 
 class ZokoSource:
     name = "zoko"
+    traits = Traits()
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
         self._owns_client = client is None

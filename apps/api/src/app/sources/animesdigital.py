@@ -19,7 +19,7 @@ import httpx
 from cachetools import TTLCache
 
 from app.singleflight import SingleFlight
-from app.sources.base import EpisodeList, Lang, Stream
+from app.sources.base import EpisodeList, Lang, Stream, Traits
 from app.sources.matching import Candidate, match, same_season, search_queries
 
 BASE = "https://animesdigital.org"
@@ -118,6 +118,7 @@ def parse_player(page: str) -> str | None:
 
 class AnimesDigitalSource:
     name = "animesdigital"
+    traits = Traits(hard_sub_lang="pt-BR", dub_audio_lang="pt-BR")
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
         self._owns_client = client is None

@@ -227,6 +227,25 @@ def top_resolution(master: str) -> int | None:
     return max((int(h) for h in RESOLUTION.findall(master)), default=None)
 
 
+ATTRIBUTE = re.compile(r'([A-Z0-9-]+)=("[^"]*"|[^,]*)')
+
+
+def audio_tracks(master: str) -> list[tuple[str, str]]:
+    """(name, language) of each separate audio track a master playlist lists, in order and
+    without repeats. Some hosts list the same track once per quality; the player offers it once."""
+    found: list[tuple[str, str]] = []
+    for line in master.splitlines():
+        if not line.startswith("#EXT-X-MEDIA:"):
+            continue
+        attrs = {k: v.strip('"') for k, v in ATTRIBUTE.findall(line[len("#EXT-X-MEDIA:") :])}
+        if attrs.get("TYPE") != "AUDIO":
+            continue
+        track = (attrs.get("NAME", ""), attrs.get("LANGUAGE", ""))
+        if track not in found:
+            found.append(track)
+    return found
+
+
 def rewrite_playlist(text: str, base_url: str, referer: str, viewer: str) -> str:
     local = base_url.startswith("file:")
 

@@ -23,6 +23,23 @@
         "connections": "Conexões",
         "security": "Segurança",
         "nav": "Seções das configurações"
+      },
+      "playback": {
+        "title": "Reprodução",
+        "intro": "Quando um título tem várias fontes, a melhor versão para você é escolhida automaticamente, nesta ordem: seu áudio, depois suas legendas, depois a qualidade.",
+        "audio": "Áudio",
+        "audioOriginal": "Original (japonês)",
+        "audioDub": "Dublagem em {language} quando houver",
+        "audioHint": "Se existir uma dublagem neste idioma, ela toca. Senão você recebe o áudio original com legendas.",
+        "subtitles": "Legendas",
+        "subtitlesAuto": "Automática (português, depois inglês)",
+        "subtitlesOff": "Desligadas",
+        "soft": "Preferir legendas que posso desligar",
+        "softHint": "Escolhe fontes com legendas que podem ser trocadas ou escondidas em vez de legendas gravadas na imagem.",
+        "quality": "Qualidade",
+        "qualityBest": "A melhor disponível",
+        "qualityUpTo": "Até {height}p",
+        "qualityHint": "Útil em conexão lenta ou plano de dados."
       }
     },
     "mal": {

@@ -1773,6 +1773,25 @@
             "title": "Kind",
             "type": "string"
           },
+          "lang": {
+            "enum": [
+              "sub",
+              "dub"
+            ],
+            "title": "Lang",
+            "type": "string"
+          },
+          "max_resolution": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Resolution"
+          },
           "resolution": {
             "anyOf": [
               {
@@ -1811,6 +1830,7 @@
         },
         "required": [
           "source",
+          "lang",
           "kind",
           "resolution",
           "url"
@@ -1820,6 +1840,33 @@
       },
       "PlayerPreferencesIO": {
         "properties": {
+          "audio_lang": {
+            "default": "original",
+            "title": "Audio Lang",
+            "type": "string"
+          },
+          "max_resolution": {
+            "anyOf": [
+              {
+                "enum": [
+                  360,
+                  480,
+                  720,
+                  1080
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Resolution"
+          },
+          "prefer_soft_subs": {
+            "default": true,
+            "title": "Prefer Soft Subs",
+            "type": "boolean"
+          },
           "subtitle_background": {
             "default": "outline",
             "enum": [
@@ -1865,6 +1912,120 @@
           }
         },
         "title": "PlayerPreferencesIO",
+        "type": "object"
+      },
+      "PlayerPreferencesIn": {
+        "description": "A change to the preferences: only the fields sent are saved, the rest stay as they are.",
+        "properties": {
+          "audio_lang": {
+            "anyOf": [
+              {
+                "pattern": "^(original|[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,4})?)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Lang"
+          },
+          "max_resolution": {
+            "anyOf": [
+              {
+                "enum": [
+                  360,
+                  480,
+                  720,
+                  1080
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Resolution"
+          },
+          "prefer_soft_subs": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefer Soft Subs"
+          },
+          "subtitle_background": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "outline",
+                  "translucent",
+                  "solid"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle Background"
+          },
+          "subtitle_color": {
+            "anyOf": [
+              {
+                "enum": [
+                  "white",
+                  "yellow",
+                  "cyan",
+                  "green"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle Color"
+          },
+          "subtitle_position": {
+            "anyOf": [
+              {
+                "enum": [
+                  "bottom",
+                  "raised",
+                  "top"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle Position"
+          },
+          "subtitle_size": {
+            "anyOf": [
+              {
+                "enum": [
+                  "small",
+                  "medium",
+                  "large",
+                  "huge"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle Size"
+          }
+        },
+        "title": "PlayerPreferencesIn",
         "type": "object"
       },
       "PresetIn": {
@@ -5642,7 +5803,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PlayerPreferencesIO"
+                "$ref": "#/components/schemas/PlayerPreferencesIn"
               }
             }
           },

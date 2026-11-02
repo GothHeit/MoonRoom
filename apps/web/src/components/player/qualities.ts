@@ -11,6 +11,25 @@ export function qualityList(levels: { height: number }[]): Quality[] {
     .sort((a, b) => b.height - a.height);
 }
 
+/**
+ * The level automatic quality may not go above, for a viewer who set a limit: the tallest one
+ * within it, or the smallest there is when everything is taller. -1 (no cap) without a limit.
+ */
+export function capLevel(levels: { height: number }[], limit: number | null): number {
+  if (!limit || levels.length === 0) return -1;
+  let best = -1;
+  for (const [i, level] of levels.entries()) {
+    if (level.height <= 0) continue;
+    const better =
+      best < 0 ||
+      (level.height <= limit
+        ? levels[best].height > limit || level.height > levels[best].height
+        : levels[best].height > limit && level.height < levels[best].height);
+    if (better) best = i;
+  }
+  return best;
+}
+
 const HEVC = /^(hvc1|hev1)\./;
 
 /**

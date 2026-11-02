@@ -173,9 +173,9 @@ async def test_details_include_related_recommendations_and_lazy_sources(client, 
     assert (await client.get("/anime/5/sources", headers=headers)).json() == {
         "sources": ["present"],
         "choice": None,
-        "stream": {"source": "present", "lang": "sub"},
+        "stream": {"source": "auto", "lang": "sub"},
         "listing": {
-            "source": "present",
+            "source": "auto",
             "source_title": "x",
             "episodes": [1],
             "thumbnails": {},

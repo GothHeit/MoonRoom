@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { DEFAULT_STYLE } from "@/components/player/subtitleStyle";
+import { styleOf } from "@/components/player/subtitleStyle";
 import { RoomClient } from "@/components/room/RoomClient";
 import { titled } from "@/lib/page-title";
 import { serverApi, unwrap } from "@/lib/server-api";
@@ -50,7 +50,7 @@ export default async function RoomPage({ params }: PageProps<"/[locale]/room/[co
       meId={me.id}
       episodes={[...(episodes?.data?.episodes ?? [])].sort((a, b) => a - b)}
       subtitleLang={me.subtitle_lang}
-      subtitleStyle={preferences?.data ?? DEFAULT_STYLE}
+      subtitleStyle={styleOf(preferences?.data)}
     />
   );
 }

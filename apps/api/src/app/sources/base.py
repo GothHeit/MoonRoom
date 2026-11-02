@@ -1,8 +1,8 @@
 """The plug-in boundary for where video comes from.
 
 The rest of the app (player, progress, UI) only talks to a VideoSource. The private
-implementations are the ZokoAnime, AnimesDigital and AnimesDrive scrapers and the user's own
-converted files; a licensed catalog would be another one.
+implementations are the ZokoAnime, AnimesDigital, AnimesDrive, KickAssAnime and AniZone scrapers
+and the user's own converted files; a licensed catalog would be another one.
 """
 
 from dataclasses import dataclass, field
@@ -52,6 +52,17 @@ class Stream:
     default_audio: str | None = None
     # Font name (lower case) -> file, for the ASS subtitles. Fetched only when a script uses it.
     fonts: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Traits:
+    """What a source's streams are, when the stream itself doesn't say. The ranking reads this
+    to tell a hard-subbed copy from a soft-subbed one and to know what language a dub is in."""
+
+    # Language burned into the picture of the "sub" copies, when they carry one.
+    hard_sub_lang: str | None = None
+    # Language of the source's "dub" copies; None when it has none.
+    dub_audio_lang: str | None = "en"
 
 
 class VideoSource(Protocol):

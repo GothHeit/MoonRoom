@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({ api: {} }));
 
-const { pickAudio } = await import("./useHls");
+const { pickAudio, uniqueAudio } = await import("./useHls");
 const { pickTrack } = await import("./useSubtitles");
 
 describe("pickTrack", () => {
@@ -44,5 +44,29 @@ describe("pickAudio", () => {
     expect(pickAudio(audio, "fr")).toBe(0);
     expect(pickAudio(audio, null)).toBe(0);
     expect(pickAudio([], "ja")).toBe(-1);
+  });
+
+  it("takes the track the stream marks as default over the first one", () => {
+    const listed = [
+      { id: 0, name: "Hindi", lang: "hin" },
+      { id: 1, name: "Japanese", lang: "jpn", default: true },
+    ];
+    expect(pickAudio(listed, null)).toBe(1);
+    expect(pickAudio(listed, "fr")).toBe(1);
+    // A wanted dub still wins over the default.
+    expect(pickAudio(listed, "hin")).toBe(0);
+  });
+});
+
+describe("uniqueAudio", () => {
+  it("lists a track once even when the master repeats it for every quality", () => {
+    const repeated = [
+      { id: 0, name: "Japanese", lang: "jpn" },
+      { id: 1, name: "Portuguese", lang: "por" },
+      { id: 2, name: "Japanese", lang: "jpn" },
+      { id: 3, name: "Portuguese", lang: "por" },
+      { id: 4, name: "Portuguese", lang: "pt-BR" },
+    ];
+    expect(uniqueAudio(repeated).map((a) => a.id)).toEqual([0, 1, 4]);
   });
 });

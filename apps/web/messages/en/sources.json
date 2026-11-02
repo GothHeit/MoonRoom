@@ -16,6 +16,14 @@
       "local": {
         "sub": "Local library · Subtitled",
         "dub": "Local library · Dubbed"
+      },
+      "kaa": {
+        "sub": "KickAssAnime · Subtitled, all dubs",
+        "dub": "KickAssAnime · Subtitled, all dubs"
+      },
+      "anizone": {
+        "sub": "AniZone · Subtitled, all dubs",
+        "dub": "AniZone · Subtitled, all dubs"
       }
     }
   }

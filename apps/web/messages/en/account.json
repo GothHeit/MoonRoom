@@ -23,6 +23,23 @@
         "connections": "Connections",
         "security": "Security",
         "nav": "Settings sections"
+      },
+      "playback": {
+        "title": "Playback",
+        "intro": "When a title has several sources, the best version for you is picked automatically, in this order: your audio, then your subtitles, then quality.",
+        "audio": "Audio",
+        "audioOriginal": "Original (Japanese)",
+        "audioDub": "{language} dub when available",
+        "audioHint": "If a dub in this language exists, it plays. Otherwise you get the original audio with subtitles.",
+        "subtitles": "Subtitles",
+        "subtitlesAuto": "Automatic (Portuguese, then English)",
+        "subtitlesOff": "Off",
+        "soft": "Prefer subtitles I can turn off",
+        "softHint": "Chooses sources whose subtitles can be switched or hidden over ones burned into the picture.",
+        "quality": "Quality",
+        "qualityBest": "Best available",
+        "qualityUpTo": "Up to {height}p",
+        "qualityHint": "Handy on a slow connection or a data plan."
       }
     },
     "mal": {

@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request
 
+from app.choose import union_episodes
 from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.mal.client import MalClient, is_safe
@@ -232,19 +233,27 @@ async def _first_listing(
     choice: StreamOption | None,
     viewer: str,
 ) -> tuple[StreamOption | None, EpisodesOut | None]:
-    """The episodes of the stream the title page plays from: the saved pick, else the first
-    source, subbed. A pick that lists nothing falls through to the default."""
+    """The episodes of the stream the title page plays from: the saved pick, else the automatic
+    choice. A pick that lists nothing falls through to the default."""
     candidates = [choice] if choice else []
     if available:
-        default = StreamOption(source=available[0], lang="sub")
+        # Without a pick the API chooses per episode (automatic).
+        default = StreamOption(source="auto", lang="sub")
         if default not in candidates:
             candidates.append(default)
     for option in candidates:
         try:
-            listed = await asyncio.wait_for(
-                request.app.state.sources[option.source].episodes(anime, option.lang),
-                SOURCE_PROBE_TIMEOUT,
-            )
+            if option.source == "auto":
+                listed = await union_episodes(
+                    {n: request.app.state.sources[n] for n in available},
+                    anime,
+                    SOURCE_PROBE_TIMEOUT,
+                )
+            else:
+                listed = await asyncio.wait_for(
+                    request.app.state.sources[option.source].episodes(anime, option.lang),
+                    SOURCE_PROBE_TIMEOUT,
+                )
         except Exception:  # the page falls back to asking for the episodes itself
             continue
         if listed and listed.episodes:

@@ -104,6 +104,13 @@ Rotate it if it may have leaked, or once a year. Nobody is signed out:
 empty for anything public or any store build. `PT_SYNOPSIS_SCRAPE` is the same kind of switch: it
 fetches Portuguese synopses from an unlicensed site, so keep it `false` outside this deployment.
 
+Unless a viewer picks a source by hand in the player, each episode plays from the best version
+for them across every enabled source, in this order: playable, their audio (a dub in the language
+they chose in Settings, else the original), their subtitles (soft over burned-in), then quality
+(the best, or the best under the limit they set). The order of `VIDEO_SOURCES` only breaks ties,
+so more sources never make the pick worse. `kaa` and `anizone` carry every dub as an audio track
+of the same stream; the player's Audio menu switches between them.
+
 ## Local library
 
 The `local` video source plays your own episode files, converted ahead of time so watching

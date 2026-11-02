@@ -27,7 +27,7 @@ from app.library import (
     title_dir,
 )
 from app.singleflight import SingleFlight
-from app.sources.base import EpisodeList, Lang, Skip, Stream, Subtitle
+from app.sources.base import EpisodeList, Lang, Skip, Stream, Subtitle, Traits
 
 # How long a listing or stream is reused, so a new conversion shows up within a minute.
 CACHE_SECONDS = 60
@@ -35,6 +35,7 @@ CACHE_SECONDS = 60
 
 class LocalSource:
     name = "local"
+    traits = Traits(dub_audio_lang=None)
 
     def __init__(self, roots: Path | Sequence[Path]):
         self.roots = [roots] if isinstance(roots, Path) else list(roots)

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { AvatarForm } from "@/components/account/AvatarForm";
 import { NotificationsForm } from "@/components/account/NotificationsForm";
 import { MalSection } from "@/components/account/MalSection";
+import { PlaybackForm } from "@/components/account/PlaybackForm";
 import { PasswordForm } from "@/components/account/PasswordForm";
 import { PreferencesForm } from "@/components/account/PreferencesForm";
 import { SessionsPanel } from "@/components/account/SessionsPanel";
@@ -50,12 +51,13 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
   const { mal } = await searchParams;
 
   const api = await serverApi();
-  const [me, malStatus, sessions, notifications, twoFactor] = await Promise.all([
+  const [me, malStatus, sessions, notifications, twoFactor, playback] = await Promise.all([
     unwrap(api.GET("/me"), locale),
     unwrap(api.GET("/me/mal"), locale),
     unwrap(api.GET("/me/sessions"), locale),
     unwrap(api.GET("/notifications/settings"), locale),
     unwrap(api.GET("/me/2fa"), locale),
+    unwrap(api.GET("/watch/preferences"), locale),
   ]);
 
   return (
@@ -96,6 +98,15 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
       <Group id="preferences" title={t("settings.groups.preferences")}>
         <Section title={t("settings.preferences")}>
           <PreferencesForm showNsfw={me.show_nsfw} shareActivity={me.share_activity} />
+        </Section>
+
+        <Section title={t("settings.playback.title")}>
+          <PlaybackForm
+            audio={playback.audio_lang ?? "original"}
+            subtitle={me.subtitle_lang ?? null}
+            softSubs={playback.prefer_soft_subs ?? true}
+            maxResolution={playback.max_resolution ?? null}
+          />
         </Section>
 
         <Section title={tNotifications("title")}>

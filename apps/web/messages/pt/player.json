@@ -85,6 +85,13 @@
       "close": "Fechar configurações"
     },
     "watchTogether": "Assistir juntos",
-    "nextShort": "Próximo"
+    "nextShort": "Próximo",
+    "autoPlaying": "Automático · {stream}",
+    "streams": {
+      "auto": {
+        "sub": "Automático (o melhor para você)",
+        "dub": "Automático (o melhor para você)"
+      }
+    }
   }
 }

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 from collections.abc import Awaitable
 from typing import Annotated, Literal
 
@@ -8,19 +9,22 @@ from cachetools import TTLCache
 from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import hls
+from app.choose import Picked, audio_to_start, resolve_auto, union_episodes
 from app.deps import CurrentSessionId, CurrentUser, Session, bearer_identity
 from app.errors import ApiError
 from app.models import PlayerPreferences, SourceChoice
 from app.probes import Gone, HostError, Master, StreamProbes
+from app.ranking import ORIGINAL, ORIGINAL_AUDIO, Prefs, base_lang
 from app.schemas import EpisodesOut, StreamOption
 from app.security import create_playback_token, decode_playback_token
 from app.singleflight import SingleFlight
 from app.source_hints import lacks_subbed
 from app.sources.base import EpisodeList, Lang, SkipKind, Stream, VideoSource
+from app.subtitles import ass_to_vtt
 from app.upstream import open_upstream, read_playlist
 
 logger = logging.getLogger(__name__)
@@ -36,6 +40,10 @@ async def _upstream[T](work: Awaitable[T]) -> T:
 
 
 router = APIRouter(prefix="/watch", tags=["watch"])
+# "original", or a language tag as players spell it ("pt", "pt-BR", "por").
+AUDIO_LANG = r"^(original|[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,4})?)$"
+# The pseudo-source that lets the API pick the best version for the viewer (app.ranking).
+AUTO = "auto"
 _bearer = HTTPBearer(auto_error=False)
 
 # How long the player's source menu waits on each source before leaving it out.
@@ -80,6 +88,8 @@ class SkipOut(BaseModel):
 class PlaybackOut(BaseModel):
     # The source that answered: another enabled one when the requested source failed.
     source: str
+    # Sub or dub, as played: automatic picks it.
+    lang: Lang
     kind: str
     resolution: int | None
     # Relative to the API base URL. Carries a short-lived token naming this episode; fetching it
@@ -89,8 +99,21 @@ class PlaybackOut(BaseModel):
     skips: list[SkipOut] = []
     # Name or language of the audio track to start with, when the stream has several.
     default_audio: str | None = None
+    # The tallest quality the viewer asked for, when they set a limit: the player keeps to it.
+    max_resolution: int | None = None
     # Font name (lower case) -> link, for rendering the ASS subtitles.
     fonts: dict[str, str] = {}
+
+
+def normalize_audio_lang(value: str) -> str:
+    """Stored as the dub's base language ("pt"); the original audio is "original", however the
+    caller spells Japanese. Anything unrecognised is refused."""
+    if value == ORIGINAL:
+        return value
+    code = base_lang(value)
+    if code == "und":
+        raise ValueError("Unknown language")
+    return ORIGINAL if code == ORIGINAL_AUDIO else code
 
 
 class PlayerPreferencesIO(BaseModel):
@@ -98,6 +121,29 @@ class PlayerPreferencesIO(BaseModel):
     subtitle_color: Literal["white", "yellow", "cyan", "green"] = "white"
     subtitle_background: Literal["none", "outline", "translucent", "solid"] = "outline"
     subtitle_position: Literal["bottom", "raised", "top"] = "bottom"
+    # What the automatic source choice looks for: "original" audio or a dub's language code.
+    audio_lang: str = ORIGINAL
+    prefer_soft_subs: bool = True
+    # The tallest quality to prefer, or none for the best there is.
+    max_resolution: Literal[360, 480, 720, 1080] | None = None
+
+
+class PlayerPreferencesIn(BaseModel):
+    """A change to the preferences: only the fields sent are saved, the rest stay as they are."""
+
+    subtitle_size: Literal["small", "medium", "large", "huge"] | None = None
+    subtitle_color: Literal["white", "yellow", "cyan", "green"] | None = None
+    subtitle_background: Literal["none", "outline", "translucent", "solid"] | None = None
+    subtitle_position: Literal["bottom", "raised", "top"] | None = None
+    audio_lang: Annotated[str, Field(pattern=AUDIO_LANG)] | None = None
+    prefer_soft_subs: bool | None = None
+    # null clears the limit; leaving the field out keeps it.
+    max_resolution: Literal[360, 480, 720, 1080] | None = None
+
+    @field_validator("audio_lang")
+    @classmethod
+    def _audio_lang(cls, value: str | None) -> str | None:
+        return None if value is None else normalize_audio_lang(value)
 
 
 def _source(request: Request, name: str) -> VideoSource:
@@ -105,6 +151,33 @@ def _source(request: Request, name: str) -> VideoSource:
     if source is None:
         raise ApiError(404, "source_not_found", f"Video source '{name}' is not enabled")
     return source
+
+
+async def load_prefs(session: AsyncSession, user_id: uuid.UUID, subtitle_lang: str | None) -> Prefs:
+    """What the viewer wants from the automatic choice: their saved playback preferences and
+    their subtitle language."""
+    saved = await session.get(PlayerPreferences, user_id)
+    if saved is None:
+        return Prefs(subtitle=subtitle_lang)
+    return Prefs(
+        audio=saved.audio_lang,
+        subtitle=subtitle_lang,
+        soft_subs=saved.prefer_soft_subs,
+        resolution=saved.max_resolution,
+    )
+
+
+async def _resolve_auto(
+    request: Request, anime: dict, episode: int, prefs: Prefs, fresh: bool = False
+) -> Picked | None:
+    """The best version across every enabled source, or None when none has the episode. A
+    run where sources failed and none answered is a 502, not a 404."""
+    outcome = await resolve_auto(
+        request.app.state.sources, request.app.state.probes, anime, episode, prefs, fresh
+    )
+    if outcome.picked is None and outcome.failed:
+        raise ApiError(502, "upstream_failed", "The video sources are failing right now")
+    return outcome.picked
 
 
 async def _resolve_stream(
@@ -199,9 +272,11 @@ def episodes_out(source: str, result: EpisodeList, viewer: str) -> EpisodesOut:
 async def episodes(
     request: Request, source: str, anime_id: int, user: CurrentUser, lang: Lang = "sub"
 ):
-    src = _source(request, source)
     anime = await request.app.state.mal.visible_details(anime_id, user.show_nsfw)
-    result = await _upstream(src.episodes(anime, lang))
+    if source == AUTO:
+        result = await union_episodes(request.app.state.sources, anime, OPTION_PROBE_TIMEOUT)
+    else:
+        result = await _upstream(_source(request, source).episodes(anime, lang))
     if result is None:
         raise ApiError(404, "not_available", "This anime isn't available from this source")
     return episodes_out(source, result, str(user.id))
@@ -249,6 +324,9 @@ async def _probe_options(request: Request, anime: dict, episode: int) -> list[St
         for (name, lang), hit in zip(pairs, found, strict=True)
         if hit
     ]
+    if len(menu) > 1:
+        # Letting the API choose is only a choice when there is something to choose between.
+        menu.insert(0, StreamOption(source=AUTO, lang="sub"))
     # A source that failed may be back in a moment: only a complete answer is kept.
     if not failed:
         request.app.state.watch.options[(anime["id"], episode)] = menu
@@ -266,18 +344,22 @@ async def prepare(
     anime_id: Annotated[int, Path(ge=1)],
     episode: Annotated[int, Path(ge=1)],
     user: CurrentUser,
+    session: Session,
     lang: Lang = "sub",
 ):
     """Resolves an episode in the background so pressing play on it later hits warm caches:
     the title page asks for the episode its Play button opens, the player for the next one.
     Answers at once; nothing is returned and failures are only logged."""
-    _source(request, source)
+    if source != AUTO:
+        _source(request, source)
     caches: WatchCaches = request.app.state.watch
     key = (source, anime_id, episode, lang)
     if key in caches.preparing or len(caches.preparing) >= PREPARE_WIDTH:
         return Response(status_code=202)
+    prefs = await load_prefs(session, user.id, user.subtitle_lang) if source == AUTO else None
+    await session.commit()
     caches.preparing.add(key)
-    task = asyncio.create_task(_warm(request, key, user.show_nsfw))
+    task = asyncio.create_task(_warm(request, key, user.show_nsfw, prefs))
     caches.tasks.add(task)
 
     def done(finished: asyncio.Task) -> None:
@@ -288,11 +370,14 @@ async def prepare(
     return Response(status_code=202)
 
 
-async def _warm(request: Request, key: tuple, show_nsfw: bool) -> None:
+async def _warm(request: Request, key: tuple, show_nsfw: bool, prefs: Prefs | None) -> None:
     source, anime_id, episode, lang = key
     try:
         anime = await request.app.state.mal.visible_details(anime_id, show_nsfw)
-        await _resolve_stream(request, source, anime, episode, lang)
+        if prefs is not None:
+            await _resolve_auto(request, anime, episode, prefs)
+        else:
+            await _resolve_stream(request, source, anime, episode, lang)
     except ApiError as exc:
         logger.info("Warming MAL %s ep %s skipped: %s", anime_id, episode, exc.code)
     except Exception:
@@ -322,8 +407,14 @@ async def put_choice(
     session: Session,
 ):
     """Remembers the source and sub/dub the user picked for this title."""
-    _source(request, body.source)
     saved = await session.get(SourceChoice, (user.id, anime_id))
+    if body.source == AUTO:
+        # Back to the automatic choice: nothing to remember.
+        if saved is not None:
+            await session.delete(saved)
+        await session.commit()
+        return
+    _source(request, body.source)
     if saved is None:
         saved = SourceChoice(user_id=user.id, anime_id=anime_id)
         session.add(saved)
@@ -341,15 +432,19 @@ async def get_preferences(user: CurrentUser, session: Session):
 
 
 @router.put("/preferences", response_model=PlayerPreferencesIO)
-async def put_preferences(body: PlayerPreferencesIO, user: CurrentUser, session: Session):
+async def put_preferences(body: PlayerPreferencesIn, user: CurrentUser, session: Session):
     saved = await session.get(PlayerPreferences, user.id)
     if saved is None:
         saved = PlayerPreferences(user_id=user.id)
         session.add(saved)
-    for field, value in body.model_dump().items():
-        setattr(saved, field, value)
+    # Only what the request names changes: the subtitle look and the playback choices are
+    # saved by different parts of the app.
+    for field, value in body.model_dump(exclude_unset=True).items():
+        # Only max_resolution may be null (no limit); a null anywhere else is "unchanged".
+        if value is not None or field == "max_resolution":
+            setattr(saved, field, value)
     await session.commit()
-    return body
+    return PlayerPreferencesIO.model_validate(saved, from_attributes=True)
 
 
 @router.post("/{source}/{anime_id}/episodes/{episode}/play", response_model=PlaybackOut)
@@ -360,27 +455,46 @@ async def play(
     episode: int,
     user: CurrentUser,
     sid: CurrentSessionId,
+    session: Session,
     lang: Lang = "sub",
     fresh: Annotated[
         bool, Query(description="Check the stream again instead of trusting a recent check")
     ] = False,
 ):
     anime = await request.app.state.mal.visible_details(anime_id, user.show_nsfw)
-    resolved = await _resolve_stream(request, source, anime, episode, lang, fresh)
-    if resolved is None:
-        raise ApiError(404, "not_available", "This episode isn't available from this source")
-    used, stream = resolved
+    default_audio: str | None = None
+    prefs = await load_prefs(session, user.id, user.subtitle_lang)
+    await session.commit()  # the sources below can take seconds: don't hold a connection
+    if source == AUTO:
+        picked = await _resolve_auto(request, anime, episode, prefs, fresh)
+        if picked is None:
+            raise ApiError(404, "not_available", "This episode isn't available")
+        used, lang, stream, default_audio = (
+            picked.source,
+            picked.lang,
+            picked.stream,
+            picked.default_audio,
+        )
+    else:
+        resolved = await _resolve_stream(request, source, anime, episode, lang, fresh)
+        if resolved is None:
+            raise ApiError(404, "not_available", "This episode isn't available from this source")
+        used, stream = resolved
     token = create_playback_token(user.id, sid, used, anime_id, episode, lang)
     path = "video" if stream.kind == "mp4" else "hls"
     referer = stream.upstream_headers.get("Referer", "")
     viewer = str(user.id)
     resolution = stream.resolution
-    if resolution is None and stream.kind == "hls":
+    master = request.app.state.probes.peek(stream.url, referer) if stream.kind == "hls" else None
+    if resolution is None and master:
         # The liveness check just read the master; its variants say the best quality.
-        master = request.app.state.probes.peek(stream.url, referer)
-        resolution = hls.top_resolution(master.text) if master else None
+        resolution = hls.top_resolution(master.text)
+    if default_audio is None and master and not stream.default_audio:
+        # A viewer who likes a dub hears it whenever the stream carries it, picked by hand or not.
+        default_audio = audio_to_start(hls.audio_tracks(master.text), prefs)
     return PlaybackOut(
         source=used,
+        lang=lang,
         kind=stream.kind,
         resolution=resolution,
         url=f"/watch/{path}?token={token}",
@@ -398,7 +512,8 @@ async def play(
             for s in stream.subtitles
         ],
         skips=[SkipOut(kind=k.kind, start=k.start, end=k.end) for k in stream.skips],
-        default_audio=stream.default_audio,
+        default_audio=default_audio or stream.default_audio,
+        max_resolution=prefs.resolution,
         fonts={
             name: f"/watch/{hls.signed_link(url, referer, viewer, 'font')}"
             for name, url in stream.fonts.items()
@@ -564,6 +679,14 @@ async def hls_proxy(
         raise ApiError(502, "upstream_failed", f"Video host answered {upstream.status_code}")
 
     content_type = upstream.headers.get("content-type", "")
+    if k == "sub" and url.split("?")[0].lower().endswith(".ass"):
+        # A host that only has styled subtitles: serve the spoken lines as WebVTT for the
+        # plain track, next to the styled copy the player draws itself.
+        return Response(
+            ass_to_vtt(await read_playlist(upstream)),
+            media_type="text/vtt",
+            headers={"x-content-type-options": "nosniff"},
+        )
     if k == "" and hls.is_playlist(url, content_type):
         text = await read_playlist(upstream)
         return Response(

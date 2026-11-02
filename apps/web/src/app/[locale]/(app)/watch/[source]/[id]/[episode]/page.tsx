@@ -5,7 +5,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { Player, type Lang } from "@/components/player/Player";
 import { resumePosition } from "@/components/player/progress";
-import { DEFAULT_STYLE } from "@/components/player/subtitleStyle";
+import { styleOf } from "@/components/player/subtitleStyle";
 import { APP_NAME } from "@/lib/brand";
 import { serverApi, unwrap } from "@/lib/server-api";
 
@@ -67,7 +67,7 @@ export default async function WatchPage({ params, searchParams }: Params) {
       lang={lang}
       startAt={startAt}
       subtitleLang={me.subtitle_lang}
-      subtitleStyle={preferences?.data ?? DEFAULT_STYLE}
+      subtitleStyle={styleOf(preferences?.data)}
     />
   );
 }

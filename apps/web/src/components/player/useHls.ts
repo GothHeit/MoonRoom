@@ -2,14 +2,37 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
-import { levelsToDrop, qualityList } from "./qualities";
+import { capLevel, levelsToDrop, qualityList } from "./qualities";
 import type { AudioTrack, Quality } from "./SettingsMenu";
 
-/** The audio track matching the source's default (by name or language), else the first. */
-export function pickAudio(tracks: { id: number; name: string; lang?: string }[], wanted: string | null): number {
+/**
+ * The audio track matching the wanted one (by name or language), else the one the stream marks as
+ * its default, else the first. A master may list its tracks in any order (one starts with Hindi),
+ * so the first is only the last resort.
+ */
+export function pickAudio(
+  tracks: { id: number; name: string; lang?: string; default?: boolean }[],
+  wanted: string | null,
+): number {
   const target = wanted?.toLowerCase();
-  const match = target && tracks.find((a) => a.name.toLowerCase() === target || a.lang?.toLowerCase() === target);
-  return match ? match.id : (tracks[0]?.id ?? -1);
+  const match = target
+    ? tracks.find((a) => a.name.toLowerCase() === target || a.lang?.toLowerCase() === target)
+    : undefined;
+  return (match ?? tracks.find((a) => a.default) ?? tracks[0])?.id ?? -1;
+}
+
+/**
+ * The audio tracks to offer: one per name and language. Some hosts list the same track once for
+ * every quality, which would show the viewer the same language several times.
+ */
+export function uniqueAudio<T extends { name: string; lang?: string }>(tracks: T[]): T[] {
+  const seen = new Set<string>();
+  return tracks.filter((a) => {
+    const key = `${a.name}\u0000${a.lang ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
@@ -36,6 +59,8 @@ type Options = {
   url: string | null;
   kind: string;
   defaultAudio: string | null;
+  /** The tallest quality the viewer asked for; automatic quality stays within it. */
+  maxHeight?: number | null;
   /** Called to ask for the stream again, after the original HEVC failed to decode. */
   onRetry: () => void;
   onFail: () => void;
@@ -46,7 +71,7 @@ type Options = {
  * native HLS only where it can't run, e.g. iPhone Safari. Also owns the quality and audio
  * choices, and the retry with H.264 when this device can't decode the original HEVC.
  */
-export function useHls({ video, url, kind, defaultAudio, onRetry, onFail }: Options) {
+export function useHls({ video, url, kind, defaultAudio, maxHeight = null, onRetry, onFail }: Options) {
   const hlsRef = useRef<import("hls.js").default | null>(null);
   const hevcUsed = useRef(false);
   const [qualities, setQualities] = useState<Quality[]>([]);
@@ -72,10 +97,15 @@ export function useHls({ video, url, kind, defaultAudio, onRetry, onFail }: Opti
             hevcUsed.current = drop.length > 0;
             for (const i of drop.reverse()) hls?.removeLevel(i);
           }
-          setQualities(qualityList(hls?.levels ?? data.levels));
+          const levels = hls?.levels ?? data.levels;
+          setQualities(qualityList(levels));
+          const cap = capLevel(levels, maxHeight);
+          if (hls && cap >= 0) hls.autoLevelCapping = cap;
         });
         hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_event, data) => {
-          const found = data.audioTracks.map((a) => ({ id: a.id, name: a.name, lang: a.lang }));
+          const found = uniqueAudio(
+            data.audioTracks.map((a) => ({ id: a.id, name: a.name, lang: a.lang, default: a.default })),
+          );
           setAudioTracks(found.map((a) => ({ id: a.id, label: a.name || a.lang || String(a.id + 1), lang: a.lang })));
           const id = pickAudio(found, defaultAudio);
           if (hls && id >= 0 && hls.audioTrack !== id) hls.audioTrack = id;

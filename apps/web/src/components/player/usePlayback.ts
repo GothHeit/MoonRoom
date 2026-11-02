@@ -25,8 +25,12 @@ export type Playback = {
   fonts: Record<string, string>;
   /** The source that answered; another enabled one when the requested source failed. */
   answered: string;
+  /** Sub or dub as played: the automatic choice picks it. */
+  answeredLang: Lang;
   ownSkips: Skip[];
   defaultAudio: string | null;
+  /** The tallest quality the viewer asked for, if they set a limit. */
+  maxHeight: number | null;
 };
 
 /**
@@ -57,8 +61,10 @@ export function usePlayback(source: string, animeId: number, episode: number, la
             tracks: data.subtitles ?? [],
             fonts: Object.fromEntries(Object.entries(data.fonts ?? {}).map(([name, link]) => [name, `/api/proxy${link}`])),
             answered: data.source,
+            answeredLang: data.lang,
             ownSkips: data.skips ?? [],
             defaultAudio: data.default_audio ?? null,
+            maxHeight: data.max_resolution ?? null,
           });
         else setError(errorCode(body));
       })
@@ -81,8 +87,10 @@ export function usePlayback(source: string, animeId: number, episode: number, la
     tracks: playback?.tracks ?? NONE,
     fonts: playback?.fonts ?? NO_FONTS,
     answered: playback?.answered ?? source,
+    answeredLang: playback?.answeredLang ?? lang,
     ownSkips: playback?.ownSkips ?? NO_SKIPS,
     defaultAudio: playback?.defaultAudio ?? null,
+    maxHeight: playback?.maxHeight ?? null,
     error,
     setError,
     retry,

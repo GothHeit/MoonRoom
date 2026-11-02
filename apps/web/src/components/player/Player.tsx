@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { AUTO_SOURCE } from "@/lib/pick-stream";
 import { warmPlayback } from "@/lib/warm-playback";
 import { watchHref, type Lang, type StreamChoice } from "@/lib/watch-target";
 
@@ -72,7 +73,7 @@ export function Player(props: Props) {
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const playback = usePlayback(source, animeId, episode, lang);
-  const { attempt, url, kind, tracks, fonts, answered, ownSkips, defaultAudio, error, setError } = playback;
+  const { attempt, url, kind, tracks, fonts, answered, answeredLang, ownSkips, defaultAudio, maxHeight, error, setError } = playback;
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Every source and sub/dub that has this episode, for the source menu.
   const [streams, setStreams] = useState<StreamChoice[]>([]);
@@ -97,7 +98,7 @@ export function Player(props: Props) {
     playbackRetry();
   }, [playbackRetry]);
   const failPlayback = useCallback(() => setError("playback_failed"), [setError]);
-  const hls = useHls({ video, url, kind, defaultAudio, onRetry: retry, onFail: failPlayback });
+  const hls = useHls({ video, url, kind, defaultAudio, maxHeight, onRetry: retry, onFail: failPlayback });
   const subtitles = useSubtitles(tracks, subtitleLang, props.subtitleStyle);
   const { selected, styled, style } = subtitles;
   const controls = useVideoControls(video, stage, !!url);
@@ -105,10 +106,23 @@ export function Player(props: Props) {
 
   const subtitleNames = trackNames(tracks, locale);
   const names: StreamNames = { has: (key) => t.has(key), t: (key, values) => t(key, values) };
-  const playingFrom: StreamChoice = { source: answered, lang };
+  // What is playing, and what the viewer picked: they differ when the API chooses (automatic) or
+  // when the picked source failed and another answered.
+  const playingFrom: StreamChoice = { source: answered, lang: answeredLang };
+  const automatic = source === AUTO_SOURCE;
+  const picked: StreamChoice = automatic ? { source, lang } : playingFrom;
+  const playingName = streamLabel(names, playingFrom);
   // In a room only the host moves everyone to another stream.
   const canSwitchStream = !room || room.switchStream !== undefined;
   const audioNames = hls.audioTracks.map((a) => ({ ...a, label: languageName(a.lang, locale) ?? a.label }));
+
+  // The audio the viewer picks is the one they will want next time: the automatic choice and
+  // every stream that carries it start there.
+  const chooseAudio = (id: number) => {
+    hls.chooseAudio(id);
+    const lang = hls.audioTracks.find((a) => a.id === id)?.lang;
+    if (lang) void api.PUT("/watch/preferences", { body: { audio_lang: lang } }).catch(() => undefined);
+  };
 
   const next = episodes.find((e) => e > episode);
   // Near the end, have the API resolve the next episode so pressing next (or auto-next) is quick.
@@ -210,7 +224,8 @@ export function Player(props: Props) {
 
   async function startRoom() {
     const { data, error: body } = await api
-      .POST("/watch/rooms", { body: { source, anime_id: animeId, title, episode, lang } })
+      // A room plays the same stream for everyone, so it starts from what is playing now.
+      .POST("/watch/rooms", { body: { source: answered, anime_id: animeId, title, episode, lang: answeredLang } })
       .catch(() => ({ data: undefined, error: { error: { code: "network" } } }));
     if (data) router.push(`/room/${data.code}`);
     else toast(t(errorKey(errorCode(body))), "error");
@@ -237,6 +252,7 @@ export function Player(props: Props) {
   }
 
   const others = canSwitchStream ? streams.filter((s) => !sameStream(s, { source, lang })) : [];
+  const streamName = automatic ? t("autoPlaying", { stream: playingName }) : playingName;
   const shown = active || !playing || ended || settingsOpen || error !== null;
 
   return (
@@ -335,8 +351,8 @@ export function Player(props: Props) {
             <p className="truncate font-display text-xl leading-tight">{title}</p>
             <p className="text-sm text-muted">
               {t("episode", { episode })}
-              {answered !== source && (
-                <span className="ml-2">· {t("fallbackSource", { source: streamLabel(names, playingFrom) })}</span>
+              {!automatic && answered !== source && (
+                <span className="ml-2">· {t("fallbackSource", { source: playingName })}</span>
               )}
             </p>
           </div>
@@ -402,11 +418,11 @@ export function Player(props: Props) {
             onQuality={hls.chooseQuality}
             audioTracks={audioNames}
             audioTrack={hls.audioTrack}
-            onAudioTrack={hls.chooseAudio}
+            onAudioTrack={chooseAudio}
             streams={canSwitchStream ? streams.map((s) => streamLabel(names, s)) : []}
-            stream={streams.findIndex((s) => sameStream(s, playingFrom))}
+            stream={streams.findIndex((s) => sameStream(s, picked))}
             onStream={(index) => switchStream(streams[index])}
-            streamName={streamLabel(names, playingFrom)}
+            streamName={streamName}
             subtitleNames={subtitleNames}
             subtitle={selected}
             onSubtitle={subtitles.chooseTrack}

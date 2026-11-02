@@ -1836,6 +1836,13 @@ export interface components {
             };
             /** Kind */
             kind: string;
+            /**
+             * Lang
+             * @enum {string}
+             */
+            lang: "sub" | "dub";
+            /** Max Resolution */
+            max_resolution?: number | null;
             /** Resolution */
             resolution: number | null;
             /**
@@ -1855,6 +1862,18 @@ export interface components {
         };
         /** PlayerPreferencesIO */
         PlayerPreferencesIO: {
+            /**
+             * Audio Lang
+             * @default original
+             */
+            audio_lang: string;
+            /** Max Resolution */
+            max_resolution?: (360 | 480 | 720 | 1080) | null;
+            /**
+             * Prefer Soft Subs
+             * @default true
+             */
+            prefer_soft_subs: boolean;
             /**
              * Subtitle Background
              * @default outline
@@ -1879,6 +1898,26 @@ export interface components {
              * @enum {string}
              */
             subtitle_size: "small" | "medium" | "large" | "huge";
+        };
+        /**
+         * PlayerPreferencesIn
+         * @description A change to the preferences: only the fields sent are saved, the rest stay as they are.
+         */
+        PlayerPreferencesIn: {
+            /** Audio Lang */
+            audio_lang?: string | null;
+            /** Max Resolution */
+            max_resolution?: (360 | 480 | 720 | 1080) | null;
+            /** Prefer Soft Subs */
+            prefer_soft_subs?: boolean | null;
+            /** Subtitle Background */
+            subtitle_background?: ("none" | "outline" | "translucent" | "solid") | null;
+            /** Subtitle Color */
+            subtitle_color?: ("white" | "yellow" | "cyan" | "green") | null;
+            /** Subtitle Position */
+            subtitle_position?: ("bottom" | "raised" | "top") | null;
+            /** Subtitle Size */
+            subtitle_size?: ("small" | "medium" | "large" | "huge") | null;
         };
         /** PresetIn */
         PresetIn: {
@@ -4051,7 +4090,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PlayerPreferencesIO"];
+                "application/json": components["schemas"]["PlayerPreferencesIn"];
             };
         };
         responses: {

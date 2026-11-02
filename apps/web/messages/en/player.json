@@ -85,6 +85,13 @@
       "close": "Close settings"
     },
     "watchTogether": "Watch together",
-    "nextShort": "Next"
+    "nextShort": "Next",
+    "autoPlaying": "Automatic · {stream}",
+    "streams": {
+      "auto": {
+        "sub": "Automatic (best for you)",
+        "dub": "Automatic (best for you)"
+      }
+    }
   }
 }

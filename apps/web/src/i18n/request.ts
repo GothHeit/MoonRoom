@@ -13,7 +13,7 @@ async function loadMessages(locale: string) {
   const files = (await readdir(dir)).filter((f) => f.endsWith(".json")).sort();
   const parts = await Promise.all(files.map(async (f) => JSON.parse(await readFile(join(dir, f), "utf8"))));
   // Names of unlicensed sources only ship for the sources this server runs (plus the local library).
-  return pruneSources(mergeMessages(parts), ["local", ...enabledSources(process.env.VIDEO_SOURCES)]);
+  return pruneSources(mergeMessages(parts), ["auto", "local", ...enabledSources(process.env.VIDEO_SOURCES)]);
 }
 
 export default getRequestConfig(async ({ requestLocale }) => {
