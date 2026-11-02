@@ -229,3 +229,28 @@ def test_crlf_variants_are_rewritten_without_carriage_returns() -> None:
     assert "\r" not in out
     assert out.count("hls?u=") == 2
     assert "720p%2Fseg-0.png&" in out
+
+
+@respx.mock
+async def test_the_dub_says_which_language_it_is_and_the_ranking_reads_it() -> None:
+    from app.choose import build_offer
+
+    for locale in ("pt-BR", "en-US", "ja-JP"):
+        respx.get(f"{API}/episode/e1/media/dash/{locale}").mock(
+            return_value=httpx.Response(200, json={"hls": {"playlist": f"{MASTER}&l={locale}"}})
+        )
+    async with httpx.AsyncClient() as client:
+        source = UniqueStreamSource(client)
+
+        async def entries(_anime):
+            return {1: entry(1, ("ja-JP", "en-US")), 2: entry(1, ("ja-JP", "pt-BR", "en-US"))}
+
+        source._entries = entries  # type: ignore[method-assign]
+        english = await source.stream(FRIEREN, 1, "dub")
+        portuguese = await source.stream(FRIEREN, 2, "dub")
+        original = await source.stream(FRIEREN, 1, "sub")
+    assert english and portuguese and original
+    assert (english.dub_audio_lang, portuguese.dub_audio_lang) == ("en", "pt")
+    assert original.dub_audio_lang is None
+    heard = lambda s: build_offer("uniquestream", 0, "dub", s, None, source.traits).audio  # noqa: E731
+    assert heard(english) == {"en"} and heard(portuguese) == {"pt"}

@@ -54,6 +54,9 @@ class Stream:
     fonts: dict[str, str] = field(default_factory=dict)
     # Subtitles made by machine translation. The ranking puts such a version below any other.
     machine_translated: bool = False
+    # Language of this stream's dub, when it differs from the source's usual one (a source that
+    # falls back to English for an episode without a Portuguese dub says so here).
+    dub_audio_lang: str | None = None
 
 
 @dataclass(frozen=True)

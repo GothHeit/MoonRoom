@@ -67,7 +67,7 @@ def build_offer(
     if heard:
         audio, original = frozenset(heard), ORIGINAL_AUDIO in heard
     elif lang == "dub":
-        dub = base_lang(traits.dub_audio_lang)
+        dub = base_lang(stream.dub_audio_lang or traits.dub_audio_lang)
         audio, original = (frozenset({dub}) if dub != "und" else frozenset()), False
     else:
         audio, original = frozenset({ORIGINAL_AUDIO}), True

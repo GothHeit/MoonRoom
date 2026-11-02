@@ -318,6 +318,8 @@ class UniqueStreamSource:
             resolution=None,
             upstream_headers={"Referer": f"{BASE}/"},
             subtitles=parse_subtitles(hls.get("subtitles")),
+            # The dub is Portuguese or, for an episode without one, English: say which.
+            dub_audio_lang=locale.split("-")[0] if locale != ORIGINAL_LOCALE else None,
         )
 
 
