@@ -26,3 +26,14 @@ test("main pages do not scroll sideways on a phone", async ({ page }) => {
     expect(overflow, path).toBe(0);
   }
 });
+
+test("search works on a phone from the Search tab", async ({ page }) => {
+  await signIn(page, "en");
+  await page.getByRole("link", { name: "Search" }).click();
+  const box = page.getByRole("searchbox", { name: "Search" });
+  await box.tap();
+  await box.fill("dungeon");
+  await box.press("Enter");
+  await expect(page).toHaveURL(/\/en\/search\?q=dungeon$/);
+  await expect(page.getByRole("link", { name: /Dungeon Meshi/ })).toBeVisible();
+});

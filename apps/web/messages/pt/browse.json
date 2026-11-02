@@ -23,7 +23,7 @@
   "search": {
     "title": "Buscar",
     "resultsFor": "Resultados para “{q}”",
-    "prompt": "Digite um título na caixa de busca.",
+    "prompt": "Digite um título para buscar.",
     "empty": "Nada encontrado para “{q}”.",
     "suggestions": "Sugestões",
     "noSuggestions": "Sem sugestões",

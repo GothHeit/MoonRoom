@@ -23,7 +23,7 @@
   "search": {
     "title": "Search",
     "resultsFor": "Results for “{q}”",
-    "prompt": "Type a title in the search box.",
+    "prompt": "Type a title to search.",
     "empty": "Nothing found for “{q}”.",
     "suggestions": "Suggestions",
     "noSuggestions": "No suggestions",
