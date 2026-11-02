@@ -35,6 +35,8 @@
         "subtitlesAuto": "Automática (português, depois inglês)",
         "subtitlesOff": "Desligadas",
         "soft": "Preferir legendas que posso desligar",
+        "skips": "Mostrar botões de pular",
+        "skipsHint": "Ligado por padrão. Desligue para esconder pular abertura, resumo e créditos no player.",
         "softHint": "Escolhe fontes com legendas que podem ser trocadas ou escondidas em vez de legendas gravadas na imagem.",
         "quality": "Qualidade",
         "qualityBest": "A melhor disponível",

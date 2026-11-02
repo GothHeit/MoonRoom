@@ -68,6 +68,7 @@ export default async function WatchPage({ params, searchParams }: Params) {
       startAt={startAt}
       subtitleLang={me.subtitle_lang}
       subtitleStyle={styleOf(preferences?.data)}
+      showSkips={preferences?.data?.show_skip_buttons ?? true}
     />
   );
 }

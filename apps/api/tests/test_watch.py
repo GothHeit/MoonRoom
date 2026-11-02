@@ -231,6 +231,7 @@ async def test_player_preferences_default_then_saved_per_user(client, session):
         "subtitle_position": "bottom",
         "audio_lang": "original",
         "prefer_soft_subs": True,
+        "show_skip_buttons": True,
         "max_resolution": None,
     }
     body = {
@@ -239,7 +240,13 @@ async def test_player_preferences_default_then_saved_per_user(client, session):
         "subtitle_background": "solid",
         "subtitle_position": "raised",
     }
-    saved = {**body, "audio_lang": "original", "prefer_soft_subs": True, "max_resolution": None}
+    saved = {
+        **body,
+        "audio_lang": "original",
+        "prefer_soft_subs": True,
+        "show_skip_buttons": True,
+        "max_resolution": None,
+    }
     assert (await client.put("/watch/preferences", json=body, headers=headers)).json() == saved
     assert (await client.get("/watch/preferences", headers=headers)).json() == saved
     assert (await client.get("/watch/preferences", headers=other)).json()[

@@ -50,6 +50,8 @@ type Props = {
   subtitleLang: string | null;
   /** Saved look of the subtitles. */
   subtitleStyle: SubtitleStyle;
+  /** Whether the skip intro, recap and credits buttons are offered. */
+  showSkips: boolean;
   /** Set when watching together: the room drives playback and picks the next episode. */
   room?: RoomBinding;
 };
@@ -61,7 +63,7 @@ export const NEXT_COUNTDOWN = 10;
 const WARM_NEXT_SECONDS = 180;
 
 export function Player(props: Props) {
-  const { source, animeId, episode, title, episodes, lang, startAt, subtitleLang, room } = props;
+  const { source, animeId, episode, title, episodes, lang, startAt, subtitleLang, room, showSkips } = props;
   const t = useTranslations("player");
   const locale = useLocale();
   const router = useRouter();
@@ -168,13 +170,14 @@ export function Player(props: Props) {
 
   // Whole seconds, so the small corrections players make to the length don't ask again.
   const length = url && Number.isFinite(duration) && duration > 0 ? Math.round(duration) : 0;
-  const skips = useSkips(ownSkips, animeId, episode, length);
-  const skip = activeSkip(skips, current);
+  // Someone who turned the buttons off never asks AniSkip either.
+  const skips = useSkips(ownSkips, animeId, episode, showSkips ? length : 0);
+  const skip = showSkips ? activeSkip(skips, current) : undefined;
   const skipNow = useCallback(() => {
     const v = video.current;
-    const target = activeSkip(skips, v?.currentTime ?? 0);
+    const target = showSkips ? activeSkip(skips, v?.currentTime ?? 0) : undefined;
     if (v && target) v.currentTime = target.end;
-  }, [skips]);
+  }, [skips, showSkips]);
 
   const goNext = useCallback(() => {
     if (next === undefined) return;

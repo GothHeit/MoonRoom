@@ -51,6 +51,7 @@ export default async function RoomPage({ params }: PageProps<"/[locale]/room/[co
       episodes={[...(episodes?.data?.episodes ?? [])].sort((a, b) => a - b)}
       subtitleLang={me.subtitle_lang}
       subtitleStyle={styleOf(preferences?.data)}
+      showSkips={preferences?.data?.show_skip_buttons ?? true}
     />
   );
 }

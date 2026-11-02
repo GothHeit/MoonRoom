@@ -163,6 +163,8 @@ async def test_playback_preferences_validate_and_update_partially(client, sessio
         ).status_code == 422
     got = await client.get("/watch/preferences", headers=headers)
     assert got.json()["audio_lang"] == "en" and got.json()["prefer_soft_subs"] is True
+    r = await client.put("/watch/preferences", json={"show_skip_buttons": False}, headers=headers)
+    assert r.json()["show_skip_buttons"] is False and r.json()["audio_lang"] == "en"
 
 
 @respx.mock

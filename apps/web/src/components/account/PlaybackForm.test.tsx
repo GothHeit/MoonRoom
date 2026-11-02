@@ -10,7 +10,7 @@ vi.mock("@/lib/api", () => ({ api: client }));
 
 const ok = { data: {}, response: { ok: true } };
 const failed = { error: {}, response: { ok: false } };
-const base = { audio: "original", subtitle: null, softSubs: true, maxResolution: null };
+const base = { audio: "original", subtitle: null, softSubs: true, showSkips: true, maxResolution: null };
 
 afterEach(() => {
   for (const fn of Object.values(client)) fn.mockReset();

@@ -1896,6 +1896,11 @@ export interface components {
              */
             prefer_soft_subs: boolean;
             /**
+             * Show Skip Buttons
+             * @default true
+             */
+            show_skip_buttons: boolean;
+            /**
              * Subtitle Background
              * @default outline
              * @enum {string}
@@ -1931,6 +1936,8 @@ export interface components {
             max_resolution?: (360 | 480 | 720 | 1080) | null;
             /** Prefer Soft Subs */
             prefer_soft_subs?: boolean | null;
+            /** Show Skip Buttons */
+            show_skip_buttons?: boolean | null;
             /** Subtitle Background */
             subtitle_background?: ("none" | "outline" | "translucent" | "solid") | null;
             /** Subtitle Color */

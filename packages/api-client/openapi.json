@@ -1854,6 +1854,11 @@
             "title": "Prefer Soft Subs",
             "type": "boolean"
           },
+          "show_skip_buttons": {
+            "default": true,
+            "title": "Show Skip Buttons",
+            "type": "boolean"
+          },
           "subtitle_background": {
             "default": "outline",
             "enum": [
@@ -1943,6 +1948,17 @@
               }
             ],
             "title": "Prefer Soft Subs"
+          },
+          "show_skip_buttons": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Skip Buttons"
           },
           "subtitle_background": {
             "anyOf": [

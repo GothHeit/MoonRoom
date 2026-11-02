@@ -123,6 +123,8 @@ class PlayerPreferencesIO(BaseModel):
     # What the automatic source choice looks for: "original" audio or a dub's language code.
     audio_lang: str = ORIGINAL
     prefer_soft_subs: bool = True
+    # Whether the player offers the skip intro, recap and credits buttons.
+    show_skip_buttons: bool = True
     # The tallest quality to prefer, or none for the best there is.
     max_resolution: Literal[360, 480, 720, 1080] | None = None
 
@@ -136,6 +138,7 @@ class PlayerPreferencesIn(BaseModel):
     subtitle_position: Literal["bottom", "raised", "top"] | None = None
     audio_lang: Annotated[str, Field(pattern=AUDIO_LANG)] | None = None
     prefer_soft_subs: bool | None = None
+    show_skip_buttons: bool | None = None
     # null clears the limit; leaving the field out keeps it.
     max_resolution: Literal[360, 480, 720, 1080] | None = None
 

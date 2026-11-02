@@ -105,6 +105,7 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
             audio={playback.audio_lang ?? "original"}
             subtitle={me.subtitle_lang ?? null}
             softSubs={playback.prefer_soft_subs ?? true}
+            showSkips={playback.show_skip_buttons ?? true}
             maxResolution={playback.max_resolution ?? null}
           />
         </Section>

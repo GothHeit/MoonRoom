@@ -30,9 +30,10 @@ type Props = {
   episodes: number[];
   subtitleLang: string | null;
   subtitleStyle: SubtitleStyle;
+  showSkips: boolean;
 };
 
-export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyle }: Props) {
+export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyle, showSkips }: Props) {
   const t = useTranslations("room");
   const toast = useToast();
   const {
@@ -146,6 +147,7 @@ export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyl
       startAt={0}
       subtitleLang={subtitleLang}
       subtitleStyle={subtitleStyle}
+      showSkips={showSkips}
       room={{
         playback,
         canControl,

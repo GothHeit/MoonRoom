@@ -19,6 +19,7 @@ type Props = {
   /** A language code, "off", or null for automatic. */
   subtitle: string | null;
   softSubs: boolean;
+  showSkips: boolean;
   /** The tallest quality to prefer; null is the best there is. */
   maxResolution: number | null;
 };
@@ -34,6 +35,7 @@ export function PlaybackForm(props: Props) {
   const [audio, setAudio] = useState(props.audio);
   const [subtitle, setSubtitle] = useState(props.subtitle ?? "auto");
   const [soft, setSoft] = useState(props.softSubs);
+  const [skips, setSkips] = useState(props.showSkips);
   const [quality, setQuality] = useState(props.maxResolution ? String(props.maxResolution) : "best");
   const [busy, setBusy] = useState(false);
 
@@ -43,7 +45,7 @@ export function PlaybackForm(props: Props) {
     return ok;
   }
 
-  async function savePreferences(body: { audio_lang?: string; prefer_soft_subs?: boolean; max_resolution?: Quality | null }) {
+  async function savePreferences(body: { audio_lang?: string; prefer_soft_subs?: boolean; show_skip_buttons?: boolean; max_resolution?: Quality | null }) {
     setBusy(true);
     const { response } = await api.PUT("/watch/preferences", { body }).catch(() => ({ response: null }));
     return finish(!!response?.ok);
@@ -58,6 +60,11 @@ export function PlaybackForm(props: Props) {
   async function onSoft(next: boolean) {
     setSoft(next);
     if (!(await savePreferences({ prefer_soft_subs: next }))) setSoft(!next);
+  }
+
+  async function onSkips(next: boolean) {
+    setSkips(next);
+    if (!(await savePreferences({ show_skip_buttons: next }))) setSkips(!next);
   }
 
   async function onQuality(next: string) {
@@ -116,6 +123,14 @@ export function PlaybackForm(props: Props) {
           <p className="mt-1 text-sm text-muted">{t("softHint")}</p>
         </div>
         <Switch checked={soft} onChange={onSoft} label={t("soft")} disabled={busy} />
+      </div>
+
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-medium">{t("skips")}</p>
+          <p className="mt-1 text-sm text-muted">{t("skipsHint")}</p>
+        </div>
+        <Switch checked={skips} onChange={onSkips} label={t("skips")} disabled={busy} />
       </div>
 
       <label className="flex flex-col gap-1">

@@ -142,6 +142,7 @@ class PlayerPreferences(Base):
         String(8), default="original", server_default="original"
     )
     prefer_soft_subs: Mapped[bool] = mapped_column(default=True, server_default="true")
+    show_skip_buttons: Mapped[bool] = mapped_column(default=True, server_default="true")
     max_resolution: Mapped[int | None] = mapped_column(default=None)
 
 
