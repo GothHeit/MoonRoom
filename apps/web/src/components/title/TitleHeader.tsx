@@ -62,7 +62,7 @@ export async function TitleHeader({ anime, badge, play, hint, list, art }: Props
     <>
       <div className="mt-6 flex flex-wrap gap-3">
         {play}
-        <AddToList animeId={anime.id} state={list} />
+        <AddToList titleId={anime.id} state={list} />
       </div>
       {hint}
 

@@ -1402,6 +1402,22 @@
         "title": "MalListOut",
         "type": "object"
       },
+      "MalMangaListOut": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/MangaListItemOut"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "MalMangaListOut",
+        "type": "object"
+      },
       "MalStatistics": {
         "properties": {
           "num_items_completed": {
@@ -1894,6 +1910,7 @@
           "id": {
             "enum": [
               "continue_reading",
+              "my_list",
               "top",
               "popular",
               "manhwa",
@@ -1917,6 +1934,68 @@
         "title": "MangaHomeRow",
         "type": "object"
       },
+      "MangaListEntryOut": {
+        "properties": {
+          "linked": {
+            "title": "Linked",
+            "type": "boolean"
+          },
+          "num_chapters_read": {
+            "default": 0,
+            "title": "Num Chapters Read",
+            "type": "integer"
+          },
+          "num_volumes_read": {
+            "default": 0,
+            "title": "Num Volumes Read",
+            "type": "integer"
+          },
+          "score": {
+            "default": 0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "reading",
+                  "completed",
+                  "on_hold",
+                  "dropped",
+                  "plan_to_read"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "linked"
+        ],
+        "title": "MangaListEntryOut",
+        "type": "object"
+      },
+      "MangaListItemOut": {
+        "properties": {
+          "list_status": {
+            "$ref": "#/components/schemas/MangaListStatusOut"
+          },
+          "node": {
+            "$ref": "#/components/schemas/MangaCard"
+          }
+        },
+        "required": [
+          "node",
+          "list_status"
+        ],
+        "title": "MangaListItemOut",
+        "type": "object"
+      },
       "MangaListOut": {
         "properties": {
           "data": {
@@ -1931,6 +2010,141 @@
           "data"
         ],
         "title": "MangaListOut",
+        "type": "object"
+      },
+      "MangaListStatusOut": {
+        "properties": {
+          "num_chapters_read": {
+            "default": 0,
+            "title": "Num Chapters Read",
+            "type": "integer"
+          },
+          "num_volumes_read": {
+            "default": 0,
+            "title": "Num Volumes Read",
+            "type": "integer"
+          },
+          "score": {
+            "default": 0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "reading",
+              "completed",
+              "on_hold",
+              "dropped",
+              "plan_to_read"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "MangaListStatusOut",
+        "type": "object"
+      },
+      "MangaListUpdate": {
+        "properties": {
+          "num_chapters_read": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Chapters Read"
+          },
+          "num_volumes_read": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Volumes Read"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "reading",
+                  "completed",
+                  "on_hold",
+                  "dropped",
+                  "plan_to_read"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "MangaListUpdate",
+        "type": "object"
+      },
+      "MangaListUpdated": {
+        "properties": {
+          "num_chapters_read": {
+            "default": 0,
+            "title": "Num Chapters Read",
+            "type": "integer"
+          },
+          "num_volumes_read": {
+            "default": 0,
+            "title": "Num Volumes Read",
+            "type": "integer"
+          },
+          "score": {
+            "default": 0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "reading",
+                  "completed",
+                  "on_hold",
+                  "dropped",
+                  "plan_to_read"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "MangaListUpdated",
         "type": "object"
       },
       "MangaProgressIn": {
@@ -6113,6 +6327,207 @@
           }
         ],
         "summary": "Status",
+        "tags": [
+          "mal"
+        ]
+      }
+    },
+    "/me/mangalist": {
+      "get": {
+        "operationId": "mangalist_me_mangalist_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "reading",
+                    "completed",
+                    "on_hold",
+                    "dropped",
+                    "plan_to_read"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MalMangaListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mangalist",
+        "tags": [
+          "mal"
+        ]
+      }
+    },
+    "/me/mangalist/{manga_id}": {
+      "delete": {
+        "operationId": "remove_manga_entry_me_mangalist__manga_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Manga Entry",
+        "tags": [
+          "mal"
+        ]
+      },
+      "get": {
+        "operationId": "get_manga_entry_me_mangalist__manga_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaListEntryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Manga Entry",
+        "tags": [
+          "mal"
+        ]
+      },
+      "patch": {
+        "operationId": "update_manga_entry_me_mangalist__manga_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MangaListUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaListUpdated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Manga Entry",
         "tags": [
           "mal"
         ]

@@ -14,6 +14,9 @@ import {
   type ReadMode,
 } from "@/lib/manga";
 
+import { DroppedPrompt } from "@/components/player/DroppedPrompt";
+import { useDroppedPrompt } from "@/components/player/useDroppedPrompt";
+
 import { EndCard } from "./EndCard";
 import { clampPage, swipeStep, zoneOf } from "./navigation";
 import { PageView } from "./PageView";
@@ -63,6 +66,17 @@ export function Reader({ mangaId, source, title, mediaType, chapter, previous, n
   }, []);
 
   useReadProgress(mangaId, progressKey(chapter), page, count);
+
+  // Reaching the end of a chapter (the end card in page mode, the last page of a strip) asks
+  // once whether a title dropped on MyAnimeList should go back to reading.
+  const dropped = useDroppedPrompt(mangaId, "manga");
+  const asked = useRef(false);
+  const finished = settings.mode === "page" ? ended : count > 0 && page >= count - 1;
+  useEffect(() => {
+    if (!finished || asked.current) return;
+    asked.current = true;
+    dropped.check();
+  }, [finished, dropped]);
 
   const goTo = useCallback(
     (index: number) => {
@@ -132,7 +146,11 @@ export function Reader({ mangaId, source, title, mediaType, chapter, previous, n
   }
 
   const chapterHref = (target: Chapter) => readHref(source, mangaId, target.id, lang);
-  const end = <EndCard title={title} next={next} nextHref={next ? chapterHref(next) : null} titleHref={mangaHref(mangaId)} />;
+  const end = (
+    <EndCard title={title} next={next} nextHref={next ? chapterHref(next) : null} titleHref={mangaHref(mangaId)}>
+      {dropped.asking && <DroppedPrompt namespace="reader" inline onAccept={dropped.accept} onDismiss={dropped.dismiss} />}
+    </EndCard>
+  );
 
   return (
     <div className="fixed inset-0 z-[60] select-none bg-[#0d0719] text-fg" data-mode={settings.mode}>

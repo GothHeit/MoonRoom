@@ -230,3 +230,65 @@ async def test_progress_is_upserted_and_finishes_on_the_last_page(client, sessio
     assert (
         await client.put("/manga/5/progress/1", json={"page": 0, "pages": 0}, headers=headers)
     ).status_code == 422
+
+
+async def _link(session, user):
+    from datetime import timedelta
+
+    from app.db import utcnow
+    from app.models import MalLink
+
+    session.add(
+        MalLink(
+            user_id=user.id,
+            access_token="a",
+            refresh_token="r",
+            expires_at=utcnow() + timedelta(hours=1),
+        )
+    )
+    await session.commit()
+
+
+@respx.mock
+async def test_finishing_a_chapter_is_mirrored_on_the_mal_list_once(client, session):
+    import asyncio
+
+    user, headers = await make_user(session, "kafka")
+    await _link(session, user)
+    mock_details(4, num_chapters=0)
+    respx.get(f"{API_BASE}/manga/4").mock(
+        return_value=httpx.Response(200, json={**manga(4), "my_list_status": {}})
+    )
+    patch = respx.patch(f"{API_BASE}/manga/4/my_list_status").mock(
+        return_value=httpx.Response(200, json={})
+    )
+    for _ in range(2):  # saving the last page again doesn't sync again
+        r = await client.put(
+            "/manga/4/progress/12.5", json={"page": 9, "pages": 10}, headers=headers
+        )
+        assert r.json()["completed"] is True
+        await asyncio.gather(*fastapi_app.state.__dict__.get("mal_sync_tasks", set()))
+    assert patch.call_count == 1
+    body = patch.calls.last.request.content
+    assert b"status=reading" in body and b"num_chapters_read=12" in body
+
+    # An unnumbered chapter has no place on MAL: nothing is sent.
+    await client.put("/manga/4/progress/abc", json={"page": 9, "pages": 10}, headers=headers)
+    await asyncio.gather(*fastapi_app.state.__dict__.get("mal_sync_tasks", set()))
+    assert patch.call_count == 1
+
+
+@respx.mock
+async def test_home_shows_the_users_mal_manga_list(client, session):
+    user, headers = await make_user(session, "kafka")
+    await _link(session, user)
+    mock_ranking(manga(1, "One"))
+    respx.get(f"{API_BASE}/users/@me/mangalist").mock(
+        return_value=httpx.Response(
+            200,
+            json={"data": [{"node": manga(7, "Listed"), "list_status": {"status": "reading"}}]},
+        )
+    )
+    home = (await client.get("/manga/home", headers=headers)).json()
+    assert [row["id"] for row in home["rows"]][:2] == ["my_list", "top"]
+    assert home["rows"][0]["items"][0]["manga"]["title"] == "Listed"

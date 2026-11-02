@@ -60,7 +60,9 @@
         "plan_to_watch": "Plan to watch",
         "completed": "Completed",
         "on_hold": "On hold",
-        "dropped": "Dropped"
+        "dropped": "Dropped",
+        "reading": "Reading",
+        "plan_to_read": "Plan to read"
       },
       "errors": {
         "mal_not_linked": "Link your MyAnimeList account to keep a list.",

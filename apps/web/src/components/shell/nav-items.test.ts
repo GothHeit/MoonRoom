@@ -29,7 +29,7 @@ describe("modeOf", () => {
     expect(modeOf("/mangaka")).toBe("anime");
   });
   it("gives each mode its own home, browse and search", () => {
-    expect(navItemsFor("manga").map((i) => i.href)).toEqual(["/manga", "/manga/browse", "/list"]);
+    expect(navItemsFor("manga").map((i) => i.href)).toEqual(["/manga", "/manga/browse", "/manga/list"]);
     expect(navItemsFor("anime").map((i) => i.href)).toEqual(["/", "/browse", "/list"]);
     expect(searchHrefFor("manga")).toBe("/manga/search");
   });

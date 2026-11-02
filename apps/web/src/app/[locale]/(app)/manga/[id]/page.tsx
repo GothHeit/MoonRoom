@@ -1,3 +1,4 @@
+import { errorCode } from "@app/api-client";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -5,6 +6,7 @@ import { cache, Suspense } from "react";
 
 import { ChapterList } from "@/components/manga/ChapterList";
 import { MangaHeader } from "@/components/manga/MangaHeader";
+import { AddToList, type ListState } from "@/components/title/AddToList";
 import { ButtonLink } from "@/components/ui/Button";
 import { PosterCard } from "@/components/ui/PosterCard";
 import { Row } from "@/components/ui/Row";
@@ -29,6 +31,19 @@ const chapters = cache(async (id: number, lang: string | undefined) => {
   const { data } = await (await serverApi()).GET("/manga/{manga_id}/chapters", { params: { path: { manga_id: id }, query: { lang } } });
   return data ?? null;
 });
+
+/** The user's manga list status. A failed lookup is "unavailable", never an empty list entry. */
+async function listState(id: number): Promise<ListState> {
+  try {
+    const api = await serverApi();
+    const { data, error } = await api.GET("/me/mangalist/{manga_id}", { params: { path: { manga_id: id } } });
+    if (data) return data.status ?? null;
+    // Not linked: the picker starts empty and says so when the user tries to save.
+    return errorCode(error) === "mal_not_linked" ? null : "unavailable";
+  } catch {
+    return "unavailable";
+  }
+}
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
@@ -99,7 +114,7 @@ export default async function MangaPage({ params, searchParams }: Params) {
   const rawLang = (await searchParams).lang;
   const lang = (Array.isArray(rawLang) ? rawLang[0] : rawLang)?.slice(0, 10) || undefined;
   const t = await getTranslations("manga.page");
-  const manga = await unwrap(details(id), locale);
+  const [manga, list] = await Promise.all([unwrap(details(id), locale), listState(id)]);
   const related = manga.related_manga ?? [];
   const recommendations = manga.recommendations ?? [];
 
@@ -115,9 +130,12 @@ export default async function MangaPage({ params, searchParams }: Params) {
           </Suspense>
         }
         action={
-          <Suspense fallback={<ActionSkeleton />}>
-            <ReadAction id={id} lang={lang} />
-          </Suspense>
+          <>
+            <Suspense fallback={<ActionSkeleton />}>
+              <ReadAction id={id} lang={lang} />
+            </Suspense>
+            <AddToList kind="manga" titleId={id} state={list} />
+          </>
         }
       />
       <div className="flex flex-col gap-10 py-6">

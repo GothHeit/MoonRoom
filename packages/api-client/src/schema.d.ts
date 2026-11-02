@@ -768,6 +768,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/mangalist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mangalist */
+        get: operations["mangalist_me_mangalist_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/mangalist/{manga_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Manga Entry */
+        get: operations["get_manga_entry_me_mangalist__manga_id__get"];
+        put?: never;
+        post?: never;
+        /** Remove Manga Entry */
+        delete: operations["remove_manga_entry_me_mangalist__manga_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Manga Entry */
+        patch: operations["update_manga_entry_me_mangalist__manga_id__patch"];
+        trace?: never;
+    };
     "/me/password": {
         parameters: {
             query?: never;
@@ -1887,6 +1923,11 @@ export interface components {
             /** Data */
             data: components["schemas"]["ListItemOut"][];
         };
+        /** MalMangaListOut */
+        MalMangaListOut: {
+            /** Data */
+            data: components["schemas"]["MangaListItemOut"][];
+        };
         /** MalStatistics */
         MalStatistics: {
             /** Num Items Completed */
@@ -2004,14 +2045,95 @@ export interface components {
              * Id
              * @enum {string}
              */
-            id: "continue_reading" | "top" | "popular" | "manhwa" | "manhua";
+            id: "continue_reading" | "my_list" | "top" | "popular" | "manhwa" | "manhua";
             /** Items */
             items: components["schemas"]["MangaHomeItem"][];
+        };
+        /** MangaListEntryOut */
+        MangaListEntryOut: {
+            /** Linked */
+            linked: boolean;
+            /**
+             * Num Chapters Read
+             * @default 0
+             */
+            num_chapters_read: number;
+            /**
+             * Num Volumes Read
+             * @default 0
+             */
+            num_volumes_read: number;
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /** Status */
+            status?: ("reading" | "completed" | "on_hold" | "dropped" | "plan_to_read") | null;
+        };
+        /** MangaListItemOut */
+        MangaListItemOut: {
+            list_status: components["schemas"]["MangaListStatusOut"];
+            node: components["schemas"]["MangaCard"];
         };
         /** MangaListOut */
         MangaListOut: {
             /** Data */
             data: components["schemas"]["MangaCard"][];
+        };
+        /** MangaListStatusOut */
+        MangaListStatusOut: {
+            /**
+             * Num Chapters Read
+             * @default 0
+             */
+            num_chapters_read: number;
+            /**
+             * Num Volumes Read
+             * @default 0
+             */
+            num_volumes_read: number;
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "reading" | "completed" | "on_hold" | "dropped" | "plan_to_read";
+        };
+        /** MangaListUpdate */
+        MangaListUpdate: {
+            /** Num Chapters Read */
+            num_chapters_read?: number | null;
+            /** Num Volumes Read */
+            num_volumes_read?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Status */
+            status?: ("reading" | "completed" | "on_hold" | "dropped" | "plan_to_read") | null;
+        };
+        /** MangaListUpdated */
+        MangaListUpdated: {
+            /**
+             * Num Chapters Read
+             * @default 0
+             */
+            num_chapters_read: number;
+            /**
+             * Num Volumes Read
+             * @default 0
+             */
+            num_volumes_read: number;
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /** Status */
+            status?: ("reading" | "completed" | "on_hold" | "dropped" | "plan_to_read") | null;
         };
         /** MangaProgressIn */
         MangaProgressIn: {
@@ -4124,6 +4246,132 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    mangalist_me_mangalist_get: {
+        parameters: {
+            query?: {
+                status?: ("reading" | "completed" | "on_hold" | "dropped" | "plan_to_read") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MalMangaListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_manga_entry_me_mangalist__manga_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                manga_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MangaListEntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_manga_entry_me_mangalist__manga_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                manga_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_manga_entry_me_mangalist__manga_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                manga_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MangaListUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MangaListUpdated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

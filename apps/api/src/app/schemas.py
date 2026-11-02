@@ -321,7 +321,7 @@ class MangaHomeItem(BaseModel):
 
 
 class MangaHomeRow(BaseModel):
-    id: Literal["continue_reading", "top", "popular", "manhwa", "manhua"]
+    id: Literal["continue_reading", "my_list", "top", "popular", "manhwa", "manhua"]
     items: list[MangaHomeItem]
 
 

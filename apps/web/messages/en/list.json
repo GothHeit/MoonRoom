@@ -2,16 +2,25 @@
   "list": {
     "title": "My list",
     "tabs": "List status",
+    "kinds": "List kind",
+    "kind": {
+      "anime": "Anime",
+      "manga": "Manga"
+    },
     "status": {
       "watching": "Watching",
       "plan_to_watch": "Plan to watch",
       "completed": "Completed",
       "on_hold": "On hold",
-      "dropped": "Dropped"
+      "dropped": "Dropped",
+      "reading": "Reading",
+      "plan_to_read": "Plan to read"
     },
     "empty": "Nothing here yet.",
     "progress": "{watched} of {total} episodes",
     "progressUnknown": "{watched} episodes",
+    "chapters": "{read} of {total} chapters",
+    "chaptersUnknown": "{read} chapters",
     "menu": "Options for {title}",
     "moveTo": "Move to {status}",
     "remove": "Remove from list",

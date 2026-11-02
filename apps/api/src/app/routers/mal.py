@@ -8,11 +8,12 @@ from app.config import get_settings
 from app.deps import ClientIp, CurrentUser, Session, browser_user_id, throttle
 from app.errors import ApiError
 from app.mal.account import MalAccounts
-from app.schemas import AnimeCard
+from app.schemas import AnimeCard, MangaCard
 
 router = APIRouter(tags=["mal"])
 
 ListStatus = Literal["watching", "completed", "on_hold", "dropped", "plan_to_watch"]
+MangaListStatus = Literal["reading", "completed", "on_hold", "dropped", "plan_to_read"]
 
 
 class ListUpdate(BaseModel):
@@ -67,6 +68,48 @@ class ListUpdated(BaseModel):
     status: ListStatus | None = None
     score: int = 0
     num_episodes_watched: int = 0
+
+
+# The manga list: the same shape, with chapters and volumes in place of episodes.
+
+
+class MangaListUpdate(BaseModel):
+    status: MangaListStatus | None = None
+    score: int | None = Field(default=None, ge=0, le=10)
+    num_chapters_read: int | None = Field(default=None, ge=0)
+    num_volumes_read: int | None = Field(default=None, ge=0)
+
+
+class MangaListEntryOut(BaseModel):
+    linked: bool
+    # None when the title isn't on the user's list.
+    status: MangaListStatus | None = None
+    score: int = 0
+    num_chapters_read: int = 0
+    num_volumes_read: int = 0
+
+
+class MangaListStatusOut(BaseModel):
+    status: MangaListStatus
+    score: int = 0
+    num_chapters_read: int = 0
+    num_volumes_read: int = 0
+
+
+class MangaListItemOut(BaseModel):
+    node: MangaCard
+    list_status: MangaListStatusOut
+
+
+class MalMangaListOut(BaseModel):
+    data: list[MangaListItemOut]
+
+
+class MangaListUpdated(BaseModel):
+    status: MangaListStatus | None = None
+    score: int = 0
+    num_chapters_read: int = 0
+    num_volumes_read: int = 0
 
 
 def _accounts(request: Request) -> MalAccounts:
@@ -154,3 +197,46 @@ async def update_entry(
 )
 async def remove_entry(request: Request, anime_id: int, user: CurrentUser, session: Session):
     await _accounts(request).remove_entry(session, user, anime_id)
+
+
+@router.get("/me/mangalist", response_model=MalMangaListOut)
+async def mangalist(
+    request: Request, user: CurrentUser, session: Session, status: MangaListStatus | None = None
+):
+    return await _accounts(request).mangalist(session, user, status)
+
+
+@router.get("/me/mangalist/{manga_id}", response_model=MangaListEntryOut)
+async def get_manga_entry(request: Request, manga_id: int, user: CurrentUser, session: Session):
+    accounts = _accounts(request)
+    if not await accounts.is_linked(session, user):
+        return MangaListEntryOut(linked=False)
+    entry = await accounts.entry(session, user, manga_id, "manga") or {}
+    return MangaListEntryOut(
+        linked=True,
+        status=entry.get("status"),
+        score=entry.get("score") or 0,
+        num_chapters_read=entry.get("num_chapters_read") or 0,
+        num_volumes_read=entry.get("num_volumes_read") or 0,
+    )
+
+
+@router.patch(
+    "/me/mangalist/{manga_id}",
+    response_model=MangaListUpdated,
+    dependencies=[throttle("mal_list_write")],
+)
+async def update_manga_entry(
+    request: Request, manga_id: int, body: MangaListUpdate, user: CurrentUser, session: Session
+):
+    changes = body.model_dump(exclude_none=True)
+    if not changes:
+        raise ApiError(422, "validation_failed", "Nothing to update")
+    return await _accounts(request).update_entry(session, user, manga_id, changes, "manga")
+
+
+@router.delete(
+    "/me/mangalist/{manga_id}", status_code=204, dependencies=[throttle("mal_list_write")]
+)
+async def remove_manga_entry(request: Request, manga_id: int, user: CurrentUser, session: Session):
+    await _accounts(request).remove_entry(session, user, manga_id, "manga")

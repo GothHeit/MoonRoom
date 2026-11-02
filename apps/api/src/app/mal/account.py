@@ -4,7 +4,7 @@ import asyncio
 import secrets
 import uuid
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlencode
 
 import httpx
@@ -23,6 +23,15 @@ STATE_LIFETIME = timedelta(minutes=10)
 LIST_CACHE_TTL = 60  # seconds: the home page and the list page both read the list
 CALL_TIMEOUT = 15  # seconds: a full list page can be slow
 MAX_CONCURRENT_CALLS = 4
+
+# The two lists a MAL account keeps. The same token edits both: MAL grants one access level.
+ListKind = Literal["anime", "manga"]
+LIST_FIELDS: dict[ListKind, str] = {
+    "anime": "list_status,num_episodes,main_picture,mean,rating,genres",
+    "manga": (
+        "list_status,num_chapters,num_volumes,main_picture,mean,media_type,status,start_date,genres"
+    ),
+}
 
 
 def _bearer(token: str) -> dict:
@@ -133,18 +142,28 @@ class MalAccounts:
         self._forget_lists(user.id)
 
     async def animelist(self, session: AsyncSession, user: User, status: str | None) -> dict:
-        key = (user.id, status, user.show_nsfw)
+        return await self.user_list(session, user, "anime", status)
+
+    async def mangalist(self, session: AsyncSession, user: User, status: str | None) -> dict:
+        return await self.user_list(session, user, "manga", status)
+
+    async def user_list(
+        self, session: AsyncSession, user: User, kind: ListKind, status: str | None
+    ) -> dict:
+        key = (user.id, kind, status, user.show_nsfw)
         cached = self._lists.get(key)
         if cached is not None:
             return cached
-        result = await self._fetch_animelist(session, user, status)
+        result = await self._fetch_list(session, user, kind, status)
         self._lists[key] = result
         return result
 
-    async def _fetch_animelist(self, session: AsyncSession, user: User, status: str | None) -> dict:
+    async def _fetch_list(
+        self, session: AsyncSession, user: User, kind: ListKind, status: str | None
+    ) -> dict:
         token = await self._valid_token(session, user)
         first_params: dict[str, Any] = {
-            "fields": "list_status,num_episodes,main_picture,mean,rating,genres",
+            "fields": LIST_FIELDS[kind],
             "limit": 1000,
             "nsfw": str(user.show_nsfw).lower(),
             "sort": "list_updated_at",
@@ -154,7 +173,7 @@ class MalAccounts:
         params: dict[str, Any] | None = first_params
 
         items: list[dict] = []
-        url: str | None = f"{API_BASE}/users/@me/animelist"
+        url: str | None = f"{API_BASE}/users/@me/{kind}list"
         while url:
             response = await self._call("GET", url, headers=_bearer(token), params=params)
             if response.status_code != 200:
@@ -167,12 +186,14 @@ class MalAccounts:
             params = None  # the "next" URL already carries them
         return {"data": filter_nsfw(items, user.show_nsfw)}
 
-    async def entry(self, session: AsyncSession, user: User, anime_id: int) -> dict | None:
+    async def entry(
+        self, session: AsyncSession, user: User, title_id: int, kind: ListKind = "anime"
+    ) -> dict | None:
         """The user's list entry for one title, or None when it isn't on their list."""
         token = await self._valid_token(session, user)
         response = await self._call(
             "GET",
-            f"{API_BASE}/anime/{anime_id}",
+            f"{API_BASE}/{kind}/{title_id}",
             headers=_bearer(token),
             params={"fields": "my_list_status"},
         )
@@ -186,13 +207,18 @@ class MalAccounts:
         return await session.get(MalLink, user.id) is not None
 
     async def update_entry(
-        self, session: AsyncSession, user: User, anime_id: int, changes: dict
+        self,
+        session: AsyncSession,
+        user: User,
+        title_id: int,
+        changes: dict,
+        kind: ListKind = "anime",
     ) -> dict:
         token = await self._valid_token(session, user)
         try:
             response = await self._call(
                 "PATCH",
-                f"{API_BASE}/anime/{anime_id}/my_list_status",
+                f"{API_BASE}/{kind}/{title_id}/my_list_status",
                 headers=_bearer(token),
                 data=changes,
             )
@@ -226,11 +252,37 @@ class MalAccounts:
             {"status": "completed" if finished else "watching", "num_watched_episodes": watched},
         )
 
-    async def remove_entry(self, session: AsyncSession, user: User, anime_id: int) -> None:
+    async def sync_finished_chapter(
+        self, session: AsyncSession, user: User, manga_id: int, chapter: int, total: int
+    ) -> None:
+        """Mirror a finished chapter on the user's MAL manga list, the way episodes are.
+
+        Starts the title as reading (from not listed, plan to read or on hold) and moves the
+        chapters-read count forward, never back. Dropped and completed titles are left alone."""
+        if chapter < 1 or not await self.is_linked(session, user):
+            return
+        entry = await self.entry(session, user, manga_id, "manga") or {}
+        if entry.get("status") in ("dropped", "completed"):
+            return
+        read = max(entry.get("num_chapters_read") or 0, chapter)
+        if read == (entry.get("num_chapters_read") or 0) and entry.get("status"):
+            return
+        finished = total > 0 and read >= total
+        await self.update_entry(
+            session,
+            user,
+            manga_id,
+            {"status": "completed" if finished else "reading", "num_chapters_read": read},
+            "manga",
+        )
+
+    async def remove_entry(
+        self, session: AsyncSession, user: User, title_id: int, kind: ListKind = "anime"
+    ) -> None:
         token = await self._valid_token(session, user)
         try:
             response = await self._call(
-                "DELETE", f"{API_BASE}/anime/{anime_id}/my_list_status", headers=_bearer(token)
+                "DELETE", f"{API_BASE}/{kind}/{title_id}/my_list_status", headers=_bearer(token)
             )
         finally:
             self._forget_lists(user.id)

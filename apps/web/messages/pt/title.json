@@ -60,7 +60,9 @@
         "plan_to_watch": "Quero assistir",
         "completed": "Completo",
         "on_hold": "Em pausa",
-        "dropped": "Abandonado"
+        "dropped": "Abandonado",
+        "reading": "Lendo",
+        "plan_to_read": "Quero ler"
       },
       "errors": {
         "mal_not_linked": "Vincule sua conta do MyAnimeList para ter uma lista.",

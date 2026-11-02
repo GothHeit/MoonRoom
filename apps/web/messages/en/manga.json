@@ -4,6 +4,7 @@
     "chapterShort": "Ch. {n}",
     "rows": {
       "continue_reading": "Continue reading",
+      "my_list": "My list",
       "top": "Top rated manga",
       "popular": "Most popular",
       "manhwa": "Manhwa",
@@ -102,6 +103,9 @@
     "controls": "Reader controls",
     "showControls": "Show controls",
     "hideControls": "Hide controls",
-    "pageAlt": "Page {page}"
+    "pageAlt": "Page {page}",
+    "droppedAsk": "You dropped this title. Move it back to Reading on MyAnimeList?",
+    "droppedMove": "Move to Reading",
+    "droppedKeep": "Keep Dropped"
   }
 }

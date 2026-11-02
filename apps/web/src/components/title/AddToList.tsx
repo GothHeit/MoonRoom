@@ -6,9 +6,10 @@ import { useState } from "react";
 
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api";
+import { LIST_STATUSES, type ListKind, type ListStatus } from "@/lib/catalog";
+import { MANGA_LIST_STATUSES, type MangaListStatus } from "@/lib/manga";
 
-export const LIST_STATUSES = ["watching", "plan_to_watch", "completed", "on_hold", "dropped"] as const;
-export type Status = (typeof LIST_STATUSES)[number];
+export type Status = ListStatus | MangaListStatus;
 
 const LIST_ERRORS = ["mal_not_linked", "mal_session_expired", "mal_update_failed"];
 
@@ -16,27 +17,32 @@ const LIST_ERRORS = ["mal_not_linked", "mal_session_expired", "mal_update_failed
 export type ListState = Status | null | "unavailable";
 
 type Props = {
-  animeId: number;
+  kind?: ListKind;
+  titleId: number;
   state: ListState;
 };
 
-/** Status picker that saves the title to the user's MyAnimeList list. */
-export function AddToList({ animeId, state }: Props) {
+function patch(kind: ListKind, titleId: number, status: Status) {
+  return kind === "manga"
+    ? api.PATCH("/me/mangalist/{manga_id}", { params: { path: { manga_id: titleId } }, body: { status: status as MangaListStatus } })
+    : api.PATCH("/me/animelist/{anime_id}", { params: { path: { anime_id: titleId } }, body: { status: status as ListStatus } });
+}
+
+/** Status picker that saves the title to the user's MyAnimeList anime or manga list. */
+export function AddToList({ kind = "anime", titleId, state }: Props) {
   const t = useTranslations("titlePage.list");
   const tErrors = useTranslations("errors");
   const toast = useToast();
   const [status, setStatus] = useState<Status | "">(state === "unavailable" ? "" : (state ?? ""));
   const [saving, setSaving] = useState(false);
+  const statuses: readonly Status[] = kind === "manga" ? MANGA_LIST_STATUSES : LIST_STATUSES;
 
   async function save(next: Status) {
     const previous = status;
     setStatus(next);
     setSaving(true);
     try {
-      const { error, response } = await api.PATCH("/me/animelist/{anime_id}", {
-        params: { path: { anime_id: animeId } },
-        body: { status: next },
-      });
+      const { error, response } = await patch(kind, titleId, next);
       if (response.ok) {
         toast(t("saved", { status: t(`status.${next}`) }), "success");
         return;
@@ -74,7 +80,7 @@ export function AddToList({ animeId, state }: Props) {
         <option value="" disabled>
           {unavailable ? t("unavailable") : t("add")}
         </option>
-        {LIST_STATUSES.map((s) => (
+        {statuses.map((s) => (
           <option key={s} value={s} className="bg-surface">
             {t(`status.${s}`)}
           </option>

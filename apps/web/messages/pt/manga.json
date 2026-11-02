@@ -4,6 +4,7 @@
     "chapterShort": "Cap. {n}",
     "rows": {
       "continue_reading": "Continuar lendo",
+      "my_list": "Minha lista",
       "top": "Mangás mais bem avaliados",
       "popular": "Mais populares",
       "manhwa": "Manhwa",
@@ -102,6 +103,9 @@
     "controls": "Controles do leitor",
     "showControls": "Mostrar controles",
     "hideControls": "Esconder controles",
-    "pageAlt": "Página {page}"
+    "pageAlt": "Página {page}",
+    "droppedAsk": "Você abandonou este título. Voltar para Lendo no MyAnimeList?",
+    "droppedMove": "Voltar para Lendo",
+    "droppedKeep": "Manter como Abandonado"
   }
 }

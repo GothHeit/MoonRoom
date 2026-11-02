@@ -15,13 +15,13 @@ from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import hls
-from app.db import utcnow
+from app.db import new_session, utcnow
 from app.deps import CurrentSessionId, CurrentUser, Session
 from app.errors import ApiError
 from app.mal.client import MANGA_RANKINGS, MalClient, is_safe
 from app.manga.base import Chapter, ChapterList, MangaSource
 from app.manga.pagecache import MAX_PAGE_BYTES, PageCache
-from app.models import MangaProgress
+from app.models import MalLink, MangaProgress, User
 from app.routers.anime import only_safe
 from app.routers.watch import session_open
 from app.schemas import (
@@ -88,6 +88,16 @@ def progress_key(chapter: Chapter) -> str:
     """What progress in a chapter is filed under: its number, or its id for an unnumbered one.
     The web computes the same key (see lib/manga.ts)."""
     return (chapter.number or chapter.id)[:16]
+
+
+def chapter_number(key: str) -> int | None:
+    """The whole chapter a progress key stands for ("12.5" counts as 12), or None for an
+    unnumbered chapter, which MAL has no place for."""
+    try:
+        number = int(float(key))
+    except ValueError:
+        return None
+    return number if number >= 1 else None
 
 
 def chapter_out(chapter: Chapter) -> ChapterOut:
@@ -203,8 +213,9 @@ async def home(request: Request, user: CurrentUser, session: Session):
             return None
         return MangaHomeItem(manga=MangaCard.from_node(node), progress=progress_out(row))
 
-    continue_items, *rankings = await asyncio.gather(
+    continue_items, listed, *rankings = await asyncio.gather(
         asyncio.gather(*(card(r) for r in reading)),
+        _my_list(request, user),
         *(mal.manga_ranking(row, user.show_nsfw) for row in HOME_ROWS),
         return_exceptions=True,
     )
@@ -213,6 +224,10 @@ async def home(request: Request, user: CurrentUser, session: Session):
         items = [item for item in continue_items if item is not None]
         if items:
             rows.append(MangaHomeRow(id="continue_reading", items=items))
+    if isinstance(listed, BaseException):
+        log.warning("manga home: my list row failed: %s", listed)
+    elif listed:
+        rows.append(MangaHomeRow(id="my_list", items=[MangaHomeItem(manga=c) for c in listed]))
     for row_id, ranking in zip(HOME_ROWS, rankings, strict=True):
         if isinstance(ranking, BaseException):
             log.warning("manga home: %s row failed: %s", row_id, ranking)
@@ -225,6 +240,17 @@ async def home(request: Request, user: CurrentUser, session: Session):
     if not rows:
         raise ApiError(502, "mal_unavailable", "MyAnimeList did not answer")
     return MangaHomeOut(rows=rows)
+
+
+async def _my_list(request: Request, user: User) -> list[MangaCard]:
+    """What the user is reading and plans to read, from their MAL manga list, when linked."""
+    async with new_session() as session:
+        if await session.get(MalLink, user.id) is None:
+            return []
+        accounts = request.app.state.mal_accounts
+        reading = (await accounts.mangalist(session, user, "reading"))["data"]
+        planned = (await accounts.mangalist(session, user, "plan_to_read"))["data"]
+    return _cards([i["node"] for i in (*reading, *planned)])
 
 
 @router.get("/search", response_model=MangaListOut)
@@ -394,6 +420,7 @@ async def pages(
 
 @router.put("/{manga_id}/progress/{chapter}", response_model=MangaProgressOut)
 async def put_progress(
+    request: Request,
     manga_id: int,
     chapter: Annotated[str, PathParam(min_length=1, max_length=16)],
     body: MangaProgressIn,
@@ -402,6 +429,13 @@ async def put_progress(
 ):
     page_index = min(body.page, body.pages - 1)
     completed = body.completed or page_index >= body.pages - 1
+    was_done = await session.scalar(
+        select(MangaProgress.completed).where(
+            MangaProgress.user_id == user.id,
+            MangaProgress.manga_id == manga_id,
+            MangaProgress.chapter == chapter,
+        )
+    )
     values = {
         "page": page_index,
         "pages": body.pages,
@@ -419,7 +453,27 @@ async def put_progress(
     await session.commit()
     row = await session.get(MangaProgress, (user.id, manga_id, chapter))
     assert row is not None
+    number = chapter_number(chapter)
+    if row.completed and not was_done and number is not None:
+        tasks: set = request.app.state.__dict__.setdefault("mal_sync_tasks", set())
+        task = asyncio.create_task(_sync_mal(request, user.id, manga_id, number))
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
     return progress_out(row)
+
+
+async def _sync_mal(request: Request, user_id: uuid.UUID, manga_id: int, chapter: int) -> None:
+    """Best effort, after the save has been answered: a MAL hiccup must never affect reading."""
+    try:
+        total = int((await _mal(request).manga_details(manga_id)).get("num_chapters") or 0)
+        async with new_session() as session:
+            user = await session.get(User, user_id)
+            if user is not None:
+                await request.app.state.mal_accounts.sync_finished_chapter(
+                    session, user, manga_id, chapter, total
+                )
+    except Exception:
+        log.warning("MAL sync failed for manga %s ch %s", manga_id, chapter, exc_info=True)
 
 
 def new_page_cache(directory: str, max_mb: int) -> PageCache:

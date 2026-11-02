@@ -6,6 +6,10 @@ export type Chapter = components["schemas"]["ChapterOut"];
 export type ChaptersOut = components["schemas"]["ChaptersOut"];
 export type MangaProgress = components["schemas"]["MangaProgressOut"];
 
+export const MANGA_LIST_STATUSES = ["reading", "plan_to_read", "completed", "on_hold", "dropped"] as const;
+export type MangaListStatus = (typeof MANGA_LIST_STATUSES)[number];
+export type MangaListEntry = components["schemas"]["MangaListItemOut"];
+
 export const mangaHref = (id: number) => `/manga/${id}`;
 
 /** Opens a chapter in the reader. The language keeps the chapter list (and so "next") in the same translation. */

@@ -340,3 +340,116 @@ async def test_on_hold_and_plan_to_watch_titles_move_to_watching(session):
     await accounts.sync_finished_episode(session, user, 4, 3, 12)
     await accounts.sync_finished_episode(session, user, 5, 1, 12)
     assert all(b"status=watching" in p.calls.last.request.content for p in patches)
+
+
+def _manga_entry(manga_id, **status):
+    body = {"id": manga_id, "my_list_status": status} if status else {"id": manga_id}
+    return respx.get(f"{API_BASE}/manga/{manga_id}").mock(
+        return_value=httpx.Response(200, json=body)
+    )
+
+
+def _manga_patch(manga_id):
+    return respx.patch(f"{API_BASE}/manga/{manga_id}/my_list_status").mock(
+        return_value=httpx.Response(200, json={})
+    )
+
+
+@respx.mock
+async def test_finishing_a_chapter_starts_the_manga_as_reading(session):
+    user, accounts = await _linked_accounts(session)
+    _manga_entry(9)
+    patch = _manga_patch(9)
+    await accounts.sync_finished_chapter(session, user, 9, 1, 0)
+    body = patch.calls.last.request.content
+    assert b"status=reading" in body and b"num_chapters_read=1" in body
+
+
+@respx.mock
+async def test_finishing_the_last_chapter_completes_the_manga(session):
+    user, accounts = await _linked_accounts(session)
+    _manga_entry(9, status="reading", num_chapters_read=41)
+    patch = _manga_patch(9)
+    await accounts.sync_finished_chapter(session, user, 9, 42, 42)
+    assert b"status=completed" in patch.calls.last.request.content
+
+
+@respx.mock
+async def test_chapter_sync_never_goes_back_or_overrides_a_parked_manga(session):
+    user, accounts = await _linked_accounts(session)
+    _manga_entry(1, status="reading", num_chapters_read=5)
+    _manga_entry(2, status="dropped", num_chapters_read=1)
+    _manga_entry(3, status="completed", num_chapters_read=12)
+    patches = [_manga_patch(i) for i in (1, 2, 3)]
+    await accounts.sync_finished_chapter(session, user, 1, 3, 12)
+    await accounts.sync_finished_chapter(session, user, 2, 4, 12)
+    await accounts.sync_finished_chapter(session, user, 3, 1, 12)
+    assert [p.called for p in patches] == [False, False, False]
+
+
+@respx.mock
+async def test_manga_list_is_read_and_edited_through_the_same_link(client, session):
+    user, headers = await make_user(session, "kafka")
+    session.add(
+        MalLink(
+            user_id=user.id,
+            access_token="a",
+            refresh_token="r",
+            expires_at=utcnow() + timedelta(hours=1),
+        )
+    )
+    await session.commit()
+    listing = respx.get(f"{API_BASE}/users/@me/mangalist").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "node": {"id": 9, "title": "Berserk", "num_chapters": 0},
+                        "list_status": {"status": "reading", "score": 10, "num_chapters_read": 3},
+                    }
+                ]
+            },
+        )
+    )
+    _manga_entry(9, status="reading", score=10, num_chapters_read=3)
+    patch = _manga_patch(9)
+    delete = respx.delete(f"{API_BASE}/manga/9/my_list_status").mock(
+        return_value=httpx.Response(200, json={})
+    )
+
+    body = (await client.get("/me/mangalist", headers=headers)).json()
+    assert body["data"][0]["node"]["title"] == "Berserk"
+    assert body["data"][0]["list_status"]["num_chapters_read"] == 3
+    assert listing.calls.last.request.url.params["fields"].startswith("list_status,num_chapters")
+
+    entry = (await client.get("/me/mangalist/9", headers=headers)).json()
+    assert entry == {
+        "linked": True,
+        "status": "reading",
+        "score": 10,
+        "num_chapters_read": 3,
+        "num_volumes_read": 0,
+    }
+
+    r = await client.patch("/me/mangalist/9", json={"status": "completed"}, headers=headers)
+    assert r.status_code == 200 and b"status=completed" in patch.calls.last.request.content
+    assert (await client.delete("/me/mangalist/9", headers=headers)).status_code == 204
+    assert delete.called
+    # Each write drops the cached list, so the next read sees the change.
+    await client.get("/me/mangalist", headers=headers)
+    assert listing.call_count == 2
+
+
+@respx.mock
+async def test_manga_list_without_a_link(client, session):
+    _, headers = await make_user(session, "kafka")
+    assert (await client.get("/me/mangalist/9", headers=headers)).json() == {
+        "linked": False,
+        "status": None,
+        "score": 0,
+        "num_chapters_read": 0,
+        "num_volumes_read": 0,
+    }
+    r = await client.get("/me/mangalist", headers=headers)
+    assert r.status_code == 400 and r.json()["error"]["code"] == "mal_not_linked"
