@@ -78,6 +78,12 @@ describe("MangaListEntryCard", () => {
     expect(screen.getByRole("link", { name: /Berserk/ })).toHaveAttribute("href", "/manga/9");
   });
 
+  it("says only how many chapters were read when the total is unknown", () => {
+    const ongoing = { ...manga, node: { ...manga.node, num_chapters: 0 } };
+    render(<MangaListEntryCard entry={ongoing} />, { wrapper: Wrap });
+    expect(screen.getByText("120 read")).toBeInTheDocument();
+  });
+
   it("offers the manga statuses and saves through the manga list", async () => {
     patch.mockResolvedValue({ response: { ok: true } });
     render(<MangaListEntryCard entry={manga} />, { wrapper: Wrap });

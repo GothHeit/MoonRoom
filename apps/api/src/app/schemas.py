@@ -321,7 +321,21 @@ class MangaHomeItem(BaseModel):
 
 
 class MangaHomeRow(BaseModel):
-    id: Literal["continue_reading", "my_list", "top", "popular", "manhwa", "manhua"]
+    id: Literal[
+        "continue_reading",
+        "my_list",
+        "similar",
+        "top",
+        "popular",
+        "genre",
+        "manhwa",
+        "manhua",
+        "favorites",
+    ]
+    # Set on genre rows only: the MAL genre, named in English (the web translates it).
+    genre: GenreOut | None = None
+    # Set on the similar row only: the title the recommendations are about.
+    about: MangaCard | None = None
     items: list[MangaHomeItem]
 
 

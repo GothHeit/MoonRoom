@@ -4,17 +4,27 @@ import { getTranslations } from "next-intl/server";
 import { CoverCard } from "@/components/manga/CoverCard";
 import { PosterCard } from "@/components/ui/PosterCard";
 import { Row } from "@/components/ui/Row";
+import { genreName } from "@/lib/genres";
 import { coverOf, mangaCaption, mangaHref, readFraction } from "@/lib/manga";
 
 type Rows = components["schemas"]["MangaHomeOut"]["rows"];
+type HomeRow = Rows[number];
 
-/** The manga home rows: what the user is reading, then the rankings. The API leaves out empty ones. */
+/** The manga home rows: what the user is reading, then the rankings and the day's genres. The API leaves out empty ones. */
 export async function MangaRows({ rows }: { rows: Rows }) {
   const t = await getTranslations("manga");
+  const tGenres = await getTranslations("genres");
+
+  const titleOf = (row: HomeRow) => {
+    if (row.genre) return t("rows.genre", { genre: genreName(tGenres, row.genre) });
+    if (row.about) return t("rows.similar", { title: row.about.title });
+    return t(`rows.${row.id}`);
+  };
+
   return (
     <div className="space-y-10 py-8">
       {rows.map((row) => (
-        <Row key={row.id} title={t(`rows.${row.id}`)} itemClassName={row.id === "top" ? "w-auto" : undefined}>
+        <Row key={row.genre ? `genre-${row.genre.id}` : row.id} title={titleOf(row)} itemClassName={row.id === "top" ? "w-auto" : undefined}>
           {row.items.map(({ manga, progress }, i) =>
             row.id === "continue_reading" ? (
               <CoverCard

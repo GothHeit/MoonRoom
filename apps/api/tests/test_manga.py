@@ -86,10 +86,79 @@ async def test_home_lists_rankings_and_what_the_user_is_reading(client, session)
 
     home = (await client.get("/manga/home", headers=headers)).json()
     ids = [row["id"] for row in home["rows"]]
-    assert ids == ["continue_reading", "top", "popular", "manhwa", "manhua"]
+    assert ids == ["continue_reading", "top", "popular", "manhwa", "manhua", "favorites"]
     [reading] = home["rows"][0]["items"]
     assert reading["manga"]["title"] == "Book 1"
     assert reading["progress"]["chapter"] == "3" and reading["progress"]["page"] == 4
+
+
+@respx.mock
+async def test_home_adds_genre_rows_and_what_goes_with_the_last_title_read(
+    client, session, monkeypatch
+):
+    from app.routers import manga as manga_router
+
+    monkeypatch.setattr(manga_router, "todays_genres", lambda today, count=4: [1, 4])
+    _, headers = await make_user(session, "kafka")
+    action = [manga(n, f"A{n}", genres=[(1, "Action")]) for n in range(100, 110)]
+    mock_ranking(*action, manga(2, "Two", genres=[(4, "Comedy")]))
+    mock_details(
+        1,
+        recommendations=[
+            {"node": {"id": n, "title": f"R{n}"}, "num_recommendations": 3} for n in range(50, 56)
+        ],
+    )
+    # Recommendations carry no genres: with the adult switch off, each is checked.
+    for n in range(50, 56):
+        mock_details(n)
+    await client.put("/manga/1/progress/3", json={"page": 4, "pages": 20}, headers=headers)
+
+    home = (await client.get("/manga/home", headers=headers)).json()
+    rows = {row["id"]: row for row in home["rows"]}
+    assert [row["id"] for row in home["rows"]] == [
+        "continue_reading",
+        "similar",
+        "top",
+        "popular",
+        "manhwa",
+        "manhua",
+        "genre",
+        "favorites",
+    ]
+    # Comedy has one title: too short a row to show. Action has ten.
+    assert rows["genre"]["genre"]["name"] == "Action"
+    assert len(rows["genre"]["items"]) == 10
+    assert rows["similar"]["about"]["title"] == "Book 1"
+    assert [i["manga"]["id"] for i in rows["similar"]["items"]] == list(range(50, 56))
+
+
+@respx.mock
+async def test_browse_filters_a_ranking_by_genre(client, session):
+    _, headers = await make_user(session, "kafka")
+    route = mock_ranking(
+        manga(1, "One", genres=[(22, "Romance")]),
+        manga(2, "Two", genres=[(1, "Action")]),
+        manga(3, "Three", genres=[(22, "Romance"), (1, "Action")]),
+    )
+    found = (
+        await client.get("/manga/browse", params={"row": "manhwa", "genre": 22}, headers=headers)
+    ).json()
+    assert [m["id"] for m in found["data"]] == [1, 3] and found["has_next"] is False
+    # The deep pool is several pages of the row's own ranking, not the default one.
+    assert {
+        parse_qs(urlsplit(str(c.request.url)).query)["ranking_type"][0] for c in route.calls
+    } == {"manhwa"}
+    assert len(route.calls) > 1
+
+    assert (
+        await client.get("/manga/browse", params={"genre": 999}, headers=headers)
+    ).status_code == 422
+    # Adult genres are not offered, nor accepted, with the switch off.
+    listed = (await client.get("/manga/genres", headers=headers)).json()
+    assert "Hentai" not in {g["name"] for g in listed}
+    assert (
+        await client.get("/manga/browse", params={"genre": 12}, headers=headers)
+    ).status_code == 422
 
 
 @respx.mock

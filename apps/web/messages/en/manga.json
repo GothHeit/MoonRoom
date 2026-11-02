@@ -5,20 +5,26 @@
     "rows": {
       "continue_reading": "Continue reading",
       "my_list": "My list",
+      "similar": "More like {title}",
       "top": "Top rated manga",
       "popular": "Most popular",
       "manhwa": "Manhwa",
-      "manhua": "Manhua"
+      "manhua": "Manhua",
+      "genre": "{genre}",
+      "favorites": "Fan favorites"
     },
     "empty": "Nothing to show yet. Try again in a moment.",
     "browse": {
       "title": "Browse manga",
       "rows": "Rankings",
+      "genres": "Genres",
+      "anyGenre": "All genres",
       "top": "Top rated",
       "popular": "Popular",
       "manhwa": "Manhwa",
       "manhua": "Manhua",
       "oneshots": "One-shots",
+      "favorites": "Favorites",
       "empty": "No titles here."
     },
     "search": {

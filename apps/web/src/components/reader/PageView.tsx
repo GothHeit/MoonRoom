@@ -1,12 +1,19 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { placeholderFor } from "@/components/ui/PosterCard";
 
+type Props = {
+  src: string | undefined;
+  page: number;
+  /** The page being read is fetched before its neighbours. */
+  priority?: boolean;
+};
+
 /** One page, fitted to the screen. A flat panel holds its place while it loads. */
-export function PageView({ src, page, chapterEnd }: { src: string | undefined; page: number; chapterEnd: ReactNode }) {
+export function PageView({ src, page, priority = false }: Props) {
   const t = useTranslations("reader");
   const [attempt, setAttempt] = useState(0);
   // The outcome is filed under the picture it is about, so a new page starts out loading.
@@ -22,8 +29,6 @@ export function PageView({ src, page, chapterEnd }: { src: string | undefined; p
     if (el?.complete && el.naturalWidth > 0) setOutcome({ of: current, state: "ready" });
   }, [current]);
 
-  if (chapterEnd) return <div className="flex h-full items-center justify-center px-4">{chapterEnd}</div>;
-
   return (
     <div className="relative flex h-full items-center justify-center">
       {src && (
@@ -35,7 +40,7 @@ export function PageView({ src, page, chapterEnd }: { src: string | undefined; p
           alt={t("pageAlt", { page: page + 1 })}
           draggable={false}
           decoding="async"
-          fetchPriority="high"
+          fetchPriority={priority ? "high" : "auto"}
           onLoad={() => setState("ready")}
           onError={() => setState("failed")}
           className={`max-h-full max-w-full object-contain transition-opacity duration-200 ${state === "ready" ? "opacity-100" : "opacity-0"}`}

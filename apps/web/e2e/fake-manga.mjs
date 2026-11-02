@@ -23,6 +23,13 @@ export const MANGA = [
   cover(2, "Solo Leveling", "manhwa"),
   cover(3, "Vagabond", "manga", { status: "on_hiatus", num_chapters: 327 }),
   cover(4, "Dungeon Meshi", "manga", { status: "finished", num_chapters: 97 }),
+  cover(5, "Chainsaw Man", "manga", { genres: [{ id: 1, name: "Action" }] }),
+];
+
+const GENRES = [
+  { id: 1, name: "Action", kind: "genre", nsfw: false },
+  { id: 2, name: "Adventure", kind: "genre", nsfw: false },
+  { id: 10, name: "Fantasy", kind: "genre", nsfw: false },
 ];
 
 // The user is partway through chapter 2 of title 1. Reading moves it; /manga/__reset puts it back.
@@ -58,19 +65,25 @@ export function handleManga(url, req, send, res, body) {
     return send(200, {
       rows: [
         ...(reading.length ? [{ id: "continue_reading", items: reading }] : []),
+        ...(reading.length ? [{ id: "similar", about: MANGA[0], items: [{ manga: MANGA[2] }, { manga: MANGA[3] }] }] : []),
         { id: "top", items: MANGA.map((manga) => ({ manga })) },
         { id: "popular", items: [...MANGA].reverse().map((manga) => ({ manga })) },
+        { id: "genre", genre: GENRES[2], items: MANGA.filter((m) => m.genres.some((g) => g.id === 10)).map((manga) => ({ manga })) },
         { id: "manhwa", items: [{ manga: MANGA[1] }] },
+        { id: "favorites", items: MANGA.map((manga) => ({ manga })) },
       ],
     });
   }
+  if (path === "/manga/genres") return send(200, GENRES);
   if (path === "/manga/search") {
     const q = (url.searchParams.get("q") ?? "").toLowerCase();
     return send(200, { data: MANGA.filter((m) => m.title.toLowerCase().includes(q)) });
   }
   if (path === "/manga/browse") {
     const row = url.searchParams.get("row") ?? "top";
-    return send(200, { data: row === "manhwa" ? [MANGA[1]] : MANGA, page: 1, has_next: false });
+    const genre = Number(url.searchParams.get("genre"));
+    const pool = row === "manhwa" ? [MANGA[1]] : MANGA;
+    return send(200, { data: genre ? pool.filter((m) => m.genres.some((g) => g.id === genre)) : pool, page: 1, has_next: false });
   }
   if (path === "/manga/page") {
     const n = Number(url.searchParams.get("u")?.split("-").pop() ?? 1);

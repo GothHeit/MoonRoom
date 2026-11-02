@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import uuid
+from datetime import date
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -19,14 +20,17 @@ from app.db import new_session, utcnow
 from app.deps import CurrentSessionId, CurrentUser, Session
 from app.errors import ApiError
 from app.mal.client import MANGA_RANKINGS, MalClient, is_safe
+from app.mal.genres import GENRE_IDS, GENRES
 from app.manga.base import Chapter, ChapterList, MangaSource
 from app.manga.pagecache import MAX_PAGE_BYTES, PageCache
 from app.models import MalLink, MangaProgress, User
 from app.routers.anime import only_safe
+from app.routers.home import MIN_ROW, todays_genres
 from app.routers.watch import session_open
 from app.schemas import (
     ChapterOut,
     ChaptersOut,
+    GenreOut,
     MangaBrowseOut,
     MangaCard,
     MangaDetailsOut,
@@ -43,17 +47,18 @@ from app.upstream import open_upstream
 router = APIRouter(prefix="/manga", tags=["manga"])
 log = logging.getLogger(__name__)
 
-Row = Literal["top", "popular", "manhwa", "manhua", "oneshots"]
+Row = Literal["top", "popular", "manhwa", "manhua", "oneshots", "favorites"]
 
 SOURCE_TIMEOUT = 12.0
 # Titles on the continue-reading row.
 CONTINUE_LIMIT = 12
-HOME_ROWS: tuple[Literal["top", "popular", "manhwa", "manhua"], ...] = (
-    "top",
-    "popular",
-    "manhwa",
-    "manhua",
-)
+RankedRow = Literal["top", "popular", "manhwa", "manhua", "favorites"]
+HomeRowId = Literal[RankedRow, "genre", "similar"]
+HOME_ROWS: tuple[RankedRow, ...] = ("top", "popular", "manhwa", "manhua", "favorites")
+# Titles on a home row.
+ROW_SIZE = 20
+# Genre rows come from the most-followed manga; this many, rotated by day like the anime home.
+GENRE_ROWS = 4
 # A page link lives this long: a chapter is read in one sitting, and the reader asks again.
 PAGE_LINK_LIFETIME = 6 * 3600
 PAGE_CACHE_CONTROL = "private, max-age=86400, immutable"
@@ -198,6 +203,36 @@ async def page(
     return Response(data, media_type=media_type, headers=headers)
 
 
+def _row(row_id: HomeRowId, nodes: list[dict], **extra) -> MangaHomeRow:
+    return MangaHomeRow(
+        id=row_id, items=[MangaHomeItem(manga=c) for c in _cards(nodes[:ROW_SIZE])], **extra
+    )
+
+
+async def _genre_rows(mal: MalClient, allow_nsfw: bool) -> list[MangaHomeRow]:
+    """Most-followed manga of a few genres, drawn from the cached popularity pool."""
+    pool = await mal.manga_pool("popular", allow_nsfw)
+    rows = []
+    for genre_id in todays_genres(date.today(), GENRE_ROWS):
+        nodes = [n for n in pool if any(g.get("id") == genre_id for g in n.get("genres") or [])]
+        info = GENRE_IDS[genre_id]
+        if len(nodes) >= MIN_ROW:
+            genre = GenreOut(id=info.id, name=info.name, kind=info.kind, nsfw=info.nsfw)
+            rows.append(_row("genre", nodes, genre=genre))
+    return rows
+
+
+async def _similar_row(mal: MalClient, about: dict, allow_nsfw: bool) -> MangaHomeRow | None:
+    """What readers of the title last opened also recommend, from its (cached) details."""
+    recommended = about.get("recommendations") or []
+    if not allow_nsfw:
+        (recommended,) = await only_safe(mal, recommended, fetch=mal.manga_details)
+    nodes = [r["node"] for r in recommended]
+    if len(nodes) < MIN_ROW // 2:
+        return None
+    return _row("similar", nodes, about=MangaCard.from_node(about))
+
+
 @router.get("/home", response_model=MangaHomeOut)
 async def home(request: Request, user: CurrentUser, session: Session):
     mal = _mal(request)
@@ -213,9 +248,18 @@ async def home(request: Request, user: CurrentUser, session: Session):
             return None
         return MangaHomeItem(manga=MangaCard.from_node(node), progress=progress_out(row))
 
-    continue_items, listed, *rankings = await asyncio.gather(
+    async def similar() -> MangaHomeRow | None:
+        for row in reading:
+            about = await mal.manga_details(row.manga_id)
+            if user.show_nsfw or is_safe(about):
+                return await _similar_row(mal, about, user.show_nsfw)
+        return None
+
+    continue_items, listed, alike, genre_rows, *rankings = await asyncio.gather(
         asyncio.gather(*(card(r) for r in reading)),
         _my_list(request, user),
+        similar(),
+        _genre_rows(mal, user.show_nsfw),
         *(mal.manga_ranking(row, user.show_nsfw) for row in HOME_ROWS),
         return_exceptions=True,
     )
@@ -228,15 +272,34 @@ async def home(request: Request, user: CurrentUser, session: Session):
         log.warning("manga home: my list row failed: %s", listed)
     elif listed:
         rows.append(MangaHomeRow(id="my_list", items=[MangaHomeItem(manga=c) for c in listed]))
+    if isinstance(alike, BaseException):
+        log.warning("manga home: similar row failed: %s", alike)
+    elif alike is not None:
+        rows.append(alike)
+    ranked: dict[str, MangaHomeRow] = {}
     for row_id, ranking in zip(HOME_ROWS, rankings, strict=True):
         if isinstance(ranking, BaseException):
             log.warning("manga home: %s row failed: %s", row_id, ranking)
             continue
         nodes, _ = ranking
         if nodes:
-            rows.append(
-                MangaHomeRow(id=row_id, items=[MangaHomeItem(manga=c) for c in _cards(nodes)])
-            )
+            ranked[row_id] = _row(row_id, nodes)
+    if isinstance(genre_rows, BaseException):
+        log.warning("manga home: genre rows failed: %s", genre_rows)
+        genre_rows = []
+    # The rankings first, then the day's genres between the regional rows and the favorites,
+    # so the page changes from one visit to the next without losing its anchors.
+    half = len(genre_rows) // 2
+    order: list[MangaHomeRow | None] = [
+        ranked.get("top"),
+        ranked.get("popular"),
+        *genre_rows[:half],
+        ranked.get("manhwa"),
+        ranked.get("manhua"),
+        *genre_rows[half:],
+        ranked.get("favorites"),
+    ]
+    rows.extend(row for row in order if row is not None)
     if not rows:
         raise ApiError(502, "mal_unavailable", "MyAnimeList did not answer")
     return MangaHomeOut(rows=rows)
@@ -260,18 +323,30 @@ async def search(
     return MangaListOut(data=_cards(await _mal(request).manga_search(q, user.show_nsfw)))
 
 
+@router.get("/genres", response_model=list[GenreOut])
+async def genres(user: CurrentUser):
+    """MAL's genres are shared by anime and manga, ids included."""
+    return [
+        GenreOut(id=g.id, name=g.name, kind=g.kind, nsfw=g.nsfw)
+        for g in GENRES
+        if user.show_nsfw or not g.nsfw
+    ]
+
+
 @router.get("/browse", response_model=MangaBrowseOut)
 async def browse(
     request: Request,
     user: CurrentUser,
     row: Row = "top",
+    genre: Annotated[int | None, Query(description="MAL genre id, see /manga/genres")] = None,
     page: Annotated[int, Query(ge=1, le=25)] = 1,
 ):
     assert row in MANGA_RANKINGS
-    page_size = 20
-    nodes, has_next = await _mal(request).manga_ranking(
-        row, user.show_nsfw, page_size, (page - 1) * page_size
-    )
+    if genre is not None:
+        known = GENRE_IDS.get(genre)
+        if known is None or (known.nsfw and not user.show_nsfw):
+            raise ApiError(422, "validation_failed", "Unknown genre")
+    nodes, has_next = await _mal(request).manga_browse(row, genre, page, user.show_nsfw)
     return MangaBrowseOut(data=_cards(nodes), page=page, has_next=has_next)
 
 

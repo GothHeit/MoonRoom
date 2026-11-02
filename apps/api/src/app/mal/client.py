@@ -46,6 +46,7 @@ MANGA_RANKINGS = {
     "manhwa": "manhwa",
     "manhua": "manhua",
     "oneshots": "oneshots",
+    "favorites": "favorite",
 }
 
 LIST_TTL = 600  # seconds
@@ -300,6 +301,41 @@ class MalClient:
         )
         nodes = [i["node"] for i in filter_nsfw(data.get("data", []), allow_nsfw)]
         return nodes, bool((data.get("paging") or {}).get("next"))
+
+    async def manga_pool(
+        self, row: str, allow_nsfw: bool, offset: int = 0, size: int = POOL_SIZE
+    ) -> list[dict]:
+        """One big page of a manga ranking: the pool that genre rows and filters draw from."""
+        nodes, _ = await self.manga_ranking(row, allow_nsfw, size, offset)
+        return nodes
+
+    async def manga_deep_pool(self, row: str, allow_nsfw: bool) -> list[dict]:
+        """Several pages of a manga ranking, merged. Like `deep_ranking_pool`: a genre filter
+        needs depth to find anything, a failed page is skipped, and only when every page fails
+        does the error surface."""
+        pages = await asyncio.gather(
+            *(self.manga_pool(row, allow_nsfw, i * POOL_SIZE) for i in range(DEEP_POOL_PAGES)),
+            return_exceptions=True,
+        )
+        ok = [p for p in pages if not isinstance(p, BaseException)]
+        if not ok:
+            first = pages[0]
+            assert isinstance(first, BaseException)
+            raise first
+        merged = {n["id"]: n for p in ok for n in p}
+        return list(merged.values())
+
+    async def manga_browse(
+        self, row: str, genre: int | None, page: int, allow_nsfw: bool, page_size: int = 20
+    ) -> tuple[list[dict], bool]:
+        """A ranking's page, or, with a genre, that ranking's deep pool filtered by it. MAL's
+        API can't filter manga by genre either, so the pool is fetched once, cached, and sifted."""
+        if genre is None:
+            return await self.manga_ranking(row, allow_nsfw, page_size, (page - 1) * page_size)
+        pool = await self.manga_deep_pool(row, allow_nsfw)
+        pool = [n for n in pool if any(g.get("id") == genre for g in n.get("genres") or [])]
+        start = (page - 1) * page_size
+        return pool[start : start + page_size], len(pool) > start + page_size
 
     async def manga_details(self, manga_id: int) -> dict:
         cached = self._details.get(("manga", manga_id))

@@ -20,7 +20,7 @@
     "progress": "{watched} of {total} episodes",
     "progressUnknown": "{watched} episodes",
     "chapters": "{read} of {total} chapters",
-    "chaptersUnknown": "{read} chapters",
+    "chaptersUnknown": "{read} read",
     "menu": "Options for {title}",
     "moveTo": "Move to {status}",
     "remove": "Remove from list",

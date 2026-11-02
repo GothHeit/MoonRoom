@@ -1907,14 +1907,37 @@
       },
       "MangaHomeRow": {
         "properties": {
+          "about": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MangaCard"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "genre": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GenreOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "enum": [
               "continue_reading",
               "my_list",
+              "similar",
               "top",
               "popular",
+              "genre",
               "manhwa",
-              "manhua"
+              "manhua",
+              "favorites"
             ],
             "title": "Id",
             "type": "string"
@@ -5227,10 +5250,29 @@
                 "popular",
                 "manhwa",
                 "manhua",
-                "oneshots"
+                "oneshots",
+                "favorites"
               ],
               "title": "Row",
               "type": "string"
+            }
+          },
+          {
+            "description": "MAL genre id, see /manga/genres",
+            "in": "query",
+            "name": "genre",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MAL genre id, see /manga/genres",
+              "title": "Genre"
             }
           },
           {
@@ -5274,6 +5316,37 @@
           }
         ],
         "summary": "Browse",
+        "tags": [
+          "manga"
+        ]
+      }
+    },
+    "/manga/genres": {
+      "get": {
+        "description": "MAL's genres are shared by anime and manga, ids included.",
+        "operationId": "genres_manga_genres_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GenreOut"
+                  },
+                  "title": "Response Genres Manga Genres Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Genres",
         "tags": [
           "manga"
         ]

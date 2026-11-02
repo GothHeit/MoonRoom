@@ -431,6 +431,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/manga/genres": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Genres
+         * @description MAL's genres are shared by anime and manga, ids included.
+         */
+        get: operations["genres_manga_genres_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/manga/home": {
         parameters: {
             query?: never;
@@ -2041,11 +2061,13 @@ export interface components {
         };
         /** MangaHomeRow */
         MangaHomeRow: {
+            about?: components["schemas"]["MangaCard"] | null;
+            genre?: components["schemas"]["GenreOut"] | null;
             /**
              * Id
              * @enum {string}
              */
-            id: "continue_reading" | "my_list" | "top" | "popular" | "manhwa" | "manhua";
+            id: "continue_reading" | "my_list" | "similar" | "top" | "popular" | "genre" | "manhwa" | "manhua" | "favorites";
             /** Items */
             items: components["schemas"]["MangaHomeItem"][];
         };
@@ -3557,7 +3579,9 @@ export interface operations {
     browse_manga_browse_get: {
         parameters: {
             query?: {
-                row?: "top" | "popular" | "manhwa" | "manhua" | "oneshots";
+                row?: "top" | "popular" | "manhwa" | "manhua" | "oneshots" | "favorites";
+                /** @description MAL genre id, see /manga/genres */
+                genre?: number | null;
                 page?: number;
             };
             header?: never;
@@ -3582,6 +3606,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    genres_manga_genres_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenreOut"][];
                 };
             };
         };

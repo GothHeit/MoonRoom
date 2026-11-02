@@ -25,8 +25,22 @@ export const navItemsFor = (mode: Mode) => (mode === "manga" ? MANGA_ITEMS : ANI
 
 export const searchHrefFor = (mode: Mode) => (mode === "manga" ? "/manga/search" : "/search");
 
-/** The same page in the other catalog's home: the switch always lands somewhere that exists. */
 export const modeHome = (mode: Mode) => (mode === "manga" ? "/manga" : "/");
+
+// Pages that exist in both catalogs, by their anime address.
+const COUNTERPARTS: Record<string, string> = { "/": "/manga", "/browse": "/manga/browse", "/list": "/manga/list", "/search": "/manga/search" };
+
+/**
+ * Where the catalog switch goes from `pathname` (locale already stripped): the same page in the
+ * other catalog when there is one (My list stays My list), else that catalog's home. The query
+ * is dropped: a list status or a search is not the same thing on the other side.
+ */
+export function counterpartOf(pathname: string, mode: Mode): string {
+  const section = pathname === "/manga" ? "/" : pathname.startsWith("/manga/") ? pathname.slice("/manga".length) : pathname;
+  const entry = Object.entries(COUNTERPARTS).find(([anime, manga]) => section === anime || section === manga);
+  if (!entry) return modeHome(mode);
+  return mode === "manga" ? entry[1] : entry[0];
+}
 
 /** True when `pathname` (locale already stripped) is inside the nav item's section. */
 export function isActive(pathname: string, href: string) {

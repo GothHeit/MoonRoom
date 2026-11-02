@@ -10,8 +10,13 @@ type Props = {
   page: number;
   startPage: number;
   onPageChange: (index: number) => void;
+  /** Told when the reader scrolls on down the strip, which hides the controls. */
+  onScrollDown: () => void;
   chapterEnd: ReactNode;
 };
+
+// Scrolling this far down the strip is reading on, not a wobble.
+const SCROLL_HIDE = 24;
 
 // Pages this close to the one on screen are fetched ahead.
 const AHEAD = 3;
@@ -20,12 +25,19 @@ const AHEAD = 3;
  * The whole chapter as one column. Each page keeps a reserved height until it loads, so the
  * strip never jumps; the page most on screen is the current one.
  */
-export function StripView({ pages, page, startPage, onPageChange, chapterEnd }: Props) {
+export function StripView({ pages, page, startPage, onPageChange, onScrollDown, chapterEnd }: Props) {
   const t = useTranslations("reader");
   const root = useRef<HTMLDivElement>(null);
   const items = useRef<(HTMLDivElement | null)[]>([]);
   const [loaded, setLoaded] = useState<Set<number>>(() => new Set());
   const [reach, setReach] = useState(Math.min(startPage + AHEAD, pages.length));
+  const lastTop = useRef(0);
+
+  function onScroll(e: React.UIEvent<HTMLDivElement>) {
+    const top = e.currentTarget.scrollTop;
+    if (top - lastTop.current > SCROLL_HIDE) onScrollDown();
+    if (Math.abs(top - lastTop.current) > SCROLL_HIDE) lastTop.current = top;
+  }
 
   // Open on the saved page, and count the pages that loaded before React took over.
   useEffect(() => {
@@ -67,7 +79,7 @@ export function StripView({ pages, page, startPage, onPageChange, chapterEnd }: 
   }, [pages.length, onPageChange]);
 
   return (
-    <div ref={root} className="h-full overflow-y-auto overscroll-contain">
+    <div ref={root} onScroll={onScroll} className="h-full overflow-y-auto overscroll-contain">
       <div className="mx-auto w-full max-w-[56rem]">
         {pages.map((src, i) => (
           <div

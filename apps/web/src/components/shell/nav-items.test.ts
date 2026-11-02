@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isActive, modeOf, navItemsFor, searchHrefFor } from "./nav-items";
+import { counterpartOf, isActive, modeOf, navItemsFor, searchHrefFor } from "./nav-items";
 
 describe("isActive", () => {
   it("matches home only exactly", () => {
@@ -32,5 +32,26 @@ describe("modeOf", () => {
     expect(navItemsFor("manga").map((i) => i.href)).toEqual(["/manga", "/manga/browse", "/manga/list"]);
     expect(navItemsFor("anime").map((i) => i.href)).toEqual(["/", "/browse", "/list"]);
     expect(searchHrefFor("manga")).toBe("/manga/search");
+  });
+});
+
+describe("counterpartOf", () => {
+  it("keeps the user on the same page when the other catalog has it", () => {
+    expect(counterpartOf("/list", "manga")).toBe("/manga/list");
+    expect(counterpartOf("/manga/list", "anime")).toBe("/list");
+    expect(counterpartOf("/manga/browse", "anime")).toBe("/browse");
+    expect(counterpartOf("/search", "manga")).toBe("/manga/search");
+    expect(counterpartOf("/", "manga")).toBe("/manga");
+    expect(counterpartOf("/manga", "anime")).toBe("/");
+  });
+  it("stays put when asked for the catalog already shown", () => {
+    expect(counterpartOf("/manga/list", "manga")).toBe("/manga/list");
+    expect(counterpartOf("/list", "anime")).toBe("/list");
+  });
+  it("falls back to the other catalog's home from a title or the reader", () => {
+    expect(counterpartOf("/anime/1", "manga")).toBe("/manga");
+    expect(counterpartOf("/manga/1", "anime")).toBe("/");
+    expect(counterpartOf("/read/mangadex/1/c1", "anime")).toBe("/");
+    expect(counterpartOf("/account", "manga")).toBe("/manga");
   });
 });

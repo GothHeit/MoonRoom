@@ -5,20 +5,26 @@
     "rows": {
       "continue_reading": "Continuar lendo",
       "my_list": "Minha lista",
+      "similar": "Parecidos com {title}",
       "top": "Mangás mais bem avaliados",
       "popular": "Mais populares",
       "manhwa": "Manhwa",
-      "manhua": "Manhua"
+      "manhua": "Manhua",
+      "genre": "{genre}",
+      "favorites": "Favoritos dos fãs"
     },
     "empty": "Nada para mostrar ainda. Tente de novo em instantes.",
     "browse": {
       "title": "Explorar mangás",
       "rows": "Rankings",
+      "genres": "Gêneros",
+      "anyGenre": "Todos os gêneros",
       "top": "Mais bem avaliados",
       "popular": "Populares",
       "manhwa": "Manhwa",
       "manhua": "Manhua",
       "oneshots": "One-shots",
+      "favorites": "Favoritos",
       "empty": "Nenhum título aqui."
     },
     "search": {
