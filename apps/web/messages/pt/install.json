@@ -1,0 +1,9 @@
+{
+  "install": {
+    "title": "Instalar o MoonRoom",
+    "body": "Adicione à tela inicial para abrir como um app, em tela cheia.",
+    "ios": "Toque no botão Compartilhar do Safari e depois em \"Adicionar à Tela de Início\".",
+    "install": "Instalar",
+    "dismiss": "Dispensar"
+  }
+}

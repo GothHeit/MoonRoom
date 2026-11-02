@@ -1,0 +1,9 @@
+{
+  "install": {
+    "title": "Install MoonRoom",
+    "body": "Add it to your home screen to open it like an app, full screen.",
+    "ios": "Tap the Share button in Safari, then \"Add to Home Screen\".",
+    "install": "Install",
+    "dismiss": "Dismiss"
+  }
+}
