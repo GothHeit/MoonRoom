@@ -181,6 +181,7 @@ async def test_hls_playback_falls_back_and_proxies_with_referer(client, session)
     assert s.content == b"\x47data"
     assert s.headers["content-type"].startswith("video/mp2t")
     assert seg.calls.last.request.headers["referer"] == "https://ref.example/"
+    assert seg.calls.last.request.headers["origin"] == "https://ref.example"
     assert play.json()["source"] == "ok"
 
     assert s.headers["x-content-type-options"] == "nosniff"

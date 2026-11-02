@@ -3,6 +3,7 @@ import logging
 import uuid
 from collections.abc import Awaitable
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 import httpx
 from cachetools import TTLCache
@@ -719,6 +720,11 @@ async def hls_proxy(
         )
 
     headers = {"Referer": referer} if referer else {}
+    if referer:
+        # Some segment hosts (AnimeStream's) answer 403 without an Origin next to the Referer.
+        site = urlsplit(referer)
+        if site.scheme and site.netloc:
+            headers["Origin"] = f"{site.scheme}://{site.netloc}"
     if "range" in request.headers:
         headers["Range"] = request.headers["range"]
     http: httpx.AsyncClient = request.app.state.http
