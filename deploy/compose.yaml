@@ -17,6 +17,18 @@ services:
       interval: 5s
       retries: 20
 
+  # Shared cache for MAL and ani.zip answers. Losing it only costs a cold cache: the API falls
+  # back to its in-process cache while Redis is away. No password: it is on the private network
+  # and publishes no port.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
   api:
     build:
       context: ../apps/api
@@ -32,6 +44,7 @@ services:
       MAL_CLIENT_ID: ${MAL_CLIENT_ID:-}
       MAL_CLIENT_SECRET: ${MAL_CLIENT_SECRET:-}
       MAL_REDIRECT_URI: ${PUBLIC_URL}/mal/callback
+      REDIS_URL: redis://redis:6379/0
       VIDEO_SOURCES: ${VIDEO_SOURCES:-}
       PT_SYNOPSIS_SCRAPE: ${PT_SYNOPSIS_SCRAPE:-false}
       # Only Caddy can reach the API, and it writes the real client address.

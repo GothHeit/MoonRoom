@@ -87,6 +87,7 @@ async def test_home_survives_a_failing_section_but_not_total_mal_failure(client,
 
     respx.get(f"{API_BASE}/anime/ranking").mock(return_value=httpx.Response(500))
     fastapi_app.state.mal._pages.clear()
+    fastapi_app.state.shared_cache._local.clear()
     r = await client.get("/home", headers=headers)
     assert r.status_code == 502
     assert r.json()["error"]["code"] == "mal_unavailable"

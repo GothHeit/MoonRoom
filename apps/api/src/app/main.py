@@ -33,6 +33,7 @@ from app.routers import (
     watch,
 )
 from app.sessions import SessionCheck
+from app.sharedcache import SharedCache
 from app.source_hints import new_source_hints
 from app.sources import load_sources
 
@@ -82,10 +83,13 @@ async def lifespan(app: FastAPI):
     db.init_engine(settings.database_url)
     async with httpx.AsyncClient(follow_redirects=True) as http:
         app.state.http = http
-        app.state.mal = MalClient(settings.mal_client_id, http, settings.mal_api_base)
+        app.state.shared_cache = SharedCache(settings.redis_url)
+        app.state.mal = MalClient(
+            settings.mal_client_id, http, settings.mal_api_base, app.state.shared_cache
+        )
         app.state.mal_accounts = MalAccounts(settings, http)
         app.state.aniskip = AniSkip(http)
-        app.state.anizip = AniZip(http)
+        app.state.anizip = AniZip(http, app.state.shared_cache)
         app.state.pt_synopses = None
         if settings.pt_synopsis_scrape:
             from app.synopsis import PtSynopses
@@ -125,6 +129,7 @@ async def lifespan(app: FastAPI):
             for source in app.state.sources.values():
                 if hasattr(source, "aclose"):
                     await source.aclose()
+            await app.state.shared_cache.aclose()
     await db.dispose_engine()
 
 

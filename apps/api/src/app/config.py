@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     # Read the client address from X-Forwarded-For. Only enable behind a trusted reverse proxy.
     trust_proxy_headers: bool = False
 
+    # Shared cache for MAL and ani.zip answers, e.g. redis://redis:6379/0. Empty keeps the cache
+    # in each process; an unreachable server falls back to that too.
+    redis_url: str = ""
+
     # Private deployments only: Portuguese synopses from an unlicensed site. Off in public builds.
     pt_synopsis_scrape: bool = False
 

@@ -13,6 +13,7 @@ from cachetools import TTLCache
 from rapidfuzz import fuzz
 
 from app.errors import ApiError
+from app.sharedcache import SharedCache
 from app.singleflight import SingleFlight
 
 API_BASE = "https://api.myanimelist.net/v2"
@@ -29,6 +30,7 @@ DETAIL_FIELDS = (
 )
 
 LIST_TTL = 600  # seconds
+DETAILS_TTL = 1800
 MAX_CONCURRENT_CALLS = 8  # in-flight calls to MAL across all requests
 POOL_SIZE = 500  # the most MAL returns for one season or ranking request
 
@@ -82,14 +84,21 @@ def rank_search_results(query: str, items: list[dict], limit: int = 8) -> list[d
 
 
 class MalClient:
-    def __init__(self, client_id: str, http: httpx.AsyncClient, api_base: str = API_BASE):
+    def __init__(
+        self,
+        client_id: str,
+        http: httpx.AsyncClient,
+        api_base: str = API_BASE,
+        shared: SharedCache | None = None,
+    ):
+        self._shared = shared or SharedCache()
         self._api_base = api_base
         self._headers = {"X-MAL-CLIENT-ID": client_id}
         self._http = http
         # Cold-cache bursts (home, profiles) would otherwise fire dozens of calls at once and
         # get answered with 429/403.
         self._slots = asyncio.Semaphore(MAX_CONCURRENT_CALLS)
-        self._details: TTLCache[int, dict] = TTLCache(maxsize=2048, ttl=1800)
+        self._details: TTLCache[int, dict] = TTLCache(maxsize=2048, ttl=DETAILS_TTL)
         # Listing pages (seasonal, top, search, browse pools) change slowly: a short TTL keeps
         # the home page from hitting MAL on every load.
         self._pages: TTLCache[tuple, dict] = TTLCache(maxsize=512, ttl=LIST_TTL)
@@ -103,8 +112,13 @@ class MalClient:
             return cached
 
         async def load() -> dict:
+            shared = await self._shared.get("mal-page", key)
+            if shared is not None:
+                self._pages[key] = shared
+                return shared
             data = await self._fetch(path, params)
             self._pages[key] = data
+            await self._shared.set("mal-page", key, data, LIST_TTL)
             return data
 
         return await self._flights.run(key, load)
@@ -247,8 +261,13 @@ class MalClient:
             return cached
 
         async def load() -> dict:
+            shared = await self._shared.get("mal-details", anime_id)
+            if shared is not None:
+                self._details[anime_id] = shared
+                return shared
             data = await self._fetch(f"/anime/{anime_id}", {"fields": DETAIL_FIELDS})
             self._details[anime_id] = data
+            await self._shared.set("mal-details", anime_id, data, DETAILS_TTL)
             return data
 
         return await self._flights.run(("details", anime_id), load)

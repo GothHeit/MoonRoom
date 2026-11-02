@@ -11,6 +11,7 @@ from typing import Literal
 import httpx
 from cachetools import TLRUCache
 
+from app.sharedcache import SharedCache
 from app.singleflight import SingleFlight
 
 log = logging.getLogger(__name__)
@@ -20,6 +21,8 @@ TIMEOUT = 5.0
 FOUND_TTL = 86400
 MISS_TTL = 6 * 3600
 ERROR_TTL = 300
+# How long this process trusts an answer another worker stored; its own ttl lives in Redis.
+SHARED_LOCAL_TTL = 600
 # Title languages tried in order for each site language: the romanized Japanese one is last.
 TITLE_LANGS: dict[str, tuple[str, ...]] = {"pt": ("pt", "en", "x-jat"), "en": ("en", "x-jat")}
 
@@ -42,6 +45,25 @@ class TitleArt:
 
 
 NO_ART = TitleArt()
+
+
+def to_json(art: TitleArt) -> dict:
+    return {
+        "backdrop": art.backdrop,
+        "episodes": {
+            str(n): {"titles": e.titles, "image": e.image} for n, e in art.episodes.items()
+        },
+    }
+
+
+def from_json(data: dict) -> TitleArt:
+    return TitleArt(
+        backdrop=data.get("backdrop"),
+        episodes={
+            int(n): EpisodeArt(titles=e.get("titles") or {}, image=e.get("image"))
+            for n, e in (data.get("episodes") or {}).items()
+        },
+    )
 
 
 def _link(value: object) -> str | None:
@@ -77,8 +99,9 @@ def parse(body: dict) -> TitleArt:
 
 
 class AniZip:
-    def __init__(self, http: httpx.AsyncClient) -> None:
+    def __init__(self, http: httpx.AsyncClient, shared: SharedCache | None = None) -> None:
         self._http = http
+        self._shared = shared or SharedCache()
         self._flights: SingleFlight[int, TitleArt] = SingleFlight()
         # Values are (art, ttl).
         self._cache: TLRUCache[int, tuple[TitleArt, float]] = TLRUCache(
@@ -91,10 +114,15 @@ class AniZip:
         return await self._flights.run(mal_id, lambda: self._fetch(mal_id))
 
     async def _fetch(self, mal_id: int) -> TitleArt:
+        if (shared := await self._shared.get("anizip", mal_id)) is not None:
+            art = from_json(shared)
+            self._cache[mal_id] = (art, SHARED_LOCAL_TTL)
+            return art
         try:
             response = await self._http.get(API, params={"mal_id": mal_id}, timeout=TIMEOUT)
             if response.status_code == 404:  # a title ani.zip doesn't map
                 self._cache[mal_id] = (NO_ART, MISS_TTL)
+                await self._shared.set("anizip", mal_id, to_json(NO_ART), MISS_TTL)
                 return NO_ART
             response.raise_for_status()
             body = response.json()
@@ -106,5 +134,7 @@ class AniZip:
             self._cache[mal_id] = (NO_ART, ERROR_TTL)
             return NO_ART
         found = art.backdrop is not None or bool(art.episodes)
-        self._cache[mal_id] = (art, FOUND_TTL if found else MISS_TTL)
+        ttl = FOUND_TTL if found else MISS_TTL
+        self._cache[mal_id] = (art, ttl)
+        await self._shared.set("anizip", mal_id, to_json(art), ttl)
         return art

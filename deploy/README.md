@@ -89,6 +89,12 @@ Rotate it if it may have leaked, or once a year. Nobody is signed out:
    already playing may need a reload.
 3. A day later, empty `JWT_PREVIOUS_SECRETS` and restart again.
 
+## Shared cache
+
+A `redis` container keeps MAL and ani.zip answers across API restarts and workers (128 MB, no
+persistence, no published port, no .env keys). It is optional at runtime: if it is down the API
+logs one warning and uses its in-process cache. Flush it with `docker compose exec redis redis-cli flushall`.
+
 ## Proxy and cookie settings
 
 - `TRUST_PROXY_HEADERS=true` on the API is safe here because only Caddy can reach it, and Caddy
