@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Link, useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { warmPlayback } from "@/lib/warm-playback";
 import { watchHref, type Lang, type StreamChoice } from "@/lib/watch-target";
 
 import { useRoomSync, type RoomBinding } from "@/components/room/useRoomSync";
@@ -54,6 +55,8 @@ type Props = {
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const HIDE_CONTROLS_MS = 3000;
 export const NEXT_COUNTDOWN = 10;
+// How long before the end the next episode is resolved, so auto-next starts at once.
+const WARM_NEXT_SECONDS = 180;
 
 export function Player(props: Props) {
   const { source, animeId, episode, title, episodes, lang, startAt, subtitleLang, room } = props;
@@ -73,6 +76,9 @@ export function Player(props: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Every source and sub/dub that has this episode, for the source menu.
   const [streams, setStreams] = useState<StreamChoice[]>([]);
+  // The menu is only asked for once the stream has loaded (or failed, or the menu is opened),
+  // so it never competes with starting the stream.
+  const [askStreams, setAskStreams] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [waiting, setWaiting] = useState(true);
   const [current, setCurrent] = useState(startAt);
@@ -85,10 +91,11 @@ export function Player(props: Props) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const autoNext = useAutoNext();
 
+  const playbackRetry = playback.retry;
   const retry = useCallback(() => {
     started.current = false;
-    playback.retry();
-  }, [playback]);
+    playbackRetry();
+  }, [playbackRetry]);
   const failPlayback = useCallback(() => setError("playback_failed"), [setError]);
   const hls = useHls({ video, url, kind, defaultAudio, onRetry: retry, onFail: failPlayback });
   const subtitles = useSubtitles(tracks, subtitleLang, props.subtitleStyle);
@@ -104,6 +111,11 @@ export function Player(props: Props) {
   const audioNames = hls.audioTracks.map((a) => ({ ...a, label: languageName(a.lang, locale) ?? a.label }));
 
   const next = episodes.find((e) => e > episode);
+  // Near the end, have the API resolve the next episode so pressing next (or auto-next) is quick.
+  const nearEnd = next !== undefined && duration > 0 && current > Math.max(duration - WARM_NEXT_SECONDS, duration / 2);
+  useEffect(() => {
+    if (nearEnd && next !== undefined) warmPlayback(source, animeId, next, lang);
+  }, [nearEnd, source, animeId, next, lang]);
   const backHref = `/anime/${animeId}`;
   const { save, onTime } = useProgressSaver(video, animeId, episode);
   const sync = useRoomSync(
@@ -118,17 +130,24 @@ export function Player(props: Props) {
     room,
   );
 
+  const wantStreams = askStreams || settingsOpen || error !== null;
+  const streamsAsked = useRef(false);
   useEffect(() => {
+    if (!wantStreams || streamsAsked.current) return;
     let cancelled = false;
     api
       .GET("/watch/options/{anime_id}/{episode}", { params: { path: { anime_id: animeId, episode } } })
-      .then(({ data }) => !cancelled && data && setStreams(data))
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        streamsAsked.current = true;
+        setStreams(data);
+      })
       // Without the list the menu just has nothing to switch to.
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [animeId, episode]);
+  }, [animeId, episode, wantStreams]);
 
   // Whole seconds, so the small corrections players make to the length don't ask again.
   const length = url && Number.isFinite(duration) && duration > 0 ? Math.round(duration) : 0;
@@ -201,6 +220,7 @@ export function Player(props: Props) {
     const v = video.current;
     if (!v) return;
     setDuration(v.duration);
+    setAskStreams(true);
     sync.onLoadedMetadata();
     if (!started.current) {
       started.current = true;

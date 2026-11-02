@@ -65,6 +65,9 @@ describe("usePlayback", () => {
     await waitFor(() => expect(result.current.url).not.toBeNull());
     expect(post).toHaveBeenCalledTimes(2);
     expect(result.current.attempt).toBe(1);
+    expect(post).toHaveBeenLastCalledWith("/watch/{source}/{anime_id}/episodes/{episode}/play", {
+      params: { path: { source: "zoko", anime_id: 1, episode: 3 }, query: { lang: "sub", fresh: true } },
+    });
   });
 });
 

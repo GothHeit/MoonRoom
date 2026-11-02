@@ -836,7 +836,8 @@ export interface paths {
         /**
          * Options
          * @description Every source and sub/dub that lists this episode, in fallback order, for the player's
-         *     source menu. A source that is slow or failing is left out.
+         *     source menu. A source that is slow or failing is left out. Kept for a few minutes per
+         *     episode, so reopening the menu or the player doesn't ask every source again.
          */
         get: operations["options_watch_options__anime_id___episode__get"];
         put?: never;
@@ -1146,6 +1147,28 @@ export interface paths {
         put?: never;
         /** Play */
         post: operations["play_watch__source___anime_id__episodes__episode__play_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/watch/{source}/{anime_id}/episodes/{episode}/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare
+         * @description Resolves an episode in the background so pressing play on it later hits warm caches:
+         *     the title page asks for the episode its Play button opens, the player for the next one.
+         *     Answers at once; nothing is returned and failures are only logged.
+         */
+        post: operations["prepare_watch__source___anime_id__episodes__episode__prepare_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4186,6 +4209,8 @@ export interface operations {
         parameters: {
             query?: {
                 lang?: "sub" | "dub";
+                /** @description Check the stream again instead of trusting a recent check */
+                fresh?: boolean;
             };
             header?: never;
             path: {
@@ -4204,6 +4229,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlaybackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_watch__source___anime_id__episodes__episode__prepare_post: {
+        parameters: {
+            query?: {
+                lang?: "sub" | "dub";
+            };
+            header?: never;
+            path: {
+                source: string;
+                anime_id: number;
+                episode: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Warming started, or not needed */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

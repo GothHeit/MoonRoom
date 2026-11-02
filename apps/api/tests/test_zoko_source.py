@@ -65,18 +65,15 @@ async def test_episodes_probe_unknown_length_and_missing_title():
 
 
 @respx.mock
-async def test_stream_is_hls_with_embed_referer_and_best_resolution():
+async def test_stream_is_hls_with_embed_referer_without_fetching_the_master():
     mock_episodes(24)
-    respx.get("https://hls.example/1.m3u8").mock(
-        return_value=httpx.Response(
-            200,
-            text="#EXTM3U\n#EXT-X-STREAM-INF:RESOLUTION=1280x720\na\n#EXT-X-STREAM-INF:RESOLUTION=1920x1080\nb\n",
-        )
-    )
+    # Playback reads the master once, for the check and the quality; resolving doesn't.
+    master = respx.get("https://hls.example/1.m3u8").mock(return_value=httpx.Response(200))
     stream = await ZokoSource().stream(ANIME, 1, "sub")
     assert stream is not None
-    assert (stream.kind, stream.resolution) == ("hls", 1080)
+    assert (stream.kind, stream.resolution) == ("hls", None)
     assert stream.upstream_headers == {"Referer": f"{EMBED}/"}
+    assert not master.called
 
 
 @respx.mock

@@ -27,6 +27,7 @@ from cachetools import TTLCache
 from app.config import get_settings
 
 URI_ATTR = re.compile(r'URI="([^"]*)"')
+RESOLUTION = re.compile(r"RESOLUTION=\d+x(\d+)")
 # Long enough for a film watched with a few pauses; a stale link only needs a retry.
 SEGMENT_LIFETIME = 4 * 3600
 # How long a host's DNS verdict is trusted. Segments come from a handful of hosts.
@@ -211,6 +212,11 @@ def in_library(url: str) -> bool:
 
 def local_media_type(path: Path) -> str:
     return LOCAL_TYPES.get(path.suffix.lower(), "application/octet-stream")
+
+
+def top_resolution(master: str) -> int | None:
+    """Height of the best variant a master playlist lists; None for a media playlist."""
+    return max((int(h) for h in RESOLUTION.findall(master)), default=None)
 
 
 def rewrite_playlist(text: str, base_url: str, referer: str, viewer: str) -> str:

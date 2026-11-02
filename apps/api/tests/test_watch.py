@@ -6,6 +6,7 @@ from app import hls
 from app.main import app as fastapi_app
 from app.mal.client import API_BASE
 from app.routers import watch
+from app.source_hints import SOURCE_FAILURE_TTL, SOURCE_HINT_TTL
 from app.sources.base import EpisodeList, Skip, Stream
 from tests.conftest import make_user
 
@@ -287,6 +288,50 @@ async def test_options_list_each_source_and_lang_with_the_episode(client, sessio
     three = await client.get("/watch/options/21/3", headers=headers)
     assert {"source": "dubs", "lang": "dub"} not in three.json()
     assert (await client.get("/watch/options/21/9", headers=headers)).json() == []
+
+
+class Counting(FakeSource):
+    def __init__(self):
+        self.calls = 0
+
+    async def episodes(self, anime, lang):
+        self.calls += 1
+        return await super().episodes(anime, lang)
+
+
+@respx.mock
+async def test_options_are_kept_per_episode_and_skip_sources_without_the_title(client, session):
+    fake, absent = Counting(), Counting()
+    fastapi_app.state.sources = {"fake": fake, "absent": absent}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    # The title page found that "absent" has no subbed episodes of this title.
+    fastapi_app.state.source_hints[("absent", 21)] = (False, SOURCE_HINT_TTL)
+
+    first = await client.get("/watch/options/21/2", headers=headers)
+    # Its dub is still asked for: the title page never looked at dubs.
+    assert first.json() == [
+        {"source": "fake", "lang": "sub"},
+        {"source": "fake", "lang": "dub"},
+        {"source": "absent", "lang": "dub"},
+    ]
+    assert (fake.calls, absent.calls) == (2, 1)
+    again = await client.get("/watch/options/21/2", headers=headers)
+    assert again.json() == first.json()
+    assert (fake.calls, absent.calls) == (2, 1)
+
+
+@respx.mock
+async def test_options_still_ask_a_source_that_only_failed_on_the_title_page(client, session):
+    fake = Counting()
+    fastapi_app.state.sources = {"fake": fake}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    # A timeout on the title page says nothing about the title.
+    fastapi_app.state.source_hints[("fake", 21)] = (False, SOURCE_FAILURE_TTL)
+
+    r = await client.get("/watch/options/21/2", headers=headers)
+    assert [o["source"] for o in r.json()] == ["fake", "fake"]
 
 
 @respx.mock

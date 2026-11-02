@@ -3,7 +3,6 @@ import logging
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
-from cachetools import TLRUCache
 from fastapi import APIRouter, Query, Request
 
 from app.deps import CurrentUser, Session
@@ -25,6 +24,7 @@ from app.schemas import (
     StreamOption,
     TitleArtOut,
 )
+from app.source_hints import SOURCE_FAILURE_TTL, SOURCE_HINT_TTL, SourceHints
 
 router = APIRouter(prefix="/anime", tags=["anime"])
 log = logging.getLogger(__name__)
@@ -32,8 +32,6 @@ log = logging.getLogger(__name__)
 Season = Literal["winter", "spring", "summer", "fall"]
 
 SOURCE_PROBE_TIMEOUT = 8.0
-SOURCE_HINT_TTL = 900
-SOURCE_FAILURE_TTL = 60
 # Related and recommended nodes carry no rating or genres: with NSFW off, this many of each are
 # checked against their (cached) details before being shown.
 SAFE_CHECK_LIMIT = 12
@@ -42,14 +40,6 @@ SAFE_CHECK_LIMIT = 12
 # next visit, but their entries are left out of this response.
 SAFE_CHECK_CONCURRENCY = 6
 SAFE_CHECK_BUDGET = 4.0
-
-
-# Values are (found, ttl): failures are remembered too, but only briefly.
-type SourceHints = TLRUCache[tuple[str, int], tuple[bool, float]]
-
-
-def new_source_hints() -> SourceHints:
-    return TLRUCache(maxsize=2048, ttu=lambda _key, value, now: now + value[1])
 
 
 def _mal(request: Request) -> MalClient:

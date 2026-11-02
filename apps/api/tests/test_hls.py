@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 import httpx
@@ -7,6 +8,7 @@ import respx
 from app import hls
 from app.main import app as fastapi_app
 from app.mal.client import API_BASE
+from app.probes import StreamProbes
 from app.sources.base import EpisodeList, Stream, Subtitle
 from tests.conftest import make_user
 
@@ -369,6 +371,114 @@ async def test_an_mp4_is_checked_with_head(client, session):
     assert play.json()["source"] == "mp4"
     assert head.calls.last.request.headers["referer"] == "https://r/"
 
+    # Verdicts are kept for a while; a new process (or a later play) asks again.
+    fastapi_app.state.probes = StreamProbes(fastapi_app.state.http)
     head.mock(return_value=httpx.Response(404))
     play = await client.post("/watch/mp4/21/episodes/1/play", headers=headers)
     assert play.json()["source"] == "backup"
+
+
+@respx.mock
+async def test_play_reads_the_master_once_for_check_quality_and_proxy(client, session):
+    fastapi_app.state.sources = {"plain": OtherHls(MASTER)}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    master = respx.get(MASTER).mock(return_value=httpx.Response(200, text=MEDIA))
+
+    play = await client.post("/watch/plain/21/episodes/1/play", headers=headers)
+    # The source didn't say; the master's best variant does.
+    assert play.json()["resolution"] == 1080
+    r = await client.get(play.json()["url"])
+    assert r.status_code == 200
+    assert "hls?u=" in r.text.splitlines()[2]
+    # Playing again soon reuses the same copy too.
+    await client.post("/watch/plain/21/episodes/1/play", headers=headers)
+    assert master.call_count == 1
+    assert master.calls.last.request.headers.get("referer") is None
+
+
+@respx.mock
+async def test_a_master_gone_since_the_check_is_a_clean_error(client, session):
+    fastapi_app.state.sources = {"ok": HlsSource()}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    respx.get(MASTER).mock(return_value=httpx.Response(200, text=MEDIA))
+    url = (await client.post("/watch/ok/21/episodes/1/play", headers=headers)).json()["url"]
+
+    fastapi_app.state.probes = StreamProbes(fastapi_app.state.http)
+    respx.get(MASTER).mock(return_value=httpx.Response(404))
+    r = await client.get(url)
+    assert r.status_code == 502
+    assert r.json()["error"]["code"] == "upstream_failed"
+
+
+async def test_concurrent_checks_share_one_fetch():
+    calls = 0
+
+    def answer(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, text="#EXTM3U\n")
+
+    transport = httpx.MockTransport(answer)
+    async with httpx.AsyncClient(transport=transport) as http:
+        probes = StreamProbes(http)
+        stream = Stream(MASTER, "hls", None, {"Referer": "https://ref.example/"})
+
+        assert await asyncio.gather(*(probes.check(stream) for _ in range(5))) == [True] * 5
+    assert calls == 1
+
+
+class CountingHls(OtherHls):
+    def __init__(self, url):
+        super().__init__(url)
+        self.calls = 0
+
+    async def stream(self, anime, episode, lang):
+        self.calls += 1
+        return await super().stream(anime, episode, lang)
+
+
+@respx.mock
+async def test_prepare_warms_the_stream_in_the_background(client, session):
+    source = CountingHls(MASTER)
+    fastapi_app.state.sources = {"plain": source}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    master = respx.get(MASTER).mock(return_value=httpx.Response(200, text=MEDIA))
+
+    r = await client.post("/watch/plain/21/episodes/2/prepare", headers=headers)
+    assert r.status_code == 202
+
+    await asyncio.gather(*fastapi_app.state.watch.tasks)
+    assert (source.calls, master.call_count) == (1, 1)
+    # Play then finds the master already checked.
+    play = await client.post("/watch/plain/21/episodes/2/play", headers=headers)
+    assert play.status_code == 200
+    assert master.call_count == 1
+
+    assert (
+        await client.post("/watch/nope/21/episodes/2/prepare", headers=headers)
+    ).status_code == 404
+    assert (await client.post("/watch/plain/21/episodes/2/prepare")).status_code == 401
+
+
+@respx.mock
+async def test_a_retry_checks_the_master_again(client, session):
+    backup = "https://backup.example/master.m3u8"
+    fastapi_app.state.sources = {"ok": HlsSource(), "backup": OtherHls(backup)}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    master = respx.get(MASTER).mock(return_value=httpx.Response(200, text=MEDIA))
+    respx.get(backup).mock(return_value=httpx.Response(200, text="#EXTM3U\n"))
+    assert (await client.post("/watch/ok/21/episodes/1/play", headers=headers)).json()[
+        "source"
+    ] == "ok"
+
+    # The file went away; a plain play still trusts the recent check, a retry asks again.
+    master.mock(return_value=httpx.Response(404))
+    retry = await client.post(
+        "/watch/ok/21/episodes/1/play", params={"fresh": True}, headers=headers
+    )
+    assert master.call_count == 2
+    assert retry.json()["source"] == "backup"

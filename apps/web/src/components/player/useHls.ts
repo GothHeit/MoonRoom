@@ -12,6 +12,25 @@ export function pickAudio(tracks: { id: number; name: string; lang?: string }[],
   return match ? match.id : (tracks[0]?.id ?? -1);
 }
 
+/**
+ * Buffering for streams that come through our proxy from far-away hosts: the first segment is
+ * asked for while the manifest is still being parsed, a minute is kept ahead so a pause or a
+ * short stall never empties the buffer, and only half a minute is kept behind, to spare memory
+ * on phones.
+ */
+export const HLS_CONFIG = {
+  startFragPrefetch: true,
+  maxBufferLength: 60,
+  maxMaxBufferLength: 120,
+  backBufferLength: 30,
+} as const;
+
+/**
+ * Whether this device already failed to decode an HEVC original. Kept for the whole visit, so
+ * every later episode starts on the H.264 copy instead of failing and retrying again.
+ */
+export const hevcSupport = { failed: false };
+
 type Options = {
   video: RefObject<HTMLVideoElement | null>;
   url: string | null;
@@ -30,7 +49,6 @@ type Options = {
 export function useHls({ video, url, kind, defaultAudio, onRetry, onFail }: Options) {
   const hlsRef = useRef<import("hls.js").default | null>(null);
   const hevcUsed = useRef(false);
-  const hevcFailed = useRef(false);
   const [qualities, setQualities] = useState<Quality[]>([]);
   const [quality, setQuality] = useState(-1);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
@@ -45,11 +63,11 @@ export function useHls({ video, url, kind, defaultAudio, onRetry, onFail }: Opti
       if (cancelled) return;
       if (Hls.isSupported()) {
         let recovered = false;
-        hls = new Hls();
+        hls = new Hls(HLS_CONFIG);
         hlsRef.current = hls;
         hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
           // Play the original HEVC when this device decodes it; if it then fails, retry with H.264.
-          if (!hevcFailed.current) {
+          if (!hevcSupport.failed) {
             const drop = levelsToDrop(data.levels);
             hevcUsed.current = drop.length > 0;
             for (const i of drop.reverse()) hls?.removeLevel(i);
@@ -65,11 +83,14 @@ export function useHls({ video, url, kind, defaultAudio, onRetry, onFail }: Opti
         });
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (!data.fatal) return;
-          if (hevcUsed.current) {
+          // Only a decoding failure means the HEVC can't play here; a network error is the
+          // host's fault and must not drop everyone to the H.264 copy.
+          const media = data.type === Hls.ErrorTypes.MEDIA_ERROR;
+          if (media && hevcUsed.current) {
             hevcUsed.current = false;
-            hevcFailed.current = true;
+            hevcSupport.failed = true;
             onRetry();
-          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) {
+          } else if (media && !recovered) {
             recovered = true;
             hls?.recoverMediaError();
           } else onFail();
@@ -94,7 +115,8 @@ export function useHls({ video, url, kind, defaultAudio, onRetry, onFail }: Opti
 
   const chooseQuality = useCallback((index: number) => {
     setQuality(index);
-    if (hlsRef.current) hlsRef.current.currentLevel = index;
+    // nextLevel switches at the next segment, keeping what is buffered instead of flushing it.
+    if (hlsRef.current) hlsRef.current.nextLevel = index;
   }, []);
 
   const chooseAudio = useCallback((id: number) => {

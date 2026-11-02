@@ -141,6 +141,13 @@ export async function handleWatch(req, res, { url, send, error, body, authed }) 
     return reply(200, preferences);
   }
 
+  if (/^\/watch\/[^/]+\/\d+\/episodes\/\d+\/prepare$/.test(path)) {
+    if (!authed) return reply(401, error("not_authenticated"));
+    res.writeHead(202);
+    res.end();
+    return true;
+  }
+
   let m = /^\/watch\/options\/(\d+)\/(\d+)$/.exec(path);
   if (m) {
     if (!authed) return reply(401, error("not_authenticated"));

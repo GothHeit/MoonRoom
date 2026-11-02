@@ -6,6 +6,7 @@ import { HERO_SIZES } from "@/components/ui/HeroSplit";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 import { titleArt } from "./titleArt";
+import { WarmPlay } from "./WarmPlay";
 import { watchPlan } from "./watchPlan";
 
 // The three parts of the title header that depend on the sources. They share one cached lookup
@@ -51,14 +52,17 @@ export async function WatchPlay({ id }: { id: number }) {
   const [plan, t] = await Promise.all([watchPlan(id), getTranslations("titlePage")]);
   if (!plan) return null;
   return (
-    <ButtonLink href={plan.href}>
-      <span aria-hidden="true">▶</span>
-      {plan.next.resume
-        ? t("continue", { episode: plan.next.episode })
-        : plan.next.rewatch
-          ? t("rewatch")
-          : t("play", { episode: plan.next.episode })}
-    </ButtonLink>
+    <>
+      <ButtonLink href={plan.href}>
+        <span aria-hidden="true">▶</span>
+        {plan.next.resume
+          ? t("continue", { episode: plan.next.episode })
+          : plan.next.rewatch
+            ? t("rewatch")
+            : t("play", { episode: plan.next.episode })}
+      </ButtonLink>
+      <WarmPlay source={plan.source} animeId={id} episode={plan.next.episode} lang={plan.lang} />
+    </>
   );
 }
 

@@ -14,11 +14,13 @@ class FakeHls {
   levels: { height: number; videoCodec?: string }[] = [];
   removed: number[] = [];
   audioTrack = -1;
-  currentLevel = -1;
+  nextLevel = -1;
+  config: unknown;
   destroyed = false;
   recovered = 0;
   loaded: string | null = null;
-  constructor() {
+  constructor(config?: unknown) {
+    this.config = config;
     instances.push(this);
   }
   on(event: string, handler: Handler) {
@@ -45,7 +47,7 @@ class FakeHls {
 
 vi.mock("hls.js", () => ({ default: FakeHls }));
 
-const { useHls } = await import("./useHls");
+const { useHls, hevcSupport, HLS_CONFIG } = await import("./useHls");
 
 const LEVELS = [
   { height: 1080, videoCodec: "hvc1.2.4.L120" },
@@ -73,6 +75,7 @@ async function started() {
 beforeEach(() => {
   instances.length = 0;
   supported = true;
+  hevcSupport.failed = false;
 });
 
 describe("useHls", () => {
@@ -80,6 +83,7 @@ describe("useHls", () => {
     const { result } = setup();
     const hls = await started();
     expect(hls.loaded).toBe("/api/proxy/stream.m3u8");
+    expect(hls.config).toBe(HLS_CONFIG);
     hls.levels = [...LEVELS];
     act(() => hls.emit("manifest", { levels: hls.levels }));
     // Every H.264 level is dropped while the device can play the HEVC original.
@@ -107,6 +111,29 @@ describe("useHls", () => {
     second.levels = [...LEVELS];
     act(() => second.emit("manifest", { levels: second.levels }));
     expect(second.removed).toEqual([]);
+  });
+
+  it("keeps the HEVC on a network error, and skips it for the rest of the visit once it fails", async () => {
+    const { onRetry, onFail } = setup();
+    const hls = await started();
+    hls.levels = [...LEVELS];
+    act(() => hls.emit("manifest", { levels: hls.levels }));
+    act(() => hls.emit("error", { fatal: true, type: "networkError" }));
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(onFail).toHaveBeenCalledTimes(1);
+    expect(hevcSupport.failed).toBe(false);
+
+    act(() => hls.emit("error", { fatal: true, type: "mediaError" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    // A later episode, in a new player, goes straight to H.264.
+    setup();
+    const next = await waitFor(() => {
+      expect(instances).toHaveLength(2);
+      return instances[1];
+    });
+    next.levels = [...LEVELS];
+    act(() => next.emit("manifest", { levels: next.levels }));
+    expect(next.removed).toEqual([]);
   });
 
   it("recovers a media error once, then reports the failure", async () => {
@@ -149,7 +176,7 @@ describe("useHls", () => {
     const hls = await started();
     act(() => result.current.chooseQuality(2));
     act(() => result.current.chooseAudio(3));
-    expect(hls.currentLevel).toBe(2);
+    expect(hls.nextLevel).toBe(2);
     expect(hls.audioTrack).toBe(3);
     expect(result.current.quality).toBe(2);
   });

@@ -5095,7 +5095,7 @@
     },
     "/watch/options/{anime_id}/{episode}": {
       "get": {
-        "description": "Every source and sub/dub that lists this episode, in fallback order, for the player's\nsource menu. A source that is slow or failing is left out.",
+        "description": "Every source and sub/dub that lists this episode, in fallback order, for the player's\nsource menu. A source that is slow or failing is left out. Kept for a few minutes per\nepisode, so reopening the menu or the player doesn't ask every source again.",
         "operationId": "options_watch_options__anime_id___episode__get",
         "parameters": [
           {
@@ -6056,6 +6056,18 @@
               "title": "Lang",
               "type": "string"
             }
+          },
+          {
+            "description": "Check the stream again instead of trusting a recent check",
+            "in": "query",
+            "name": "fresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Check the stream again instead of trusting a recent check",
+              "title": "Fresh",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -6086,6 +6098,86 @@
           }
         ],
         "summary": "Play",
+        "tags": [
+          "watch"
+        ]
+      }
+    },
+    "/watch/{source}/{anime_id}/episodes/{episode}/prepare": {
+      "post": {
+        "description": "Resolves an episode in the background so pressing play on it later hits warm caches:\nthe title page asks for the episode its Play button opens, the player for the next one.\nAnswers at once; nothing is returned and failures are only logged.",
+        "operationId": "prepare_watch__source___anime_id__episodes__episode__prepare_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "anime_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Anime Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Episode",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "default": "sub",
+              "enum": [
+                "sub",
+                "dub"
+              ],
+              "title": "Lang",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Warming started, or not needed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Prepare",
         "tags": [
           "watch"
         ]

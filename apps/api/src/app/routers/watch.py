@@ -3,9 +3,9 @@ import logging
 import uuid
 from collections.abc import Awaitable
 from typing import Annotated, Literal
-from urllib.parse import urljoin
 
 import httpx
+from cachetools import TTLCache
 from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -15,9 +15,13 @@ from app import hls
 from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.models import PlayerPreferences, SourceChoice, User
+from app.probes import Gone, HostError, Master, StreamProbes
 from app.schemas import EpisodesOut, StreamOption
 from app.security import create_playback_token, decode_access_token, decode_playback_token
+from app.singleflight import SingleFlight
+from app.source_hints import lacks_subbed
 from app.sources.base import EpisodeList, Lang, SkipKind, Stream, VideoSource
+from app.upstream import open_upstream, read_playlist
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +40,26 @@ _bearer = HTTPBearer(auto_error=False)
 
 # How long the player's source menu waits on each source before leaving it out.
 OPTION_PROBE_TIMEOUT = 8.0
+# How long a source menu is reused for the same episode. Sources gain episodes when they air,
+# not from one minute to the next.
+OPTIONS_TTL = 600
 LANGS: tuple[Lang, ...] = ("sub", "dub")
-# How long playback waits on a host to say whether a stream still exists.
-PROBE_TIMEOUT = 6.0
-# Answers that mean the file is gone, not that the host is having a bad moment.
-GONE = (404, 410)
+# Streams resolved ahead of a play (the title page's next episode, the one after the episode
+# playing) at once. Warming is a bonus: when this many are running, more requests are dropped.
+PREPARE_WIDTH = 4
+
+
+class WatchCaches:
+    """Per-process state of this router: the source menus, and the streams being warmed."""
+
+    def __init__(self) -> None:
+        self.options: TTLCache[tuple[int, int], list[StreamOption]] = TTLCache(
+            maxsize=4096, ttl=OPTIONS_TTL
+        )
+        self.option_flights: SingleFlight[tuple[int, int], list[StreamOption]] = SingleFlight()
+        self.preparing: set[tuple] = set()
+        # The loop only holds tasks weakly: keep them here until they finish.
+        self.tasks: set[asyncio.Task] = set()
 
 
 class SubtitleOut(BaseModel):
@@ -89,7 +108,7 @@ def _source(request: Request, name: str) -> VideoSource:
 
 
 async def _resolve_stream(
-    request: Request, source: str, anime: dict, episode: int, lang: Lang
+    request: Request, source: str, anime: dict, episode: int, lang: Lang, fresh: bool = False
 ) -> tuple[str, Stream] | None:
     """The requested source first, then the other enabled ones, so one broken or missing
     source doesn't stop playback. Returns the name of the source that answered.
@@ -99,10 +118,13 @@ async def _resolve_stream(
     or numbers episodes differently never plays the wrong one.
 
     A stream whose file is gone is passed over too. One whose host couldn't be checked is
-    only used when no other source has a working one."""
+    only used when no other source has a working one.
+
+    `fresh` asks every host again instead of trusting a recent check: the player sets it when
+    retrying after a failure, which a cached master may have caused."""
     requested = _source(request, source)
     names = [source] + [n for n in request.app.state.sources if n != source]
-    http: httpx.AsyncClient = request.app.state.http
+    probes: StreamProbes = request.app.state.probes
     expected: int | None = None
     failed = False
     unchecked: tuple[str, Stream] | None = None
@@ -124,7 +146,9 @@ async def _resolve_stream(
             continue
         if stream is None:
             continue
-        alive = await _stream_alive(http, stream)
+        if fresh:
+            probes.forget(stream.url, stream.upstream_headers.get("Referer", ""))
+        alive = await _stream_alive(probes, stream)
         if alive:
             return name, stream
         if alive is None:
@@ -140,42 +164,9 @@ async def _resolve_stream(
     return None
 
 
-async def _stream_alive(http: httpx.AsyncClient, stream: Stream) -> bool | None:
-    """Whether the stream's file still exists: the first bytes of an HLS master must be a
-    playlist, and an MP4 must answer a HEAD. None when the host couldn't tell (slow or erroring)."""
-    if stream.url.startswith("file:"):
-        return True
-    try:
-        async with asyncio.timeout(PROBE_TIMEOUT):
-            if stream.kind == "mp4":
-                response = await http.head(stream.url, headers=stream.upstream_headers)
-                if response.status_code in GONE:
-                    return False
-                # Some hosts refuse HEAD; only a missing file counts as dead.
-                return True
-            referer = stream.upstream_headers.get("Referer", "")
-            upstream, _ = await _open_upstream(
-                http, stream.url, {"Referer": referer} if referer else {}
-            )
-            try:
-                if upstream.status_code in GONE:
-                    return False
-                if upstream.status_code >= 400:
-                    return None
-                head = b""
-                async for chunk in upstream.aiter_bytes():
-                    head += chunk
-                    if len(head) >= 64:
-                        break
-            finally:
-                await upstream.aclose()
-    except ApiError:
-        # A private address or a redirect loop: the proxy would refuse to play it anyway.
-        return False
-    except (httpx.HTTPError, TimeoutError):
-        return None
-    # An error page served with 200 is not a playlist.
-    return head.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"#EXTM3U")
+async def _stream_alive(probes: StreamProbes, stream: Stream) -> bool | None:
+    """Whether the stream's file still exists; None when the host couldn't tell."""
+    return await probes.check(stream)
 
 
 async def _episode_count(source: VideoSource, anime: dict, lang: Lang) -> int:
@@ -219,25 +210,93 @@ async def episodes(
 @router.get("/options/{anime_id}/{episode}", response_model=list[StreamOption])
 async def options(request: Request, anime_id: int, episode: int, user: CurrentUser):
     """Every source and sub/dub that lists this episode, in fallback order, for the player's
-    source menu. A source that is slow or failing is left out."""
+    source menu. A source that is slow or failing is left out. Kept for a few minutes per
+    episode, so reopening the menu or the player doesn't ask every source again."""
     anime = await request.app.state.mal.visible_details(anime_id, user.show_nsfw)
-    pairs = [(name, lang) for name in request.app.state.sources for lang in LANGS]
+    caches: WatchCaches = request.app.state.watch
+    key = (anime_id, episode)
+    if (found := caches.options.get(key)) is not None:
+        return found
+    return await caches.option_flights.run(key, lambda: _probe_options(request, anime, episode))
+
+
+async def _probe_options(request: Request, anime: dict, episode: int) -> list[StreamOption]:
+    # The title page already found out which sources have no subbed episodes: don't ask those
+    # again for the sub. Their dub is still asked for, and a source that merely failed there is.
+    hints = request.app.state.source_hints
+    pairs = [
+        (name, lang)
+        for name in request.app.state.sources
+        for lang in LANGS
+        if not (lang == "sub" and lacks_subbed(hints, name, anime["id"]))
+    ]
+    failed = False
 
     async def has(name: str, lang: Lang) -> bool:
+        nonlocal failed
         try:
             listed = await asyncio.wait_for(
                 request.app.state.sources[name].episodes(anime, lang), OPTION_PROBE_TIMEOUT
             )
         except Exception:
+            failed = True
             return False
         return listed is not None and episode in listed.episodes
 
     found = await asyncio.gather(*(has(name, lang) for name, lang in pairs))
-    return [
+    menu = [
         StreamOption(source=name, lang=lang)
         for (name, lang), hit in zip(pairs, found, strict=True)
         if hit
     ]
+    # A source that failed may be back in a moment: only a complete answer is kept.
+    if not failed:
+        request.app.state.watch.options[(anime["id"], episode)] = menu
+    return menu
+
+
+@router.post(
+    "/{source}/{anime_id}/episodes/{episode}/prepare",
+    status_code=202,
+    responses={202: {"description": "Warming started, or not needed"}},
+)
+async def prepare(
+    request: Request,
+    source: str,
+    anime_id: Annotated[int, Path(ge=1)],
+    episode: Annotated[int, Path(ge=1)],
+    user: CurrentUser,
+    lang: Lang = "sub",
+):
+    """Resolves an episode in the background so pressing play on it later hits warm caches:
+    the title page asks for the episode its Play button opens, the player for the next one.
+    Answers at once; nothing is returned and failures are only logged."""
+    _source(request, source)
+    caches: WatchCaches = request.app.state.watch
+    key = (source, anime_id, episode, lang)
+    if key in caches.preparing or len(caches.preparing) >= PREPARE_WIDTH:
+        return Response(status_code=202)
+    caches.preparing.add(key)
+    task = asyncio.create_task(_warm(request, key, user.show_nsfw))
+    caches.tasks.add(task)
+
+    def done(finished: asyncio.Task) -> None:
+        caches.tasks.discard(finished)
+        caches.preparing.discard(key)
+
+    task.add_done_callback(done)
+    return Response(status_code=202)
+
+
+async def _warm(request: Request, key: tuple, show_nsfw: bool) -> None:
+    source, anime_id, episode, lang = key
+    try:
+        anime = await request.app.state.mal.visible_details(anime_id, show_nsfw)
+        await _resolve_stream(request, source, anime, episode, lang)
+    except ApiError as exc:
+        logger.info("Warming MAL %s ep %s skipped: %s", anime_id, episode, exc.code)
+    except Exception:
+        logger.exception("Warming MAL %s ep %s failed", anime_id, episode)
 
 
 @router.get("/skips/{anime_id}/{episode}", response_model=list[SkipOut])
@@ -301,9 +360,12 @@ async def play(
     episode: int,
     user: CurrentUser,
     lang: Lang = "sub",
+    fresh: Annotated[
+        bool, Query(description="Check the stream again instead of trusting a recent check")
+    ] = False,
 ):
     anime = await request.app.state.mal.visible_details(anime_id, user.show_nsfw)
-    resolved = await _resolve_stream(request, source, anime, episode, lang)
+    resolved = await _resolve_stream(request, source, anime, episode, lang, fresh)
     if resolved is None:
         raise ApiError(404, "not_available", "This episode isn't available from this source")
     used, stream = resolved
@@ -311,10 +373,15 @@ async def play(
     path = "video" if stream.kind == "mp4" else "hls"
     referer = stream.upstream_headers.get("Referer", "")
     viewer = str(user.id)
+    resolution = stream.resolution
+    if resolution is None and stream.kind == "hls":
+        # The liveness check just read the master; its variants say the best quality.
+        master = request.app.state.probes.peek(stream.url, referer)
+        resolution = hls.top_resolution(master.text) if master else None
     return PlaybackOut(
         source=used,
         kind=stream.kind,
-        resolution=stream.resolution,
+        resolution=resolution,
         url=f"/watch/{path}?token={token}",
         subtitles=[
             SubtitleOut(
@@ -395,49 +462,6 @@ async def video(request: Request, session: Session, token: Annotated[str, Query(
     )
 
 
-PLAYLIST_TIMEOUT = httpx.Timeout(15.0)
-# Segments can be slow to start, but a host that goes quiet must not hold the connection.
-SEGMENT_TIMEOUT = httpx.Timeout(30.0, read=60.0)
-
-
-async def _open_upstream(
-    http: httpx.AsyncClient, url: str, headers: dict[str, str]
-) -> tuple[httpx.Response, str]:
-    """GET a URL from a third-party host. Playlist hosts are untrusted, so every hop
-    (redirects included) must be a public address, never something on our own network."""
-    for _ in range(hls.MAX_REDIRECTS + 1):
-        if not await hls.is_public_target(url):
-            raise ApiError(502, "upstream_failed", "Refused to fetch a non-public address")
-        timeout = PLAYLIST_TIMEOUT if hls.is_playlist(url, "") else SEGMENT_TIMEOUT
-        upstream = await http.send(
-            http.build_request("GET", url, headers=headers, timeout=timeout),
-            stream=True,
-            follow_redirects=False,
-        )
-        location = upstream.headers.get("location")
-        if upstream.status_code not in (301, 302, 303, 307, 308) or not location:
-            return upstream, url
-        await upstream.aclose()
-        url = urljoin(url, location)
-    raise ApiError(502, "upstream_failed", "Too many redirects from the video host")
-
-
-async def _read_playlist(upstream: httpx.Response) -> str:
-    chunks: list[bytes] = []
-    size = 0
-    try:
-        async for chunk in upstream.aiter_bytes():
-            size += len(chunk)
-            if size > hls.MAX_PLAYLIST_BYTES:
-                raise ApiError(502, "upstream_failed", "Playlist from the video host is too large")
-            chunks.append(chunk)
-    except (httpx.HTTPError, TimeoutError) as exc:
-        raise ApiError(502, "upstream_failed", "The video host did not answer") from exc
-    finally:
-        await upstream.aclose()
-    return b"".join(chunks).decode("utf-8", errors="replace")
-
-
 # Library files never change once converted; a link stays valid for hours.
 LOCAL_CACHE = "private, max-age=3600"
 
@@ -505,19 +529,27 @@ async def hls_proxy(
 
     if url.startswith("file:"):
         return await asyncio.to_thread(_serve_local, url, viewer)
+    if u is None:
+        # Usually already fetched when playback checked the stream: no trip to the host.
+        master = await _master(request.app.state.probes, url, referer)
+        return Response(
+            hls.rewrite_playlist(master.text, master.url, referer, viewer),
+            media_type="application/vnd.apple.mpegurl",
+            headers={"cache-control": "no-store"},
+        )
 
     headers = {"Referer": referer} if referer else {}
     if "range" in request.headers:
         headers["Range"] = request.headers["range"]
     http: httpx.AsyncClient = request.app.state.http
-    upstream, url = await _upstream(_open_upstream(http, url, headers))
+    upstream, url = await _upstream(open_upstream(http, url, headers))
     if upstream.status_code >= 400 and upstream.status_code != 416:
         await upstream.aclose()
         raise ApiError(502, "upstream_failed", f"Video host answered {upstream.status_code}")
 
     content_type = upstream.headers.get("content-type", "")
     if k == "" and hls.is_playlist(url, content_type):
-        text = await _read_playlist(upstream)
+        text = await read_playlist(upstream)
         return Response(
             hls.rewrite_playlist(text, str(upstream.url), referer, viewer),
             media_type="application/vnd.apple.mpegurl",
@@ -545,3 +577,12 @@ async def hls_proxy(
     return StreamingResponse(
         body(), status_code=upstream.status_code, media_type=media_type, headers=passthrough
     )
+
+
+async def _master(probes: StreamProbes, url: str, referer: str) -> Master:
+    try:
+        return await _upstream(probes.master(url, referer))
+    except Gone as exc:
+        raise ApiError(502, "upstream_failed", "The video host no longer has this file") from exc
+    except HostError as exc:
+        raise ApiError(502, "upstream_failed", str(exc)) from exc

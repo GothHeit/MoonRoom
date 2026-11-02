@@ -15,6 +15,7 @@ from app.errors import install_error_handlers
 from app.mal.account import MalAccounts
 from app.mal.client import MalClient
 from app.notifications import check_new_episodes
+from app.probes import StreamProbes
 from app.ratelimit import AuthLimits
 from app.rooms import Rooms
 from app.routers import (
@@ -30,6 +31,7 @@ from app.routers import (
     rooms,
     watch,
 )
+from app.source_hints import new_source_hints
 from app.sources import load_sources
 
 log = logging.getLogger(__name__)
@@ -85,7 +87,9 @@ async def lifespan(app: FastAPI):
             app.state.pt_synopses = PtSynopses(http)
         app.state.auth_limits = AuthLimits(settings)
         app.state.rooms = Rooms(settings.max_rooms_per_host)
-        app.state.source_hints = anime.new_source_hints()
+        app.state.source_hints = new_source_hints()
+        app.state.probes = StreamProbes(http)
+        app.state.watch = watch.WatchCaches()
         app.state.sources = load_sources(settings.video_source_names)
         sweeper = asyncio.create_task(_sweep(app.state.auth_limits, app.state.rooms))
         pruner = asyncio.create_task(_prune())
@@ -99,6 +103,8 @@ async def lifespan(app: FastAPI):
         finally:
             sweeper.cancel()
             pruner.cancel()
+            for task in list(app.state.watch.tasks):
+                task.cancel()
             if checker is not None:
                 checker.cancel()
             for source in app.state.sources.values():

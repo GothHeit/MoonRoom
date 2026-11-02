@@ -26,7 +26,6 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 BLOB = re.compile(r'window\.__P="([^"]*)"')
-RESOLUTION = re.compile(r"RESOLUTION=\d+x(\d+)")
 CACHE_TTL = 1800
 # A page that is not there yet may appear soon (a just-aired episode), so misses expire sooner.
 MISS_TTL = 120
@@ -248,7 +247,8 @@ class ZokoSource:
             result = Stream(
                 url=src,
                 kind="hls",
-                resolution=await self._top_resolution(src),
+                # Read from the master when playback checks it, so it is fetched only once.
+                resolution=None,
                 upstream_headers={"Referer": f"{EMBED}/"},
                 subtitles=parse_subtitles(config.get("subtitles")),
                 skips=parse_skips(config.get("skip"), config.get("chapters")),
@@ -259,11 +259,3 @@ class ZokoSource:
         else:
             self._streams[key] = result
         return result
-
-    async def _top_resolution(self, master: str) -> int | None:
-        try:
-            response = await self._client.get(master, headers={"Referer": f"{EMBED}/"})
-            heights = [int(h) for h in RESOLUTION.findall(response.text)]
-        except httpx.HTTPError:
-            return None
-        return max(heights, default=None)
