@@ -24,6 +24,10 @@
       "anizone": {
         "sub": "AniZone · Subtitled, all dubs",
         "dub": "AniZone · Subtitled, all dubs"
+      },
+      "uniquestream": {
+        "sub": "AnimeStream · Subtitled",
+        "dub": "AnimeStream · Dubbed"
       }
     }
   }

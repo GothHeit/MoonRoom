@@ -109,7 +109,9 @@ for them across every enabled source, in this order: playable, their audio (a du
 they chose in Settings, else the original), their subtitles (soft over burned-in), then quality
 (the best, or the best under the limit they set). The order of `VIDEO_SOURCES` only breaks ties,
 so more sources never make the pick worse. `kaa` and `anizone` carry every dub as an audio track
-of the same stream; the player's Audio menu switches between them.
+of the same stream; the player's Audio menu switches between them. `uniquestream` (AnimeStream)
+offers the original audio and a Portuguese dub as separate copies at up to 1080p, but only answers
+connections from a home address, not from a datacenter.
 
 ## Local library
 

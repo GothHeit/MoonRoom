@@ -45,6 +45,10 @@ def load_sources(names: list[str]) -> dict[str, VideoSource]:
             from app.sources.anizone import AniZoneSource
 
             sources[name] = AniZoneSource()
+        elif name == "uniquestream":
+            from app.sources.uniquestream import UniqueStreamSource
+
+            sources[name] = UniqueStreamSource()
         elif name == "local":
             from app.sources.local import LocalSource
 
