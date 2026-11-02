@@ -23,13 +23,21 @@ export default async function WatchAnyPage({ params }: PageProps<"/[locale]/cont
   const found = (
     await api.GET("/anime/{anime_id}/sources", { params: { path: { anime_id: id } } }).catch(() => undefined)
   )?.data;
-  const picked = await pickStream(found, async ({ source, lang }) =>
+  // The API lists the episodes of the stream it picked along with the sources; only ask for
+  // them one by one when that came back empty.
+  const inline =
+    found?.stream && found.listing && found.listing.episodes.length > 0
+      ? { choice: found.stream, listed: found.listing }
+      : null;
+  const picked =
+    inline ??
+    (await pickStream(found, async ({ source, lang }) =>
     (
       await api.GET("/watch/{source}/{anime_id}/episodes", {
         params: { path: { source, anime_id: id }, query: { lang } },
       })
     ).data,
-  );
+  ));
   const episode = picked && pickEpisode(picked.listed.episodes, wanted);
   if (!picked || episode === null) return redirect({ href: `/anime/${id}`, locale });
   const { source, lang } = picked.choice;

@@ -39,6 +39,13 @@ const choices = new Map();
 
 export const choiceFor = (animeId) => choices.get(animeId) ?? null;
 
+// What the real API returns with the sources: the stream it picked and that stream's episodes.
+export function streamFor(animeId) {
+  const stream = choiceFor(animeId) ?? { source: SOURCE, lang: "sub" };
+  const episodes = EPISODES[stream.lang] ?? EPISODES.sub;
+  return { stream, listing: { source: SOURCE, source_title: "Moon Test", episodes, thumbnails: {} } };
+}
+
 function details(id) {
   const watchable = id !== 2;
   return {

@@ -14,14 +14,14 @@ async function stubVideo(page: Page) {
   );
   await page.route(/\/api\/proxy\/watch\/zoko\/\d+\/episodes\/\d+\/play/, (route) =>
     route.fulfill({
-      json: { source: "zoko", kind: "mp4", resolution: null, url: "/watch/media/clip.webm", subtitles: [], skips: [] },
+      json: { source: "zoko", kind: "mp4", resolution: null, url: "/watch/video?token=clip", subtitles: [], skips: [] },
     }),
   );
   await page.route(/\/api\/proxy\/watch\/options\/\d+\/\d+/, (route) =>
     route.fulfill({ json: [{ source: "zoko", lang: "sub" }, { source: "zoko", lang: "dub" }] }),
   );
   await page.route(/\/api\/proxy\/watch\/choice\/\d+/, (route) => route.fulfill({ status: 204 }));
-  await page.route("**/api/proxy/watch/media/clip.webm", (route) => {
+  await page.route("**/api/stream/video?token=clip", (route) => {
     const range = /bytes=(\d+)-(\d*)/.exec(route.request().headers()["range"] ?? "");
     if (!range) return route.fulfill({ body: CLIP, contentType: "video/webm", headers: { "Accept-Ranges": "bytes" } });
     const start = Number(range[1]);
