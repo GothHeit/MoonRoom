@@ -305,20 +305,24 @@ def add_subtitles(
     referer: str,
     viewer: "Viewer | str",
     default: int | None = None,
+    start: int | None = None,
 ) -> str:
     """Lists the (language, label, WebVTT url) subtitles in an already rewritten master playlist,
     so a player that plays the stream natively (AirPlay hands it to the TV, which fetches the
     playlist itself) gets them without any help from our page. A media playlist has nowhere to
     attach them and is returned as is. `default` is the index of the track the viewer picked
-    in the page, which the receiver then shows without anyone reaching for its remote."""
+    in the page, which the receiver then shows without anyone reaching for its remote. `start` is
+    the 90 kHz timestamp the video begins at: subtitle files count from 0, so the receiver needs
+    it to line them up (see `with_timestamp_map`)."""
     lines = master.splitlines()
     if not tracks or not any(line.startswith("#EXT-X-STREAM-INF:") for line in lines):
         return master
+    vtt_suffix = _START_MARK.format(start) if start else ""
     media = [
         '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",'
         f'NAME="{_attr(label) or _attr(lang)}",LANGUAGE="{_attr(lang)}",'
         f"{'DEFAULT=YES,AUTOSELECT=YES' if n == default else 'DEFAULT=NO,AUTOSELECT=NO'},"
-        f'URI="{signed_link(url, referer, viewer, "subpl")}"'
+        f'URI="{signed_link(url + vtt_suffix, referer, viewer, "subpl")}"'
         for n, (lang, label, url) in enumerate(tracks)
     ]
     out: list[str] = []
@@ -337,3 +341,49 @@ def subtitle_playlist(url: str, referer: str, viewer: "Viewer | str") -> str:
         f"#EXT-X-TARGETDURATION:{SUBTITLE_SPAN}\n#EXT-X-PLAYLIST-TYPE:VOD\n"
         f"#EXTINF:{SUBTITLE_SPAN}.0,\n{signed_link(url, referer, viewer, 'sub')}\n#EXT-X-ENDLIST\n"
     )
+
+
+# The video's first timestamp rides on the subtitle link, as a fragment the host never sees.
+_START_MARK = "#pts={}"
+_START = re.compile(r"#pts=(\d{1,15})$")
+
+
+def split_start(url: str) -> tuple[str, int | None]:
+    found = _START.search(url)
+    return (url[: found.start()], int(found.group(1))) if found else (url, None)
+
+
+def with_timestamp_map(vtt: str, start: int) -> str:
+    """HLS players place WebVTT cues by a mapping from the video's own timestamps, which default
+    to 0. Streams here start at 1.4 s (ffmpeg's muxer delay), so without the mapping every cue
+    shows that much early."""
+    text = vtt.lstrip("\ufeff")
+    if "X-TIMESTAMP-MAP" in text.split("\n\n", 1)[0]:
+        return text
+    head, sep, rest = text.partition("\n")
+    if not head.startswith("WEBVTT"):
+        return text
+    return f"{head}\nX-TIMESTAMP-MAP=MPEGTS:{start},LOCAL:00:00:00.000{sep}{rest}"
+
+
+def ts_start(data: bytes) -> int | None:
+    """The earliest presentation timestamp (90 kHz) in the start of an MPEG-TS segment: where the
+    stream's clock begins, whether audio or video comes first."""
+    found: int | None = None
+    for at in range(0, len(data) - 187, 188):
+        pkt = data[at : at + 188]
+        if pkt[0] != 0x47 or not pkt[1] & 0x40:
+            continue
+        offset = 4 + (pkt[4] + 1 if pkt[3] & 0x20 else 0)
+        pes = pkt[offset : offset + 14]
+        if len(pes) < 14 or pes[:3] != b"\x00\x00\x01" or not pes[7] & 0x80:
+            continue
+        pts = (
+            ((pes[9] >> 1) & 7) << 30
+            | pes[10] << 22
+            | (pes[11] >> 1) << 15
+            | pes[12] << 7
+            | pes[13] >> 1
+        )
+        found = pts if found is None else min(found, pts)
+    return found

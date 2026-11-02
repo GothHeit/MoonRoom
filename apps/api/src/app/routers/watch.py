@@ -3,7 +3,7 @@ import logging
 import uuid
 from collections.abc import Awaitable
 from typing import Annotated, Literal
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 from cachetools import TTLCache
@@ -717,6 +717,7 @@ async def hls_proxy(
                 referer,
                 viewer,
                 sub,
+                await _video_start(request, master, referer) if tracks else None,
             ),
             media_type="application/vnd.apple.mpegurl",
             headers={"cache-control": "no-store"},
@@ -737,11 +738,22 @@ async def hls_proxy(
         raise ApiError(502, "upstream_failed", f"Video host answered {upstream.status_code}")
 
     content_type = upstream.headers.get("content-type", "")
+    if k == "sub":
+        url, start = hls.split_start(url)
+    else:
+        start = None
     if k == "sub" and url.split("?")[0].lower().endswith(".ass"):
         # A host that only has styled subtitles: serve the spoken lines as WebVTT for the
         # plain track, next to the styled copy the player draws itself.
+        vtt = ass_to_vtt(await read_playlist(upstream))
         return Response(
-            ass_to_vtt(await read_playlist(upstream)),
+            hls.with_timestamp_map(vtt, start) if start else vtt,
+            media_type="text/vtt",
+            headers={"x-content-type-options": "nosniff"},
+        )
+    if k == "sub" and start:
+        return Response(
+            hls.with_timestamp_map(await read_playlist(upstream), start),
             media_type="text/vtt",
             headers={"x-content-type-options": "nosniff"},
         )
@@ -774,6 +786,38 @@ async def hls_proxy(
     return StreamingResponse(
         body(), status_code=upstream.status_code, media_type=media_type, headers=passthrough
     )
+
+
+_STARTS: TTLCache[str, int | None] = TTLCache(maxsize=256, ttl=3600)
+
+
+async def _video_start(request: Request, master: Master, referer: str) -> int | None:
+    """Where the stream's own clock starts (90 kHz), read from its first segment, so subtitles
+    can be placed against it. Best effort: without it they are served as they are."""
+    if master.url in _STARTS:
+        return _STARTS[master.url]
+    start = None
+    try:
+        http: httpx.AsyncClient = request.app.state.http
+        headers = {"Referer": referer} if referer else {}
+        entries = [x.strip() for x in master.text.splitlines() if x.strip()]
+        media_url = master.url
+        if any(x.startswith("#EXT-X-STREAM-INF") for x in entries):
+            media_url = urljoin(master.url, next(x for x in entries if not x.startswith("#")))
+            if not hls.looks_public(media_url):
+                return None
+            media = (await http.get(media_url, headers=headers)).text
+        else:
+            media = master.text
+        first = next(x.strip() for x in media.splitlines() if x.strip() and not x.startswith("#"))
+        seg = urljoin(media_url, first)
+        if hls.looks_public(seg):
+            got = await http.get(seg, headers={**headers, "Range": "bytes=0-65535"})
+            start = hls.ts_start(got.content[:65536]) if got.status_code < 300 else None
+    except (httpx.HTTPError, StopIteration, TimeoutError):
+        start = None
+    _STARTS[master.url] = start
+    return start
 
 
 async def _master(probes: StreamProbes, url: str, referer: str) -> Master:

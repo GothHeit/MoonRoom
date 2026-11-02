@@ -88,6 +88,13 @@ async def test_native_players_get_subtitles_in_the_playlist_and_a_fresh_link(cli
         return_value=httpx.Response(200, text="WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHi\n")
     )
 
+    respx.get("https://host.example/p/1080/index.m3u8").mock(
+        return_value=httpx.Response(200, text="#EXTM3U\n#EXTINF:5,\nseg0.ts\n")
+    )
+    respx.get("https://host.example/p/1080/seg0.ts").mock(
+        return_value=httpx.Response(206, content=_pes(0xE0, 126_000))
+    )
+
     play = (await client.post("/watch/ok/21/episodes/1/play", headers=headers)).json()
     plain = await client.get(play["url"])
     assert "SUBTITLES" not in plain.text  # hls.js draws its own
@@ -109,6 +116,7 @@ async def test_native_players_get_subtitles_in_the_playlist_and_a_fresh_link(cli
     vtt_link = next(x for x in wrapper.text.splitlines() if x.startswith("hls?u="))
     vtt = await client.get(f"/watch/{vtt_link}")
     assert vtt.headers["content-type"].startswith("text/vtt") and "Hi" in vtt.text
+    assert "X-TIMESTAMP-MAP=MPEGTS:126000,LOCAL:00:00:00.000" in vtt.text
     assert viewer_of(headers).sid in uri
 
 
@@ -132,3 +140,31 @@ async def test_minting_and_starting_links_are_rate_limited(client, session, monk
     assert (await client.post(url, headers=headers)).status_code == 200
     assert (await client.post(url, headers=headers)).status_code == 200
     assert (await client.post(url, headers=headers)).status_code == 429
+
+
+def _pes(stream_id: int, pts: int) -> bytes:
+    stamp = bytes(
+        [0x21 | ((pts >> 30) & 7) << 1, (pts >> 22) & 255, 1 | ((pts >> 15) & 127) << 1]
+        + [(pts >> 7) & 255, 1 | (pts & 127) << 1]
+    )
+    body = b"\x00\x00\x01" + bytes([stream_id]) + b"\x00\x00\x80\x80\x05" + stamp
+    return b"\x47\x40\x00\x10" + body.ljust(184, b"\xff")
+
+
+def test_the_first_video_timestamp_lines_subtitles_up_with_the_stream():
+    data = _pes(0xC0, 90_000) + _pes(0xE0, 126_000)
+    assert hls.ts_start(data) == 90_000
+    assert hls.ts_start(b"junk") is None
+    out = hls.with_timestamp_map("WEBVTT\n\n00:01.000 --> 00:02.000\nHi\n", 126_000)
+    assert out.startswith("WEBVTT\nX-TIMESTAMP-MAP=MPEGTS:126000,LOCAL:00:00:00.000\n\n00:01")
+    assert hls.with_timestamp_map(out, 5) == out
+    link = hls.add_subtitles(
+        hls.rewrite_playlist(MEDIA, MASTER, "", hls.Viewer("u")),
+        [("en", "E", "https://s/e.vtt")],
+        "",
+        hls.Viewer("u"),
+        None,
+        126_000,
+    )
+    assert "%23pts%3D126000" in link
+    assert hls.split_start("https://s/e.vtt#pts=126000") == ("https://s/e.vtt", 126000)
