@@ -300,20 +300,26 @@ def _attr(value: str) -> str:
 
 
 def add_subtitles(
-    master: str, tracks: list[tuple[str, str, str]], referer: str, viewer: "Viewer | str"
+    master: str,
+    tracks: list[tuple[str, str, str]],
+    referer: str,
+    viewer: "Viewer | str",
+    default: int | None = None,
 ) -> str:
     """Lists the (language, label, WebVTT url) subtitles in an already rewritten master playlist,
     so a player that plays the stream natively (AirPlay hands it to the TV, which fetches the
     playlist itself) gets them without any help from our page. A media playlist has nowhere to
-    attach them and is returned as is."""
+    attach them and is returned as is. `default` is the index of the track the viewer picked
+    in the page, which the receiver then shows without anyone reaching for its remote."""
     lines = master.splitlines()
     if not tracks or not any(line.startswith("#EXT-X-STREAM-INF:") for line in lines):
         return master
     media = [
         '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",'
-        f'NAME="{_attr(label) or _attr(lang)}",LANGUAGE="{_attr(lang)}",DEFAULT=NO,AUTOSELECT=NO,'
+        f'NAME="{_attr(label) or _attr(lang)}",LANGUAGE="{_attr(lang)}",'
+        f"{'DEFAULT=YES,AUTOSELECT=YES' if n == default else 'DEFAULT=NO,AUTOSELECT=NO'},"
         f'URI="{signed_link(url, referer, viewer, "subpl")}"'
-        for lang, label, url in tracks
+        for n, (lang, label, url) in enumerate(tracks)
     ]
     out: list[str] = []
     for line in lines:

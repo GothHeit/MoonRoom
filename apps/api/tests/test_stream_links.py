@@ -68,6 +68,12 @@ def test_subtitles_join_the_master_playlist_only_when_there_is_something_to_atta
     assert any(line.endswith(',SUBTITLES="subs"') for line in lines)
     # A media playlist has no variants to hang them on.
     plain = "#EXTM3U\n#EXTINF:5,\nhls?u=x\n"
+    assert "DEFAULT=NO,AUTOSELECT=NO" in lines[1]
+    two = hls.add_subtitles(
+        master, [("en", "E", "https://s/e.vtt"), ("pt", "P", "https://s/p.vtt")], "", viewer, 1
+    )
+    media = [x for x in two.splitlines() if x.startswith("#EXT-X-MEDIA")]
+    assert "DEFAULT=NO" in media[0] and "DEFAULT=YES,AUTOSELECT=YES" in media[1]
     assert hls.add_subtitles(plain, [("pt", "P", "https://s/x.vtt")], "", viewer) == plain
     assert hls.add_subtitles(master, [], "", viewer) == master
 

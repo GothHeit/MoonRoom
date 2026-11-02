@@ -660,6 +660,7 @@ async def hls_proxy(
     session: Session,
     token: Annotated[str | None, Query()] = None,
     subs: Annotated[bool, Query()] = False,
+    sub: Annotated[int | None, Query(ge=0, le=64)] = None,
     u: Annotated[str | None, Query()] = None,
     r: Annotated[str, Query()] = "",
     k: Annotated[str, Query()] = "",
@@ -669,7 +670,8 @@ async def hls_proxy(
     s: Annotated[str, Query()] = "",
 ):
     """Without `u`, the master playlist of the episode the token is for (with `subs`, listing
-    its subtitles in the playlist, for players that fetch it themselves). With `u`, one
+    its subtitles in the playlist, `sub` being the one to show, for players that fetch it
+    themselves). With `u`, one
     playlist, segment, subtitle or image that an earlier response linked to. Neither needs a
     login header: the token or the link names the user and the session, and is checked against
     both."""
@@ -714,6 +716,7 @@ async def hls_proxy(
                 tracks,
                 referer,
                 viewer,
+                sub,
             ),
             media_type="application/vnd.apple.mpegurl",
             headers={"cache-control": "no-store"},

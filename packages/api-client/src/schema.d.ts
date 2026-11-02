@@ -922,7 +922,8 @@ export interface paths {
         /**
          * Hls Proxy
          * @description Without `u`, the master playlist of the episode the token is for (with `subs`, listing
-         *     its subtitles in the playlist, for players that fetch it themselves). With `u`, one
+         *     its subtitles in the playlist, `sub` being the one to show, for players that fetch it
+         *     themselves). With `u`, one
          *     playlist, segment, subtitle or image that an earlier response linked to. Neither needs a
          *     login header: the token or the link names the user and the session, and is checked against
          *     both.
@@ -4028,6 +4029,7 @@ export interface operations {
             query?: {
                 token?: string | null;
                 subs?: boolean;
+                sub?: number | null;
                 u?: string | null;
                 r?: string;
                 k?: string;

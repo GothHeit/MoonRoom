@@ -99,11 +99,11 @@ export function Player(props: Props) {
     playbackRetry();
   }, [playbackRetry]);
   const failPlayback = useCallback(() => setError("playback_failed"), [setError]);
-  // A link a receiver can fetch on its own, kept ready only where AirPlay exists.
-  const castUrl = useCastLink(url !== null, answered, animeId, episode, answeredLang, kind);
-  const hls = useHls({ video, url, kind, defaultAudio, maxHeight, castUrl, onRetry: retry, onFail: failPlayback });
   const subtitles = useSubtitles(tracks, subtitleLang, props.subtitleStyle);
   const { selected, styled, style } = subtitles;
+  // A link a receiver can fetch on its own, kept ready only where AirPlay exists.
+  const castUrl = useCastLink(url !== null, answered, animeId, episode, answeredLang, kind, selected);
+  const hls = useHls({ video, url, kind, defaultAudio, maxHeight, castUrl, onRetry: retry, onFail: failPlayback });
   const controls = useVideoControls(video, stage, !!url);
   const { fullscreen, togglePlay, toggleFullscreen, toggleMute, seekBy, changeVolume } = controls;
 

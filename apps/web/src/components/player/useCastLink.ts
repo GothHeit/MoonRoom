@@ -23,7 +23,7 @@ export function airPlaySupported() {
  * ready (and renewed) while the player is open, but only where AirPlay exists at all. Asking costs
  * the API nothing: it signs a link and looks nothing up until the receiver opens it.
  */
-export function useCastLink(enabled: boolean, source: string, animeId: number, episode: number, lang: Lang, kind: string) {
+export function useCastLink(enabled: boolean, source: string, animeId: number, episode: number, lang: Lang, kind: string, subtitle: number | null = null) {
   const [link, setLink] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function useCastLink(enabled: boolean, source: string, animeId: number, e
         })
         .then(({ data }) => {
           if (cancelled || !data) return;
-          setLink(nativeLink(data.url, kind));
+          setLink(nativeLink(data.url, kind, subtitle));
         })
         .catch(() => undefined);
     void renew();
@@ -46,7 +46,7 @@ export function useCastLink(enabled: boolean, source: string, animeId: number, e
       clearInterval(timer);
       setLink(null);
     };
-  }, [enabled, source, animeId, episode, lang, kind]);
+  }, [enabled, source, animeId, episode, lang, kind, subtitle]);
 
   return link;
 }
@@ -56,8 +56,12 @@ export function useCastLink(enabled: boolean, source: string, animeId: number, e
  * resolve it against, and for HLS asking the API to list the subtitles in the playlist, since
  * the receiver cannot see the ones our page draws.
  */
-export function nativeLink(link: string, kind: string) {
+export function nativeLink(link: string, kind: string, subtitle: number | null = null) {
   const url = new URL(streamHref(link), window.location.href);
-  if (kind !== "mp4") url.searchParams.set("subs", "true");
+  if (kind !== "mp4") {
+    url.searchParams.set("subs", "true");
+    // The track picked in the page starts selected on the receiver.
+    if (subtitle !== null && subtitle >= 0) url.searchParams.set("sub", String(subtitle));
+  }
   return url.href;
 }

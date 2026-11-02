@@ -5617,7 +5617,7 @@
     },
     "/watch/hls": {
       "get": {
-        "description": "Without `u`, the master playlist of the episode the token is for (with `subs`, listing\nits subtitles in the playlist, for players that fetch it themselves). With `u`, one\nplaylist, segment, subtitle or image that an earlier response linked to. Neither needs a\nlogin header: the token or the link names the user and the session, and is checked against\nboth.",
+        "description": "Without `u`, the master playlist of the episode the token is for (with `subs`, listing\nits subtitles in the playlist, `sub` being the one to show, for players that fetch it\nthemselves). With `u`, one\nplaylist, segment, subtitle or image that an earlier response linked to. Neither needs a\nlogin header: the token or the link names the user and the session, and is checked against\nboth.",
         "operationId": "hls_proxy_watch_hls_get",
         "parameters": [
           {
@@ -5644,6 +5644,24 @@
               "default": false,
               "title": "Subs",
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sub",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 64,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sub"
             }
           },
           {
