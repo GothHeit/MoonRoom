@@ -9,7 +9,7 @@ import { isCompleted, SAVE_INTERVAL_MS, saveProgress } from "./progress";
  * player goes away. The player also calls `save` on pause and at the end, and `onTime` on every
  * time update so crossing 90 % marks the episode watched right away.
  */
-export function useProgressSaver(video: RefObject<HTMLVideoElement | null>, animeId: number, episode: number) {
+export function useProgressSaver(video: RefObject<HTMLVideoElement | null>, animeId: number, episode: number, onFinished?: () => void) {
   const lastSaved = useRef<number | null>(null);
   const completedSent = useRef(false);
 
@@ -24,6 +24,7 @@ export function useProgressSaver(video: RefObject<HTMLVideoElement | null>, anim
       if (!newlyCompleted && lastSaved.current !== null && Math.abs(position - lastSaved.current) < 1) return;
       lastSaved.current = position;
       if (completed) completedSent.current = true;
+      if (newlyCompleted) onFinished?.();
       void saveProgress(
         animeId,
         episode,
@@ -31,7 +32,7 @@ export function useProgressSaver(video: RefObject<HTMLVideoElement | null>, anim
         keepalive,
       );
     },
-    [animeId, episode],
+    [animeId, episode, onFinished],
   );
 
   const onTime = useCallback(

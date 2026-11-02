@@ -15,6 +15,7 @@ import { useRoomSync, type RoomBinding } from "@/components/room/useRoomSync";
 
 import { useAutoNext } from "./autoNext";
 import { ControlBar, iconButton } from "./ControlBar";
+import { DroppedPrompt } from "./DroppedPrompt";
 import { EndCard } from "./EndCard";
 import { ErrorPanel, errorKey } from "./ErrorPanel";
 import { PlayerIcon } from "./icons";
@@ -29,6 +30,7 @@ import { useCastLink } from "./useCastLink";
 import { useHls } from "./useHls";
 import { usePlayback } from "./usePlayback";
 import { usePlayerKeys } from "./usePlayerKeys";
+import { useDroppedPrompt } from "./useDroppedPrompt";
 import { useProgressSaver } from "./useProgressSaver";
 import { useSkips } from "./useSkips";
 import { useSubtitles } from "./useSubtitles";
@@ -136,7 +138,8 @@ export function Player(props: Props) {
     if (nearEnd && next !== undefined) warmPlayback(source, animeId, next, lang);
   }, [nearEnd, source, animeId, next, lang]);
   const backHref = `/anime/${animeId}`;
-  const { save, onTime } = useProgressSaver(video, animeId, episode);
+  const dropped = useDroppedPrompt(animeId);
+  const { save, onTime } = useProgressSaver(video, animeId, episode, dropped.check);
   const sync = useRoomSync(
     {
       read: () => (video.current && video.current.readyState >= 1 ? video.current : null),
@@ -455,6 +458,8 @@ export function Player(props: Props) {
           {t(skip.kind === "intro" ? "skipIntro" : skip.kind === "recap" ? "skipRecap" : "skipOutro")}
         </button>
       )}
+
+      {dropped.asking && !error && <DroppedPrompt onAccept={dropped.accept} onDismiss={dropped.dismiss} />}
 
       {ended && !error && (
         <EndCard

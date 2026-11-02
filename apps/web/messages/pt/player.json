@@ -1,5 +1,8 @@
 {
   "player": {
+    "droppedAsk": "Você abandonou este título. Voltar para Assistindo no MyAnimeList?",
+    "droppedMove": "Voltar para Assistindo",
+    "droppedKeep": "Manter como Abandonado",
     "region": "Player de vídeo",
     "back": "Voltar ao título",
     "episode": "Episódio {episode}",

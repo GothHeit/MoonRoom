@@ -1,5 +1,8 @@
 {
   "player": {
+    "droppedAsk": "You dropped this title. Move it back to Watching on MyAnimeList?",
+    "droppedMove": "Move to Watching",
+    "droppedKeep": "Keep Dropped",
     "region": "Video player",
     "back": "Back to the title",
     "episode": "Episode {episode}",
