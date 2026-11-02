@@ -36,7 +36,7 @@ export function ControlBar(props: Props) {
   // space so nothing moves, but show it only once the length is known.
   const known = Number.isFinite(duration) && duration > 0;
   return (
-    <div className="pointer-events-auto bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-10 sm:px-8">
+    <div className="pointer-events-auto bg-gradient-to-t from-black/80 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 sm:px-8">
       <div
         aria-hidden={!known}
         className={`flex items-center gap-3 text-xs tabular-nums text-muted ${known ? "" : "invisible"}`}

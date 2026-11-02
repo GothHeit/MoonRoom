@@ -341,7 +341,7 @@ export function Player(props: Props) {
       )}
 
       <div
-        className={`pointer-events-none absolute inset-0 flex flex-col justify-between pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`}
+        className={`pointer-events-none absolute inset-0 flex flex-col justify-between pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`}
       >
         <div className="pointer-events-auto flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent px-4 pb-10 pt-4 sm:px-8">
           <Link href={backHref} aria-label={t("back")} className={iconButton}>
