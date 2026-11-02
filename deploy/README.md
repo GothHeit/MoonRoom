@@ -29,6 +29,7 @@ cp .env.example .env     # fill every empty value; the file explains how to gene
 docker compose up -d --build
 docker compose exec api python -m app.cli invite    # invite code for the first account
 docker compose exec api python -m app.cli promote <username>   # after registering, to become admin
+docker compose exec api python -m app.cli reset-2fa <username>   # turn off two-factor login for someone locked out
 ```
 
 Open `PUBLIC_URL`. Check the stack with `docker compose ps` (all `healthy`) and

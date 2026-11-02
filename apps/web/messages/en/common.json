@@ -53,7 +53,12 @@
     "already_in_room": "They are already in the room.",
     "too_many_invites": "This room has too many invites.",
     "not_in_room": "Join the room first.",
-    "invite_not_friends": "You can only invite friends."
+    "invite_not_friends": "You can only invite friends.",
+    "invalid_code": "That code is wrong or already used.",
+    "invalid_mfa_token": "That sign-in timed out. Start again.",
+    "two_factor_enabled": "Two-factor login is already on.",
+    "two_factor_disabled": "Two-factor login is off.",
+    "two_factor_not_started": "Start the setup first."
   },
   "row": {
     "previous": "Scroll left",

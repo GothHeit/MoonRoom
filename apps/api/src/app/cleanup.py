@@ -5,7 +5,7 @@ from datetime import timedelta
 from sqlalchemy import delete, or_
 
 from app.db import new_session, utcnow
-from app.models import MalOAuthState, RefreshToken
+from app.models import MalOAuthState, RefreshToken, TrustedDevice
 
 # Rotated tokens are kept this long so a replayed (stolen) one is still recognised as such.
 TOKEN_RETENTION = timedelta(days=7)
@@ -24,6 +24,7 @@ async def prune() -> tuple[int, int]:
                 )
             )
         )
+        await session.execute(delete(TrustedDevice).where(TrustedDevice.expires_at < now))
         states = await session.execute(
             delete(MalOAuthState).where(MalOAuthState.created_at < now - STATE_RETENTION)
         )

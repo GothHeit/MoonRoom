@@ -114,6 +114,34 @@
       "zoom": "Zoom",
       "cropHint": "Arraste a foto para posicioná-la. Tudo dentro da moldura é mantido.",
       "cropFailed": "Não foi possível ler essa imagem. Tente outra."
+    },
+    "twoFactor": {
+      "title": "Login em dois fatores",
+      "intro": "Some um código de um app autenticador à sua senha, para que uma senha roubada sozinha não entre na sua conta.",
+      "on": "Ativo",
+      "codesLeft": "{count, plural, one {# código de backup restante} other {# códigos de backup restantes}}",
+      "setUp": "Configurar",
+      "passwordIntro": "Digite sua senha para começar.",
+      "password": "Senha",
+      "continue": "Continuar",
+      "cancel": "Cancelar",
+      "scanIntro": "Escaneie este código com um app autenticador (Google Authenticator, 1Password, Aegis…) e digite o código de 6 dígitos que ele mostrar.",
+      "qrLabel": "QR code para o seu app autenticador",
+      "manualKey": "Não consegue escanear? Digite esta chave à mão:",
+      "enterCode": "Código de 6 dígitos",
+      "turnOn": "Ativar",
+      "codesLabel": "Códigos de backup",
+      "codesIntro": "Guarde estes códigos de backup em um lugar seguro. Cada um vale uma vez, se você perder o celular. Eles não serão mostrados de novo.",
+      "copy": "Copiar códigos",
+      "copied": "Códigos copiados.",
+      "copyFailed": "Não deu para copiar. Selecione os códigos e copie à mão.",
+      "saved": "Já guardei",
+      "newCodes": "Novos códigos de backup",
+      "newCodesIntro": "Isso substitui todos os seus códigos de backup. Digite sua senha e um código atual.",
+      "disable": "Desativar",
+      "disableIntro": "Digite sua senha e um código atual (ou um código de backup) para desativar.",
+      "codeOrBackup": "Código ou código de backup",
+      "disabled": "Login em dois fatores desativado."
     }
   }
 }

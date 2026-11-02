@@ -3,6 +3,10 @@ import type { Tokens } from "@app/api-client";
 export const ACCESS_COOKIE = "mr_access";
 export const REFRESH_COOKIE = "mr_refresh";
 
+/** Marks this browser as trusted for two-factor login; it outlives sign-out on purpose. */
+export const TRUSTED_COOKIE = "mr_trusted";
+const TRUSTED_MAX_AGE = 60 * 60 * 24 * 30;
+
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
 
 type CookieOptions = {
@@ -31,6 +35,10 @@ export function sessionCookies(tokens: Tokens): CookieSpec[] {
     { name: ACCESS_COOKIE, value: tokens.access_token, options: base(Math.max(tokens.expires_in - 30, 1)) },
     { name: REFRESH_COOKIE, value: tokens.refresh_token, options: base(REFRESH_MAX_AGE) },
   ];
+}
+
+export function trustedCookie(token: string): CookieSpec {
+  return { name: TRUSTED_COOKIE, value: token, options: base(TRUSTED_MAX_AGE) };
 }
 
 export function clearedCookies(): CookieSpec[] {

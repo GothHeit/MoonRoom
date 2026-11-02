@@ -39,7 +39,7 @@ pnpm install
 pnpm dev:web                      # http://localhost:3000
 ```
 
-After registering: `uv run python -m app.cli promote <username>` makes you an admin.
+After registering: `uv run python -m app.cli promote <username>` makes you an admin. `uv run python -m app.cli reset-2fa <username>` turns off two-factor login for someone locked out.
 
 Tests: `cd apps/api && uv run pytest`, `pnpm lint && pnpm typecheck`, `pnpm --filter web build`.
 

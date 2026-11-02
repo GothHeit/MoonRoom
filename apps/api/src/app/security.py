@@ -72,6 +72,19 @@ def decode_access_token(token: str) -> tuple[uuid.UUID, uuid.UUID] | None:
     return uuid.UUID(claims["sub"]), uuid.UUID(claims["sid"])
 
 
+MFA_TOKEN_MINUTES = 5
+
+
+def create_mfa_token(user_id: uuid.UUID) -> str:
+    """Proves the password step of a login is done. Only /auth/login/2fa accepts it."""
+    return _encode({"sub": str(user_id), "typ": "mfa"}, timedelta(minutes=MFA_TOKEN_MINUTES))
+
+
+def decode_mfa_token(token: str) -> uuid.UUID | None:
+    claims = _decode(token, "mfa")
+    return uuid.UUID(claims["sub"]) if claims else None
+
+
 def create_playback_token(
     user_id: uuid.UUID, session_id: uuid.UUID, source: str, anime_id: int, episode: int, lang: str
 ) -> str:

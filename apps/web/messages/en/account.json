@@ -114,6 +114,34 @@
       "zoom": "Zoom",
       "cropHint": "Drag the picture to position it. Everything inside the frame is kept.",
       "cropFailed": "Couldn't read that image. Try another one."
+    },
+    "twoFactor": {
+      "title": "Two-factor login",
+      "intro": "Add a code from an authenticator app to your password, so a stolen password alone can't get into your account.",
+      "on": "On",
+      "codesLeft": "{count, plural, one {# backup code left} other {# backup codes left}}",
+      "setUp": "Set up",
+      "passwordIntro": "Enter your password to start.",
+      "password": "Password",
+      "continue": "Continue",
+      "cancel": "Cancel",
+      "scanIntro": "Scan this code with an authenticator app (Google Authenticator, 1Password, Aegis…), then type the 6-digit code it shows.",
+      "qrLabel": "QR code for your authenticator app",
+      "manualKey": "Can't scan? Enter this key by hand:",
+      "enterCode": "6-digit code",
+      "turnOn": "Turn on",
+      "codesLabel": "Backup codes",
+      "codesIntro": "Save these backup codes somewhere safe. Each works once if you lose your phone. They won't be shown again.",
+      "copy": "Copy codes",
+      "copied": "Codes copied.",
+      "copyFailed": "Couldn't copy. Select the codes and copy them by hand.",
+      "saved": "I saved them",
+      "newCodes": "New backup codes",
+      "newCodesIntro": "This replaces all your backup codes. Enter your password and a current code.",
+      "disable": "Turn off",
+      "disableIntro": "Enter your password and a current code (or a backup code) to turn this off.",
+      "codeOrBackup": "Code or backup code",
+      "disabled": "Two-factor login is off."
     }
   }
 }

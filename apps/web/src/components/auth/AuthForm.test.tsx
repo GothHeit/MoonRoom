@@ -46,4 +46,23 @@ describe("LoginForm", () => {
     setup();
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't reach the server.");
   });
+
+  it("asks for the code after the password, then signs in", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ mfa_required: true, mfa_token: "challenge" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    setup();
+    fireEvent.change(await screen.findByLabelText("Code"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByLabelText("Trust this device for 30 days"));
+    fireEvent.click(screen.getByRole("button", { name: "Verify" }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/auth/login/2fa");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      code: "123456",
+      trust_device: "on",
+      mfa_token: "challenge",
+    });
+  });
 });

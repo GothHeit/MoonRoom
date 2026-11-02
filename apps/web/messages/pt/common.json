@@ -53,7 +53,12 @@
     "already_in_room": "A pessoa já está na sala.",
     "too_many_invites": "Esta sala tem convites demais.",
     "not_in_room": "Entre na sala primeiro.",
-    "invite_not_friends": "Você só pode convidar amigos."
+    "invite_not_friends": "Você só pode convidar amigos.",
+    "invalid_code": "Esse código está errado ou já foi usado.",
+    "invalid_mfa_token": "Essa entrada expirou. Comece de novo.",
+    "two_factor_enabled": "O login em dois fatores já está ativo.",
+    "two_factor_disabled": "O login em dois fatores está desativado.",
+    "two_factor_not_started": "Comece pela configuração."
   },
   "row": {
     "previous": "Rolar para a esquerda",

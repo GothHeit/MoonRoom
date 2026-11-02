@@ -62,4 +62,24 @@ describe("tokenRoute (login proxy)", () => {
     expect(init.headers).toMatchObject({ "user-agent": "UA" });
     expect(init.headers).not.toHaveProperty("cookie");
   });
+
+  it("hands the browser a challenge, not cookies, when a code is needed", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ mfa_required: true, mfa_token: "m" })));
+    const res = await tokenRoute("/auth/login", login());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ mfa_required: true, mfa_token: "m" });
+    expect(res.headers.getSetCookie()).toHaveLength(0);
+  });
+
+  it("remembers a trusted browser and sends its cookie with the next password step", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ...tokens, trusted_device: "td" })));
+    const res = await tokenRoute("/auth/login/2fa", login());
+    expect(res.headers.getSetCookie().join("\n")).toContain("mr_trusted=td");
+
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json(tokens));
+    vi.stubGlobal("fetch", fetchMock);
+    await tokenRoute("/auth/login", login({ headers: { cookie: "a=b; mr_trusted=td" } }));
+    const sent = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(sent.trusted_device).toBe("td");
+  });
 });

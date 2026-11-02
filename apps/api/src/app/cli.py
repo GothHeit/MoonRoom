@@ -1,4 +1,4 @@
-"""Admin commands: python -m app.cli invite | promote <username>"""
+"""Admin commands: python -m app.cli invite | promote <username> | reset-2fa <username>"""
 
 import argparse
 import asyncio
@@ -29,6 +29,18 @@ async def _promote(username: str) -> None:
         print(f"{user.username} is now an admin")
 
 
+async def _reset_two_factor(username: str) -> None:
+    from app import two_factor
+
+    async for session in db.get_session():
+        user = await session.scalar(select(User).where(User.username == username.lower()))
+        if user is None:
+            raise SystemExit(f"No user named {username}")
+        await two_factor.turn_off(session, user)
+        await session.commit()
+        print(f"Two-factor login is now off for {user.username}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="app.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -36,6 +48,8 @@ def main() -> None:
     invite.add_argument("--days", type=int, default=7)
     promote = commands.add_parser("promote", help="make a user an admin")
     promote.add_argument("username")
+    reset = commands.add_parser("reset-2fa", help="turn off two-factor login for a locked-out user")
+    reset.add_argument("username")
     args = parser.parse_args()
 
     async def run() -> None:
@@ -43,6 +57,8 @@ def main() -> None:
         try:
             if args.command == "invite":
                 await _invite(args.days)
+            elif args.command == "reset-2fa":
+                await _reset_two_factor(args.username)
             else:
                 await _promote(args.username)
         finally:

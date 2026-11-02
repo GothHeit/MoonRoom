@@ -90,6 +90,7 @@ createServer(async (req, res) => {
   if (url.pathname === "/health") return send(200, { status: "ok" });
   if (url.pathname === "/notifications") return send(200, { items: [], unread: 0 });
   if (url.pathname === "/notifications/settings") return send(200, { muted: [] });
+  if (url.pathname === "/me/2fa") return send(200, { enabled: false, backup_codes_left: 0 });
   if (url.pathname === "/__stats") return send(200, { refreshCalls });
 
   if (url.pathname === "/auth/login") {

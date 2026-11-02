@@ -8,6 +8,7 @@ import { MalSection } from "@/components/account/MalSection";
 import { PasswordForm } from "@/components/account/PasswordForm";
 import { PreferencesForm } from "@/components/account/PreferencesForm";
 import { SessionsPanel } from "@/components/account/SessionsPanel";
+import { TwoFactorPanel } from "@/components/account/TwoFactorPanel";
 import { ButtonLink } from "@/components/ui/Button";
 import { serverApi, unwrap } from "@/lib/server-api";
 import { titled } from "@/lib/page-title";
@@ -49,11 +50,12 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
   const { mal } = await searchParams;
 
   const api = await serverApi();
-  const [me, malStatus, sessions, notifications] = await Promise.all([
+  const [me, malStatus, sessions, notifications, twoFactor] = await Promise.all([
     unwrap(api.GET("/me"), locale),
     unwrap(api.GET("/me/mal"), locale),
     unwrap(api.GET("/me/sessions"), locale),
     unwrap(api.GET("/notifications/settings"), locale),
+    unwrap(api.GET("/me/2fa"), locale),
   ]);
 
   return (
@@ -110,6 +112,10 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
       <Group id="security" title={t("settings.groups.security")}>
         <Section title={t("password.title")}>
           <PasswordForm />
+        </Section>
+
+        <Section title={t("twoFactor.title")}>
+          <TwoFactorPanel status={twoFactor} />
         </Section>
 
         <Section title={t("sessions.title")}>

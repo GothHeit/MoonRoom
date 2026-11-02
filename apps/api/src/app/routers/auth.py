@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
+from app import two_factor
 from app.avatars import AvatarOut, avatar_out
 from app.config import get_settings
 from app.db import utcnow
@@ -17,6 +18,8 @@ from app.models import Invite, MalLink, RefreshToken, User
 from app.security import (
     DUMMY_PASSWORD_HASH,
     create_access_token,
+    create_mfa_token,
+    decode_mfa_token,
     hash_password_async,
     new_opaque_token,
     sha256,
@@ -43,6 +46,22 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     username: str = Field(min_length=1, max_length=32)
     password: str = Field(min_length=1, max_length=128)
+    # The token a browser got when it was trusted; it skips the second step.
+    trusted_device: str | None = Field(default=None, max_length=128)
+
+
+class MfaLoginIn(BaseModel):
+    mfa_token: str = Field(max_length=2048)
+    # A 6-digit authenticator code or a backup code (xxxxx-xxxxx).
+    code: str = Field(min_length=1, max_length=32)
+    trust_device: bool = False
+
+
+class MfaChallengeOut(BaseModel):
+    """The password was right but the account has two-factor login: send the code next."""
+
+    mfa_required: Literal[True] = True
+    mfa_token: str
 
 
 class RefreshIn(BaseModel):
@@ -54,6 +73,11 @@ class TokensOut(BaseModel):
     refresh_token: str
     token_type: Literal["bearer"] = "bearer"
     expires_in: int
+
+
+class MfaTokensOut(TokensOut):
+    # Set when the user asked to trust this browser. The web app keeps it in a cookie.
+    trusted_device: str | None = None
 
 
 class MeOut(BaseModel):
@@ -170,7 +194,7 @@ async def register(body: RegisterIn, session: Session, request: Request, ip: Cli
     return await _issue_tokens(session, user, _device(request, ip))
 
 
-@router.post("/auth/login", response_model=TokensOut)
+@router.post("/auth/login", response_model=TokensOut | MfaChallengeOut)
 async def login(body: LoginIn, session: Session, request: Request, ip: ClientIp):
     limits = request.app.state.auth_limits
     username = body.username.lower()
@@ -190,8 +214,42 @@ async def login(body: LoginIn, session: Session, request: Request, ip: ClientIp)
         raise ApiError(401, "invalid_credentials", "Wrong username or password")
     limits.login_ip.forgive(ip)
     limits.login_user.reset(attempt)
+    if two_factor.is_enabled(user) and not await two_factor.is_trusted(
+        session, user, body.trusted_device
+    ):
+        audit.info("login password ok, second step needed user=%s ip=%s", user.id, ip)
+        return MfaChallengeOut(mfa_token=create_mfa_token(user.id))
     audit.info("login user=%s ip=%s", user.id, ip)
     return await _issue_tokens(session, user, _device(request, ip))
+
+
+@router.post("/auth/login/2fa", response_model=MfaTokensOut)
+async def login_second_step(body: MfaLoginIn, session: Session, request: Request, ip: ClientIp):
+    limits = request.app.state.auth_limits
+    user_id = decode_mfa_token(body.mfa_token)
+    if user_id is None:
+        raise ApiError(401, "invalid_mfa_token", "Sign in again")
+    key = str(user_id)
+    limits.mfa_ip.check(ip)
+    limits.mfa_user.check(key)
+    limits.mfa_ip.record(ip)
+    limits.mfa_user.record(key)
+    # Locked so two requests can't spend the same code.
+    user = await session.scalar(select(User).where(User.id == user_id).with_for_update())
+    if user is None or not two_factor.is_enabled(user):
+        raise ApiError(401, "invalid_mfa_token", "Sign in again")
+    kind = await two_factor.check_code(session, user, body.code)
+    if kind is None:
+        await session.rollback()
+        audit.info("second step failed user=%s ip=%s", user_id, ip)
+        raise ApiError(401, "invalid_code", "That code is wrong or already used")
+    limits.mfa_ip.forgive(ip)
+    limits.mfa_user.reset(key)
+    trusted = await two_factor.trust_device(session, user) if body.trust_device else None
+    # Committed with the tokens below.
+    audit.info("login user=%s ip=%s second_step=%s trusted=%s", user.id, ip, kind, bool(trusted))
+    tokens = await _issue_tokens(session, user, _device(request, ip))
+    return MfaTokensOut(**tokens.model_dump(), trusted_device=trusted)
 
 
 @router.post("/auth/refresh", response_model=TokensOut)
@@ -365,6 +423,138 @@ async def change_password(
     user.password_hash = await hash_password_async(body.new_password)
     # Every other device must sign in again; this one keeps its session.
     await session.execute(_revoke(user, keep=current))
+    await two_factor.forget_devices(session, user.id)
     await session.commit()
     session_check(request).closed_for_user(user.id, keep=current)
     audit.info("password changed user=%s", user.id)
+
+
+class TwoFactorOut(BaseModel):
+    enabled: bool
+    backup_codes_left: int
+
+
+class TwoFactorSetupIn(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class TwoFactorSetupOut(BaseModel):
+    secret: str
+    otpauth_uri: str
+
+
+class TwoFactorEnableIn(BaseModel):
+    code: str = Field(min_length=1, max_length=32)
+
+
+class TwoFactorConfirmIn(BaseModel):
+    """Changing two-factor settings needs the password and a current code."""
+
+    password: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=1, max_length=32)
+
+
+class BackupCodesOut(BaseModel):
+    backup_codes: list[str]
+
+
+async def _check_password(user: User, password: str, request: Request) -> None:
+    limiter = request.app.state.auth_limits.password_user
+    key = str(user.id)
+    limiter.check(key)
+    limiter.record(key)
+    if not await verify_password_async(password, user.password_hash):
+        audit.info("two-factor change refused, wrong password user=%s", user.id)
+        raise ApiError(403, "wrong_password", "Password is wrong")
+    limiter.reset(key)
+
+
+async def _check_second_step(user: User, code: str, session: Session, request: Request) -> str:
+    limiter = request.app.state.auth_limits.mfa_user
+    key = str(user.id)
+    limiter.check(key)
+    limiter.record(key)
+    user_id = user.id
+    kind = await two_factor.check_code(session, user, code)
+    if kind is None:
+        await session.rollback()
+        audit.info("two-factor change refused, wrong code user=%s", user_id)
+        raise ApiError(403, "invalid_code", "That code is wrong or already used")
+    limiter.reset(key)
+    return kind
+
+
+@router.get("/me/2fa", response_model=TwoFactorOut)
+async def two_factor_status(user: CurrentUser, session: Session):
+    enabled = two_factor.is_enabled(user)
+    left = await two_factor.backup_codes_left(session, user) if enabled else 0
+    return TwoFactorOut(enabled=enabled, backup_codes_left=left)
+
+
+@router.post("/me/2fa/setup", response_model=TwoFactorSetupOut)
+async def two_factor_setup(
+    body: TwoFactorSetupIn, user: CurrentUser, session: Session, request: Request
+):
+    """Starts enrolment with a fresh secret. Nothing changes for logins until /enable."""
+    if two_factor.is_enabled(user):
+        raise ApiError(409, "two_factor_enabled", "Two-factor login is already on")
+    await _check_password(user, body.password, request)
+    user.totp_secret = two_factor.new_secret()
+    user.totp_last_step = None
+    await session.commit()
+    return TwoFactorSetupOut(
+        secret=user.totp_secret,
+        otpauth_uri=two_factor.provisioning_uri(user.totp_secret, user.username),
+    )
+
+
+@router.post("/me/2fa/enable", response_model=BackupCodesOut)
+async def two_factor_enable(
+    body: TwoFactorEnableIn, user: CurrentUser, session: Session, request: Request
+):
+    if two_factor.is_enabled(user):
+        raise ApiError(409, "two_factor_enabled", "Two-factor login is already on")
+    if user.totp_secret is None:
+        raise ApiError(409, "two_factor_not_started", "Start the setup first")
+    limiter = request.app.state.auth_limits.mfa_user
+    key = str(user.id)
+    limiter.check(key)
+    limiter.record(key)
+    step = two_factor.matching_step(user.totp_secret, body.code, None)
+    if step is None:
+        raise ApiError(400, "invalid_code", "That code is wrong, check your authenticator app")
+    limiter.reset(key)
+    user.totp_last_step = step
+    user.two_factor_at = utcnow()
+    codes = await two_factor.replace_backup_codes(session, user)
+    await session.commit()
+    audit.info("two-factor turned on user=%s", user.id)
+    return BackupCodesOut(backup_codes=codes)
+
+
+@router.post("/me/2fa/disable", status_code=204)
+async def two_factor_disable(
+    body: TwoFactorConfirmIn, user: CurrentUser, session: Session, request: Request
+):
+    if not two_factor.is_enabled(user):
+        raise ApiError(409, "two_factor_disabled", "Two-factor login is off")
+    await _check_password(user, body.password, request)
+    await _check_second_step(user, body.code, session, request)
+    await two_factor.turn_off(session, user)
+    await session.commit()
+    audit.info("two-factor turned off user=%s", user.id)
+
+
+@router.post("/me/2fa/backup-codes", response_model=BackupCodesOut)
+async def two_factor_new_backup_codes(
+    body: TwoFactorConfirmIn, user: CurrentUser, session: Session, request: Request
+):
+    """Replaces all backup codes, used or not."""
+    if not two_factor.is_enabled(user):
+        raise ApiError(409, "two_factor_disabled", "Two-factor login is off")
+    await _check_password(user, body.password, request)
+    await _check_second_step(user, body.code, session, request)
+    codes = await two_factor.replace_backup_codes(session, user)
+    await session.commit()
+    audit.info("backup codes replaced user=%s", user.id)
+    return BackupCodesOut(backup_codes=codes)

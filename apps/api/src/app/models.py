@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Float, ForeignKey, Index, String, column, func
+from sqlalchemy import BigInteger, Float, ForeignKey, Index, String, column, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.crypto import EncryptedString
@@ -30,6 +30,12 @@ class User(TimestampMixin, Base):
     avatar_version: Mapped[int] = mapped_column(default=0, server_default="0")
     # False hides what the user is watching from their friends' view of their profile and feed.
     share_activity: Mapped[bool] = mapped_column(default=True, server_default="true")
+    # Two-factor login. The secret is stored (encrypted) from the moment enrolment starts;
+    # two_factor_at is set once the user proved the app works, and that is what turns it on.
+    totp_secret: Mapped[str | None] = mapped_column(EncryptedString, default=None)
+    two_factor_at: Mapped[datetime | None] = mapped_column(default=None)
+    # The last accepted 30 s step, so a code can't be used twice.
+    totp_last_step: Mapped[int | None] = mapped_column(BigInteger, default=None)
 
 
 class Invite(TimestampMixin, Base):
@@ -212,3 +218,30 @@ class SourceChoice(Base):
     source: Mapped[str] = mapped_column(String(40))
     lang: Mapped[str] = mapped_column(String(3))
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+
+class BackupCode(TimestampMixin, Base):
+    """A one-time code that replaces an authenticator code. Only a hash is stored."""
+
+    __tablename__ = "backup_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    code_hash: Mapped[str] = mapped_column(String(64))
+    used_at: Mapped[datetime | None]
+
+
+class TrustedDevice(TimestampMixin, Base):
+    """A browser that skips the second step until `expires_at`. Only a hash of its token is
+    stored, like refresh tokens."""
+
+    __tablename__ = "trusted_devices"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime]
