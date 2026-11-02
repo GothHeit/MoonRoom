@@ -270,15 +270,23 @@ async def _first_listing(
     request: Request, manga: dict, lang: str | None
 ) -> tuple[str, ChapterList] | None:
     """The chapters from the first enabled source that has the title (fallback, in order)."""
+    # A source that knows the title but has no readable chapters (licensed ones are pulled from
+    # MangaDex, for one) must not stop the next source from being tried; it is only the answer
+    # when nobody has chapters.
+    empty: tuple[str, ChapterList] | None = None
     for name, source in _sources(request).items():
         try:
             listed = await asyncio.wait_for(source.chapters(manga, lang), SOURCE_TIMEOUT)
         except Exception as exc:  # a broken source is skipped, the next one is tried
             log.warning("manga: source %s failed for %s: %s", name, manga.get("id"), exc)
             continue
-        if listed is not None and (listed.chapters or listed.languages):
+        if listed is None:
+            continue
+        if listed.chapters:
             return name, listed
-    return None
+        if empty is None and listed.languages:
+            empty = (name, listed)
+    return empty
 
 
 def _wanted_lang(user_locale: str, lang: str | None, available: list[str]) -> str | None:

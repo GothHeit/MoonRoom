@@ -48,7 +48,7 @@ services:
       MAL_REDIRECT_URI: ${PUBLIC_URL}/mal/callback
       REDIS_URL: redis://redis:6379/0
       VIDEO_SOURCES: ${VIDEO_SOURCES:-}
-      MANGA_SOURCES: ${MANGA_SOURCES:-mangadex}
+      MANGA_SOURCES: ${MANGA_SOURCES:-mangadex,mangapill,mangalivre}
       MANGA_CACHE_DIR: /data/manga-pages
       MANGA_CACHE_MAX_MB: ${MANGA_CACHE_MAX_MB:-20480}
       PT_SYNOPSIS_SCRAPE: ${PT_SYNOPSIS_SCRAPE:-false}

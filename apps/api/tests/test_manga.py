@@ -138,6 +138,32 @@ async def test_chapters_come_from_the_first_source_that_has_the_title(client, se
     assert (await client.get("/manga/2/chapters", headers=headers)).status_code == 404
 
 
+class EmptySource:
+    """Knows the title but has no readable chapters, as MangaDex does for a licensed one."""
+
+    name = "empty"
+
+    async def chapters(self, detail, lang):
+        return ChapterList("e", "Book", ["en"], [])
+
+    async def pages(self, detail, chapter_id):
+        return None
+
+
+@respx.mock
+async def test_a_source_without_chapters_does_not_stop_the_next_one(client, session):
+    fastapi_app.state.manga_sources = {"empty": EmptySource(), "fake": FakeSource()}
+    user, headers = await make_user(session, "kafka")
+    mock_details(1)
+    body = (await client.get("/manga/1/chapters", params={"lang": "en"}, headers=headers)).json()
+    assert body["source"] == "fake" and len(body["chapters"]) == 2
+
+    # When nobody has chapters, the empty answer still tells the user which languages exist.
+    fastapi_app.state.manga_sources = {"empty": EmptySource()}
+    body = (await client.get("/manga/1/chapters", headers=headers)).json()
+    assert body["source"] == "empty" and body["chapters"] == []
+
+
 @respx.mock
 async def test_pages_are_signed_for_the_reader_and_served_through_the_cache(
     client, session, tmp_path
