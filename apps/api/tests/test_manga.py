@@ -409,6 +409,30 @@ async def test_every_source_is_asked_and_the_language_menu_is_their_union(client
     assert body["source"] == "en_site" and body["sources"] == ["en_site"]
 
 
+class ClaimsEnglish(OneLanguage):
+    """Like MangaDex for a licensed title: lists English but has chapters only in pt-br."""
+
+    async def chapters(self, detail, lang):
+        return ChapterList(
+            self.name, "Book", ["pt-br", "en"], [Chapter("c1", "85", None, None, "pt-br")]
+        )
+
+
+@respx.mock
+async def test_a_source_that_only_claims_a_language_does_not_hide_the_one_that_has_it(
+    client, session
+):
+    fastapi_app.state.manga_sources = {
+        "hollow": ClaimsEnglish("hollow", "pt-br"),
+        "en_site": OneLanguage("en_site", "en"),
+    }
+    _, headers = await make_user(session, "kafka")
+    mock_details(1)
+    body = (await client.get("/manga/1/chapters", params={"lang": "en"}, headers=headers)).json()
+    assert body["lang"] == "en" and body["source"] == "en_site"
+    assert body["chapters"][0]["id"] == "en_site1"
+
+
 @respx.mock
 async def test_the_default_manga_language_beats_the_site_language(client, session):
     fastapi_app.state.manga_sources = {

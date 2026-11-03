@@ -450,13 +450,18 @@ async def chapters(
         languages = _ordered_languages(set(by_lang))
         picked = _wanted_lang(user, lang, languages)
         carriers = by_lang[picked] if picked else []
-        name = source if source in carriers else carriers[0]
-        listed = readable[name]
-        if listed.chapters[0].lang != picked:
-            # A source with several languages answered in its own best one: ask for ours.
-            relisted = await _ask(request, name, manga, picked)
-            if relisted is not None and relisted.chapters:
-                listed = relisted
+        # The one asked for first, then the others in the configured order: a source can list
+        # a language without having readable chapters in it (only the publisher's own links).
+        order = [c for c in carriers if c == source] + [c for c in carriers if c != source]
+        name, listed = order[0], readable[order[0]]
+        for candidate in order:
+            got: ChapterList | None = readable[candidate]
+            if got is not None and got.chapters[0].lang != picked:
+                # A source with several languages answered in its own best one: ask for ours.
+                got = await _ask(request, candidate, manga, picked)
+            if got is not None and got.chapters and got.chapters[0].lang == picked:
+                name, listed = candidate, got
+                break
     rows = await session.scalars(
         select(MangaProgress).where(
             MangaProgress.user_id == user.id, MangaProgress.manga_id == manga_id
