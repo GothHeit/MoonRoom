@@ -9,6 +9,13 @@
   }
 }
 
+/* Phone held sideways: little height, so the chrome shrinks and the phone tab bar stays. */
+@custom-variant short {
+  @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+    @slot;
+  }
+}
+
 @theme {
   --color-bg: #150d26;
   --color-surface: #1f1536;

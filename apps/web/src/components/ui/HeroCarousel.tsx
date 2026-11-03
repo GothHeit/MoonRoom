@@ -83,7 +83,7 @@ export function HeroCarousel({ slides, cta }: { slides: HeroSlide[]; cta: string
     <section
       aria-roledescription="carousel"
       aria-label={t("featured")}
-      className="relative grid bg-bg pt-16 sm:pt-20"
+      className="relative grid bg-bg pt-16 sm:pt-20 short:pt-12"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}

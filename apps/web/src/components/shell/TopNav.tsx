@@ -35,12 +35,12 @@ export function TopNav({ userId, username, avatar, isAdmin, pending = 0 }: { use
       data-scrolled={scrolled}
       className={`fixed inset-x-0 top-0 z-40 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] border-b bg-bg transition-colors ${scrolled ? "border-line" : "border-transparent"}`}
     >
-      <nav aria-label={t("main")} className="flex h-16 items-center gap-3 px-4 sm:h-20 sm:gap-6 sm:px-8 lg:gap-8">
+      <nav aria-label={t("main")} className="flex h-16 items-center gap-3 px-4 sm:h-20 sm:gap-6 sm:px-8 lg:gap-8 short:h-12">
         <Link href={mode === "manga" ? "/manga" : "/"} aria-label={APP_NAME} className="shrink-0">
           <Logo />
         </Link>
         <ModeSwitch mode={mode} />
-        <ul className="hidden items-center gap-6 md:flex">
+        <ul className="hidden items-center gap-6 md:flex short:hidden">
           {navItemsFor(mode).map(({ href, key }) => {
             const active = isActive(pathname, href);
             return (
@@ -57,14 +57,14 @@ export function TopNav({ userId, username, avatar, isAdmin, pending = 0 }: { use
           })}
         </ul>
         <div className="ml-auto flex items-center gap-3">
-          <div className="hidden md:block">
+          <div className="hidden md:block short:hidden">
             <SearchBox mode={mode} />
           </div>
           <NotificationBell />
-          <div className="hidden md:block">
+          <div className="hidden md:block short:hidden">
             <LocaleSwitcher />
           </div>
-          <div className="hidden md:block">
+          <div className="hidden md:block short:hidden">
             <UserMenu userId={userId} username={username} avatar={avatar} isAdmin={isAdmin} pending={pending} />
           </div>
         </div>

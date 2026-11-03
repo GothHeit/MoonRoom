@@ -61,7 +61,7 @@ export function UserMenu({ userId, username, avatar, isAdmin = false, pending = 
         onClick={() => setOpen((v) => !v)}
         className={triggerClassName}
       >
-        <span className="relative flex flex-col items-center gap-1">
+        <span className="relative flex flex-col short:flex-row items-center gap-1 short:gap-2">
           {trigger ?? <Avatar userId={userId} username={username} avatar={avatar} />}
           {pending > 0 && (
             <span

@@ -14,7 +14,7 @@ export function SearchForm({ initial, pathname = "/search", placeholder }: { ini
   return (
     <form
       role="search"
-      className="mb-6 md:hidden"
+      className="mb-6 md:hidden short:block"
       onSubmit={(e) => {
         e.preventDefault();
         const q = value.trim();

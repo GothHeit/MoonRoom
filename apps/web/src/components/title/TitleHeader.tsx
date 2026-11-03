@@ -93,7 +93,7 @@ export async function TitleHeader({ anime, badge, play, hint, list, art }: Props
   );
 
   return (
-    <section className="pt-16 sm:pt-20">
+    <section className="pt-16 sm:pt-20 short:pt-12">
       <HeroSplit overlay={art} poster={poster} posterAlt={t("posterAlt", { title: anime.title })}>
         {info}
         {more}

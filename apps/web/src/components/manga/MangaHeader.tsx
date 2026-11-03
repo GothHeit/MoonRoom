@@ -32,7 +32,7 @@ export async function MangaHeader({ manga, badge, action }: Props) {
   const authors = (manga.authors ?? []).map((a) => [a.first_name, a.last_name].filter(Boolean).join(" ")).filter(Boolean);
 
   return (
-    <section className="pt-16 sm:pt-20">
+    <section className="pt-16 sm:pt-20 short:pt-12">
       <HeroSplit poster={cover} posterAlt={t("coverAlt", { title: manga.title })}>
         {badge}
         {kicker && <p className="kicker mt-3">{kicker}</p>}

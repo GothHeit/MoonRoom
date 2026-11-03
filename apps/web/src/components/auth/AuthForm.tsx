@@ -45,7 +45,7 @@ export function AuthForm({ endpoint, submitLabel, extra, onChallenge, children }
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4 short:gap-2">
       {children}
       {error && (
         <p role="alert" className="text-sm text-danger">
