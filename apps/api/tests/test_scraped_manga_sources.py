@@ -5,6 +5,7 @@ import pytest
 import respx
 
 from app.manga import load_manga_sources
+from app.manga.kitsuneyako import KitsuneyakoSource
 from app.manga.leituramanga import LeituramangaSource
 from app.manga.madara import MadaraSource
 from app.manga.mangapill import MangapillSource
@@ -292,8 +293,67 @@ async def test_leituramanga_lists_chapters_and_resolves_pages(lm):
     assert await lm.pages(MONSTER, "monster~../x") is None
 
 
+KY = "https://ky.test"
+KY_SEARCH = """
+<article class="inkra-catalog-card">
+<a class="inkra-catalog-card__media" href="https://ky.test/manga/boa-noite-punpun/">
+<img src="https://ky.test/c.webp" alt="Boa noite Punpun" loading="lazy"></a></article>
+<article class="inkra-catalog-card">
+<a class="inkra-catalog-card__media" href="https://ky.test/manga/outra-obra/">
+<img src="https://ky.test/d.webp" alt="Outra Obra" loading="lazy"></a></article>
+"""
+KY_TITLE = """
+<a href="https://ky.test/boa-noite-punpun-capitulo-02/">2</a>
+<a href="https://ky.test/boa-noite-punpun-capitulo-01/">1</a>
+<a href="https://ky.test/boa-noite-punpun-capitulo-01-5/">1.5</a>
+<a href="https://ky.test/outra-obra-capitulo-01/">x</a>
+"""
+KY_PAGE = """
+<figure><img src="https://cdn.ky.test/manga/boa-noite-punpun/chapter-01/01.webp"
+alt="p1" loading="lazy"></figure>
+<figure><img src="https://cdn.ky.test/manga/boa-noite-punpun/chapter-01/02.webp"
+alt="p2" loading="lazy"></figure>
+<img src="https://cdn.ky.test/theme/logo.webp" alt="logo">
+"""
+PUNPUN = {
+    "id": 4,
+    "title": "Oyasumi Punpun",
+    "alternative_titles": {"en": "Goodnight Punpun"},
+}
+
+
+@pytest.fixture
+async def ky():
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        yield KitsuneyakoSource(client, base=KY)
+
+
+@respx.mock
+async def test_kitsuneyako_matches_a_portuguese_title_and_reads_chapters(ky):
+    respx.get(f"{KY}/").mock(return_value=httpx.Response(200, text=KY_SEARCH))
+    respx.get(f"{KY}/manga/boa-noite-punpun/").mock(return_value=httpx.Response(200, text=KY_TITLE))
+    page = respx.get(f"{KY}/boa-noite-punpun-capitulo-01/").mock(
+        return_value=httpx.Response(200, text=KY_PAGE)
+    )
+    listed = await ky.chapters(PUNPUN, None)
+    assert listed is not None and listed.source_id == "boa-noite-punpun"
+    assert [(c.id, c.number) for c in listed.chapters] == [
+        ("boa-noite-punpun~01", "1"),
+        ("boa-noite-punpun~01-5", "1.5"),
+        ("boa-noite-punpun~02", "2"),
+    ]
+    found = await ky.pages(PUNPUN, "boa-noite-punpun~01")
+    assert page.called and found is not None
+    assert found.urls == [
+        "https://cdn.ky.test/manga/boa-noite-punpun/chapter-01/01.webp",
+        "https://cdn.ky.test/manga/boa-noite-punpun/chapter-01/02.webp",
+    ]
+    assert await ky.pages(PUNPUN, "outra-obra~01") is None
+    assert await ky.pages(PUNPUN, "boa-noite-punpun~../x") is None
+
+
 def test_sources_load_by_name():
-    names = ["mangadex", "mangalivre", "mangapill", "toonbr", "teca", "leituramanga"]
+    names = ["mangadex", "mangalivre", "mangapill", "toonbr", "teca", "leituramanga", "kitsuneyako"]
     assert list(load_manga_sources(names)) == names
     with pytest.raises(ValueError):
         load_manga_sources(["nope"])

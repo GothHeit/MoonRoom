@@ -22,6 +22,10 @@ def load_manga_sources(
 
             base, lang, prefix = SITES[name]
             sources[name] = MadaraSource(name, base, lang, shared=shared, prefix=prefix)
+        elif name == "kitsuneyako":
+            from app.manga.kitsuneyako import KitsuneyakoSource
+
+            sources[name] = KitsuneyakoSource(shared=shared)
         elif name == "leituramanga":
             from app.manga.leituramanga import LeituramangaSource
 
