@@ -5,8 +5,10 @@ import pytest
 import respx
 
 from app.manga import load_manga_sources
+from app.manga.leituramanga import LeituramangaSource
 from app.manga.madara import MadaraSource
 from app.manga.mangapill import MangapillSource
+from app.manga.toonbr import ToonbrSource
 
 MONSTER = {"id": 1, "title": "Monster", "alternative_titles": {"en": "Monster"}}
 
@@ -127,8 +129,171 @@ async def test_madara_refuses_other_titles_and_odd_ids(livre):
     assert await livre.pages(GACHI, "gachiakuta") is None
 
 
+@respx.mock
+async def test_madara_follows_a_renamed_title_path():
+    html = LIVRE_SEARCH.replace("/manga/", "/obra/")
+    chapters = LIVRE_CHAPTERS.replace("/manga/", "/obra/")
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        source = MadaraSource("teca", LIVRE, "pt-br", client, prefix="obra")
+        respx.get(f"{LIVRE}/").mock(return_value=httpx.Response(200, text=html))
+        respx.post(f"{LIVRE}/obra/gachiakuta/ajax/chapters/").mock(
+            return_value=httpx.Response(200, text=chapters)
+        )
+        listed = await source.chapters(GACHI, None)
+    assert listed is not None and [c.number for c in listed.chapters] == ["1.5", "2"]
+
+
+TOON = "https://api.toonbr.test/api"
+TOON_ID = "d182a36c-320a-4147-8a4d-de68d0918dc8"
+TOON_OTHER = "c1398c80-8812-43da-9b27-652c26b8724c"
+
+
+@pytest.fixture
+async def toon():
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        yield ToonbrSource(client, api=TOON, images="https://cdn.toonbr.test")
+
+
+@respx.mock
+async def test_toonbr_lists_chapters_and_resolves_pages(toon):
+    respx.get(f"{TOON}/manga", params={"search": "Monster"}).mock(
+        return_value=httpx.Response(
+            200,
+            json={"data": [{"slug": "monster", "title": "Monster"}, {"slug": "x", "title": "Zzz"}]},
+        )
+    )
+    respx.get(f"{TOON}/manga/monster").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "chapters": [
+                    {"id": TOON_OTHER, "chapterNumber": 2},
+                    {"id": TOON_ID, "chapterNumber": 1},
+                    {"id": "not-a-uuid", "chapterNumber": 3},
+                ]
+            },
+        )
+    )
+    respx.get(f"{TOON}/chapter/{TOON_ID}").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "pages": [
+                    {"imageUrl": "/manga/pages/b.jpeg", "pageNumber": 2},
+                    {"imageUrl": "/manga/pages/a.jpeg", "pageNumber": 1},
+                    {"imageUrl": "https://evil.example/c.jpeg", "pageNumber": 3},
+                ]
+            },
+        )
+    )
+    listed = await toon.chapters(MONSTER, None)
+    assert listed is not None and listed.languages == ["pt-br"]
+    assert [(c.id, c.number) for c in listed.chapters] == [
+        (f"monster~{TOON_ID}", "1"),
+        (f"monster~{TOON_OTHER}", "2"),
+    ]
+    found = await toon.pages(MONSTER, f"monster~{TOON_ID}")
+    assert found is not None
+    assert found.urls == [
+        "https://cdn.toonbr.test/manga/pages/a.jpeg",
+        "https://cdn.toonbr.test/manga/pages/b.jpeg",
+    ]
+
+
+@respx.mock
+async def test_toonbr_refuses_other_titles_and_odd_ids(toon):
+    respx.get(f"{TOON}/manga", params={"search": "Monster"}).mock(
+        return_value=httpx.Response(200, json={"data": [{"slug": "monster", "title": "Monster"}]})
+    )
+    respx.get(f"{TOON}/manga/monster").mock(
+        return_value=httpx.Response(200, json={"chapters": [{"id": TOON_ID, "chapterNumber": 1}]})
+    )
+    assert await toon.pages(MONSTER, f"other~{TOON_ID}") is None
+    assert await toon.pages(MONSTER, f"monster~{TOON_OTHER}") is None
+    assert await toon.pages(MONSTER, "monster~../x") is None
+    assert await toon.pages(MONSTER, "monster") is None
+
+
+LM_API = "https://api.lm.test/api"
+LM_SITE = "https://lm.test"
+LM_KEY = "6a8162f6fcef7f84673da6e8"
+LM_PAGE = (
+    r"{\"images\":[{\"url\":\"monster/capitulo-1/page-1-1.webp\",\"width\":1080},"
+    r"{\"url\":\"monster/capitulo-1/page-2-1.webp\"},{\"url\":\"monster/cover-md.webp\"},"
+    r"{\"url\":\"other/capitulo-1/page-1-1.webp\"}]}"
+)
+
+
+@pytest.fixture
+async def lm():
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        yield LeituramangaSource(client, site=LM_SITE, api=LM_API, images="https://cdn.lm.test")
+
+
+@respx.mock
+async def test_leituramanga_lists_chapters_and_resolves_pages(lm):
+    respx.get(f"{LM_API}/search/manga", params={"q": "Monster"}).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "data": {
+                    "data": [
+                        {
+                            "_id": LM_KEY,
+                            "slug": "monster",
+                            "title": "Monster",
+                            "readerAccessRule": {"type": "public"},
+                        },
+                        {
+                            "_id": "6a8162f6fcef7f84673da6e9",
+                            "slug": "monster-x",
+                            "title": "Monster",
+                            "readerAccessRule": {"type": "licensed"},
+                        },
+                    ]
+                }
+            },
+        )
+    )
+    respx.get(f"{LM_API}/chapter/get-by-manga-id").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "data": {
+                    "data": [
+                        {"chapterNumber": 2, "releaseDate": "2026-01-02"},
+                        {"chapterNumber": 1.5},
+                        {"chapterNumber": 1},
+                    ]
+                }
+            },
+        )
+    )
+    respx.get(f"{LM_SITE}/manga/monster/chapter/1").mock(
+        return_value=httpx.Response(200, text=LM_PAGE)
+    )
+    listed = await lm.chapters(MONSTER, None)
+    assert listed is not None and listed.source_id == "monster"
+    assert [(c.id, c.number) for c in listed.chapters] == [
+        ("monster~1", "1"),
+        ("monster~1.5", "1.5"),
+        ("monster~2", "2"),
+    ]
+    found = await lm.pages(MONSTER, "monster~1")
+    assert found is not None
+    assert found.urls == [
+        "https://cdn.lm.test/monster/capitulo-1/page-1-1.webp",
+        "https://cdn.lm.test/monster/capitulo-1/page-2-1.webp",
+    ]
+    assert found.upstream_headers == {"Referer": "https://lm.test/"}
+    # Other titles, unknown chapters and odd ids are refused.
+    assert await lm.pages(MONSTER, "other~1") is None
+    assert await lm.pages(MONSTER, "monster~9") is None
+    assert await lm.pages(MONSTER, "monster~../x") is None
+
+
 def test_sources_load_by_name():
-    sources = load_manga_sources(["mangadex", "mangalivre", "mangapill"])
-    assert list(sources) == ["mangadex", "mangalivre", "mangapill"]
+    names = ["mangadex", "mangalivre", "mangapill", "toonbr", "teca", "leituramanga"]
+    assert list(load_manga_sources(names)) == names
     with pytest.raises(ValueError):
         load_manga_sources(["nope"])

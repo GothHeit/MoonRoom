@@ -29,23 +29,16 @@ MATCH_TTL = 24 * 3600
 CHAPTERS_TTL = 3600
 _MISSING = {"missing": True}
 
-# Sites by source name: address and the language of their chapters.
-SITES: dict[str, tuple[str, str]] = {
-    "mangalivre": ("https://mangalivre.to", "pt-br"),
+# Sites by source name: address, language of their chapters and the path their titles live
+# under ("manga" unless the site renamed it).
+SITES: dict[str, tuple[str, str, str]] = {
+    "mangalivre": ("https://mangalivre.to", "pt-br", "manga"),
+    # Adult pt-BR site, named neutrally.
+    "teca": ("https://hentaiteca.net", "pt-br", "obra"),
 }
 
 _SLUG = r"[A-Za-z0-9][A-Za-z0-9._%-]*"
 _ID_RE = re.compile(rf"^({_SLUG})~({_SLUG}(?:~{_SLUG})*)$")
-_RESULT = re.compile(
-    rf'<div class="row c-tabs-item__content">.*?<a href="[^"]*/manga/({_SLUG})/"[^>]*'
-    r'title="([^"]*)"',
-    re.S,
-)
-_CHAPTER = re.compile(
-    r'<li class="wp-manga-chapter[^>]*>\s*<a href="[^"]*?/manga/'
-    rf"({_SLUG})/((?:{_SLUG}/)+)\"[^>]*>(.*?)</a>",
-    re.S,
-)
 _IMG = re.compile(r"<img\b[^>]*\bwp-manga-chapter-img\b[^>]*>")
 _SRC = re.compile(r'\b(?:data-src|src)="\s*([^"]+?)\s*"')
 
@@ -57,11 +50,23 @@ class MadaraSource:
         base: str,
         lang: str,
         client: httpx.AsyncClient | None = None,
+        prefix: str = "manga",
         shared: SharedCache | None = None,
     ) -> None:
         self.name = name
         self._base = base.rstrip("/")
         self._lang = lang
+        self._prefix = prefix
+        self._result = re.compile(
+            rf'<div class="row c-tabs-item__content">.*?<a href="[^"]*/{prefix}/({_SLUG})/"[^>]*'
+            r'title="([^"]*)"',
+            re.S,
+        )
+        self._chapter = re.compile(
+            rf'<li class="wp-manga-chapter[^>]*>\s*<a href="[^"]*?/{prefix}/'
+            rf"({_SLUG})/((?:{_SLUG}/)+)\"[^>]*>(.*?)</a>",
+            re.S,
+        )
         self._own_client = client is None
         self._client = client or new_client()
         self._shared = shared or SharedCache()
@@ -93,7 +98,7 @@ class MadaraSource:
         candidates: dict[str, list[str]] = {}
         for query in search_queries(manga):
             page = await self._get(f"/?s={quote(query)}&post_type=wp-manga")
-            for slug, title in _RESULT.findall(page or ""):
+            for slug, title in self._result.findall(page or ""):
                 candidates.setdefault(slug, []).append(text(title))
         found = best_match(manga, list(candidates.items()))
         if found is None:
@@ -109,12 +114,12 @@ class MadaraSource:
         """Newer Madara serves the list from an ajax address, older ones inline in the page."""
         async with self._slots:
             response = await self._client.post(
-                f"{self._base}/manga/{slug}/ajax/chapters/",
+                f"{self._base}/{self._prefix}/{slug}/ajax/chapters/",
                 headers={"X-Requested-With": "XMLHttpRequest"},
             )
         if response.status_code == 200 and "wp-manga-chapter" in response.text:
             return response.text
-        return await self._get(f"/manga/{slug}/") or ""
+        return await self._get(f"/{self._prefix}/{slug}/") or ""
 
     async def chapters(self, manga: dict, lang: str | None) -> ChapterList | None:
         try:
@@ -124,7 +129,7 @@ class MadaraSource:
             slug = found["id"]
             if (listed := self._chapters.get(slug)) is None:
                 seen: dict[str, Chapter] = {}
-                for owner, path, label in _CHAPTER.findall(await self._chapter_html(slug)):
+                for owner, path, label in self._chapter.findall(await self._chapter_html(slug)):
                     if owner != slug:
                         continue
                     cid = f"{slug}~{path.strip('/').replace('/', '~')}"
@@ -155,7 +160,7 @@ class MadaraSource:
         if found is None or found["id"] != parsed.group(1):
             return None
         path = parsed.group(2).replace("~", "/")
-        page = await self._get(f"/manga/{parsed.group(1)}/{path}/")
+        page = await self._get(f"/{self._prefix}/{parsed.group(1)}/{path}/")
         urls: list[str] = []
         for tag in _IMG.findall(page or ""):
             if (src := _SRC.search(tag)) and src.group(1).startswith("https://"):

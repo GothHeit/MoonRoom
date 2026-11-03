@@ -20,8 +20,16 @@ def load_manga_sources(
         elif name in SITES:
             from app.manga.madara import MadaraSource
 
-            base, lang = SITES[name]
-            sources[name] = MadaraSource(name, base, lang, shared=shared)
+            base, lang, prefix = SITES[name]
+            sources[name] = MadaraSource(name, base, lang, shared=shared, prefix=prefix)
+        elif name == "leituramanga":
+            from app.manga.leituramanga import LeituramangaSource
+
+            sources[name] = LeituramangaSource(shared=shared)
+        elif name == "toonbr":
+            from app.manga.toonbr import ToonbrSource
+
+            sources[name] = ToonbrSource(shared=shared)
         else:
             raise ValueError(f"Unknown manga source: {name}")
     return sources
