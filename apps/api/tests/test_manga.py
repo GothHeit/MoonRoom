@@ -361,3 +361,69 @@ async def test_home_shows_the_users_mal_manga_list(client, session):
     home = (await client.get("/manga/home", headers=headers)).json()
     assert [row["id"] for row in home["rows"]][:2] == ["my_list", "top"]
     assert home["rows"][0]["items"][0]["manga"]["title"] == "Listed"
+
+
+class OneLanguage:
+    """A site with a single language, like MangaPill or a pt-BR scraper."""
+
+    def __init__(self, name, lang):
+        self.name = name
+        self._lang = lang
+
+    async def chapters(self, detail, lang):
+        return ChapterList(
+            self.name, "Book", [self._lang], [Chapter(f"{self.name}1", "1", None, None, self._lang)]
+        )
+
+    async def pages(self, detail, chapter_id):
+        return None
+
+
+@respx.mock
+async def test_every_source_is_asked_and_the_language_menu_is_their_union(client, session):
+    # English first in the order, but a Portuguese reader is still offered the pt-br source.
+    fastapi_app.state.manga_sources = {
+        "en_site": OneLanguage("en_site", "en"),
+        "pt_site": OneLanguage("pt_site", "pt-br"),
+        "pt_two": OneLanguage("pt_two", "pt-br"),
+    }
+    _, headers = await make_user(session, "kafka")
+    mock_details(1)
+
+    body = (await client.get("/manga/1/chapters", headers=headers)).json()
+    assert body["languages"] == ["pt-br", "en"]
+    assert body["lang"] == "pt-br" and body["source"] == "pt_site"
+    assert body["sources"] == ["pt_site", "pt_two"]
+
+    body = (
+        await client.get("/manga/1/chapters", params={"source": "pt_two"}, headers=headers)
+    ).json()
+    assert body["source"] == "pt_two"
+    # A source that doesn't have the language is ignored rather than trusted.
+    body = (
+        await client.get("/manga/1/chapters", params={"source": "en_site"}, headers=headers)
+    ).json()
+    assert body["source"] == "pt_site"
+
+    body = (await client.get("/manga/1/chapters", params={"lang": "en"}, headers=headers)).json()
+    assert body["source"] == "en_site" and body["sources"] == ["en_site"]
+
+
+@respx.mock
+async def test_the_default_manga_language_beats_the_site_language(client, session):
+    fastapi_app.state.manga_sources = {
+        "en_site": OneLanguage("en_site", "en"),
+        "pt_site": OneLanguage("pt_site", "pt-br"),
+    }
+    _, headers = await make_user(session, "kafka")
+    mock_details(1)
+    r = await client.patch("/me", json={"manga_lang": "en"}, headers=headers)
+    assert r.json()["manga_lang"] == "en"
+    assert (await client.get("/manga/1/chapters", headers=headers)).json()["lang"] == "en"
+    # Back to following the site language; a language the title lacks falls back to what exists.
+    r = await client.patch("/me", json={"manga_lang": "auto"}, headers=headers)
+    assert r.json()["manga_lang"] is None
+    fastapi_app.state.manga_sources = {"en_site": OneLanguage("en_site", "en")}
+    assert (await client.get("/manga/1/chapters", headers=headers)).json()["lang"] == "en"
+    bad = await client.patch("/me", json={"manga_lang": "fr!"}, headers=headers)
+    assert bad.status_code == 422

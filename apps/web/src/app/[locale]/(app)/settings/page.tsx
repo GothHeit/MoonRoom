@@ -97,7 +97,7 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
 
       <Group id="preferences" title={t("settings.groups.preferences")}>
         <Section title={t("settings.preferences")}>
-          <PreferencesForm showNsfw={me.show_nsfw} shareActivity={me.share_activity} />
+          <PreferencesForm showNsfw={me.show_nsfw} shareActivity={me.share_activity} mangaLang={me.manga_lang ?? null} />
         </Section>
 
         <Section title={t("settings.playback.title")}>

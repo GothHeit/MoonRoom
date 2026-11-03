@@ -33,6 +33,7 @@ audit = logging.getLogger("app.audit")
 
 Locale = Literal["pt", "en"]
 # "auto" clears the preference (pt-BR, then English); "off" hides subtitles.
+MangaLang = Annotated[str, StringConstraints(pattern=r"^(auto|pt-br|en)$")]
 SubtitleLang = Annotated[str, StringConstraints(pattern=r"^(auto|off|[a-z]{2,3}(-[A-Z]{2})?)$")]
 
 
@@ -86,6 +87,7 @@ class MeOut(BaseModel):
     locale: Locale
     show_nsfw: bool
     subtitle_lang: str | None
+    manga_lang: str | None
     is_admin: bool
     avatar: AvatarOut
     share_activity: bool
@@ -95,6 +97,7 @@ class MeUpdate(BaseModel):
     locale: Locale | None = None
     show_nsfw: bool | None = None
     subtitle_lang: SubtitleLang | None = None
+    manga_lang: MangaLang | None = None
     share_activity: bool | None = None
 
 
@@ -153,6 +156,7 @@ async def build_me(user: User, session: Session) -> MeOut:
         locale=user.locale,
         show_nsfw=user.show_nsfw,
         subtitle_lang=user.subtitle_lang,
+        manga_lang=user.manga_lang,
         is_admin=user.is_admin,
         avatar=avatar_out(user, link.mal_picture if link else None),
         share_activity=user.share_activity,

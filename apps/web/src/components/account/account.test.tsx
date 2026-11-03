@@ -32,7 +32,7 @@ afterEach(() => {
 describe("PreferencesForm", () => {
   it("saves the +18 switch and refreshes", async () => {
     client.PATCH.mockResolvedValue(ok());
-    renderAccount(<PreferencesForm showNsfw shareActivity />);
+    renderAccount(<PreferencesForm showNsfw shareActivity mangaLang={null} />);
     const toggle = screen.getByRole("switch", { name: "Show +18 titles" });
     expect(toggle).toHaveAttribute("aria-checked", "true");
     fireEvent.click(toggle);
@@ -43,7 +43,7 @@ describe("PreferencesForm", () => {
 
   it("puts the switch back when saving fails", async () => {
     client.PATCH.mockResolvedValue(failed);
-    renderAccount(<PreferencesForm showNsfw shareActivity />);
+    renderAccount(<PreferencesForm showNsfw shareActivity mangaLang={null} />);
     const toggle = screen.getByRole("switch", { name: "Show +18 titles" });
     fireEvent.click(toggle);
     expect(await screen.findByText("Couldn't save your settings.")).toBeInTheDocument();
@@ -53,9 +53,16 @@ describe("PreferencesForm", () => {
 
   it("saves the language, then moves to that language's page", async () => {
     client.PATCH.mockResolvedValue(ok());
-    renderAccount(<PreferencesForm showNsfw shareActivity />);
+    renderAccount(<PreferencesForm showNsfw shareActivity mangaLang={null} />);
     fireEvent.change(screen.getByLabelText(/Language/), { target: { value: "pt" } });
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/settings", { locale: "pt" }));
+  });
+
+  it("saves the manga language", async () => {
+    client.PATCH.mockResolvedValue(ok());
+    renderAccount(<PreferencesForm showNsfw shareActivity mangaLang={null} />);
+    fireEvent.change(screen.getByLabelText(/Manga language/), { target: { value: "pt-br" } });
+    await waitFor(() => expect(client.PATCH).toHaveBeenCalledWith("/me", { body: { manga_lang: "pt-br" } }));
   });
 });
 

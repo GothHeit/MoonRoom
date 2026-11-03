@@ -49,6 +49,7 @@
       "trackingOnlyHint": "Nenhuma fonte tem este título ainda.",
       "chapterList": "Capítulos",
       "language": "Idioma",
+      "source": "Fonte",
       "from": "De {source}",
       "start": "Começar a ler",
       "continue": "Continuar · Cap. {n}",

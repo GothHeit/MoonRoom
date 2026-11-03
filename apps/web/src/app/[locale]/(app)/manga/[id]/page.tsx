@@ -27,8 +27,8 @@ function parseId(raw: string) {
 const details = cache(async (id: number) => (await serverApi()).GET("/manga/{manga_id}", { params: { path: { manga_id: id } } }));
 
 // Shared by the badge and the list, so the sources are asked once.
-const chapters = cache(async (id: number, lang: string | undefined) => {
-  const { data } = await (await serverApi()).GET("/manga/{manga_id}/chapters", { params: { path: { manga_id: id }, query: { lang } } });
+const chapters = cache(async (id: number, lang: string | undefined, source: string | undefined) => {
+  const { data } = await (await serverApi()).GET("/manga/{manga_id}/chapters", { params: { path: { manga_id: id }, query: { lang, source } } });
   return data ?? null;
 });
 
@@ -51,8 +51,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return { title: data ? `${data.title} · ${APP_NAME}` : APP_NAME };
 }
 
-async function ReadBadge({ id, lang }: { id: number; lang?: string }) {
-  const [listing, t] = await Promise.all([chapters(id, lang), getTranslations("manga.page")]);
+async function ReadBadge({ id, lang, source }: { id: number; lang?: string; source?: string }) {
+  const [listing, t] = await Promise.all([chapters(id, lang, source), getTranslations("manga.page")]);
   const here = !!listing?.chapters?.length;
   return (
     <p className={`inline-block self-start rounded-full border px-3 py-0.5 text-xs font-bold ${here ? "border-accent text-accent" : "border-line-strong text-muted"}`}>
@@ -62,8 +62,8 @@ async function ReadBadge({ id, lang }: { id: number; lang?: string }) {
 }
 
 /** The primary pill: start, continue or read the next chapter. Nothing when no source has the title. */
-async function ReadAction({ id, lang }: { id: number; lang?: string }) {
-  const [listing, t] = await Promise.all([chapters(id, lang), getTranslations("manga.page")]);
+async function ReadAction({ id, lang, source }: { id: number; lang?: string; source?: string }) {
+  const [listing, t] = await Promise.all([chapters(id, lang, source), getTranslations("manga.page")]);
   const action = listing && readAction(listing, id);
   if (!action) return null;
   return (
@@ -101,8 +101,8 @@ function ChaptersSkeleton() {
   );
 }
 
-async function Chapters({ id, lang }: { id: number; lang?: string }) {
-  const [listing, t] = await Promise.all([chapters(id, lang), getTranslations("manga.page")]);
+async function Chapters({ id, lang, source }: { id: number; lang?: string; source?: string }) {
+  const [listing, t] = await Promise.all([chapters(id, lang, source), getTranslations("manga.page")]);
   if (!listing) return <p className="px-4 text-muted sm:px-8">{t("trackingOnlyHint")}</p>;
   return <ChapterList mangaId={id} listing={listing} />;
 }
@@ -113,6 +113,8 @@ export default async function MangaPage({ params, searchParams }: Params) {
   const id = parseId(rawId);
   const rawLang = (await searchParams).lang;
   const lang = (Array.isArray(rawLang) ? rawLang[0] : rawLang)?.slice(0, 10) || undefined;
+  const rawSource = (await searchParams).source;
+  const source = (Array.isArray(rawSource) ? rawSource[0] : rawSource)?.slice(0, 32) || undefined;
   const t = await getTranslations("manga.page");
   const [manga, list] = await Promise.all([unwrap(details(id), locale), listState(id)]);
   const related = manga.related_manga ?? [];
@@ -126,21 +128,21 @@ export default async function MangaPage({ params, searchParams }: Params) {
         manga={manga}
         badge={
           <Suspense fallback={<BadgeSkeleton />}>
-            <ReadBadge id={id} lang={lang} />
+            <ReadBadge id={id} lang={lang} source={source} />
           </Suspense>
         }
         action={
           <>
             <Suspense fallback={<ActionSkeleton />}>
-              <ReadAction id={id} lang={lang} />
+              <ReadAction id={id} lang={lang} source={source} />
             </Suspense>
             <AddToList kind="manga" titleId={id} state={list} />
           </>
         }
       />
       <div className="flex flex-col gap-10 py-6">
-        <Suspense key={lang ?? ""} fallback={<ChaptersSkeleton />}>
-          <Chapters id={id} lang={lang} />
+        <Suspense key={`${lang ?? ""}/${source ?? ""}`} fallback={<ChaptersSkeleton />}>
+          <Chapters id={id} lang={lang} source={source} />
         </Suspense>
         {related.length > 0 && (
           <Row title={t("related")}>

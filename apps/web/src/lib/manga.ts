@@ -99,3 +99,15 @@ export const LANGUAGE_NAMES: Record<string, string> = {
 };
 
 export const languageName = (code: string) => LANGUAGE_NAMES[code] ?? code.toUpperCase();
+
+const SOURCE_NAMES: Record<string, string> = {
+  mangadex: "MangaDex",
+  mangapill: "MangaPill",
+  mangalivre: "MangaLivre",
+  toonbr: "ToonBR",
+  teca: "Teca",
+  leituramanga: "Leitura Manga",
+};
+
+/** The source's display name; an unknown one shows as it is configured. */
+export const sourceName = (name: string) => SOURCE_NAMES[name] ?? name;

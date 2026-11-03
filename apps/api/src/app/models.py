@@ -21,6 +21,8 @@ class User(TimestampMixin, Base):
     show_nsfw: Mapped[bool] = mapped_column(default=True)
     # None means automatic (pt-BR, then English); "off" hides subtitles.
     subtitle_lang: Mapped[str | None] = mapped_column(String(8), default=None)
+    # Language manga chapters are listed in by default; None follows the site language.
+    manga_lang: Mapped[str | None] = mapped_column(String(8), default=None)
     is_admin: Mapped[bool] = mapped_column(default=False)
     # A preset artwork key, or None. An uploaded picture wins over it when avatar_uploaded.
     avatar_preset: Mapped[str | None] = mapped_column(String(16), default=None)

@@ -367,36 +367,32 @@ async def details(request: Request, manga_id: int, user: CurrentUser):
     )
 
 
-async def _first_listing(
-    request: Request, manga: dict, lang: str | None
-) -> tuple[str, ChapterList] | None:
-    """The chapters from the first enabled source that has the title (fallback, in order)."""
-    # A source that knows the title but has no readable chapters (licensed ones are pulled from
-    # MangaDex, for one) must not stop the next source from being tried; it is only the answer
-    # when nobody has chapters.
-    empty: tuple[str, ChapterList] | None = None
-    for name, source in _sources(request).items():
-        try:
-            listed = await asyncio.wait_for(source.chapters(manga, lang), SOURCE_TIMEOUT)
-        except Exception as exc:  # a broken source is skipped, the next one is tried
-            log.warning("manga: source %s failed for %s: %s", name, manga.get("id"), exc)
-            continue
-        if listed is None:
-            continue
-        if listed.chapters:
-            return name, listed
-        if empty is None and listed.languages:
-            empty = (name, listed)
-    return empty
+async def _ask(request: Request, name: str, manga: dict, lang: str | None) -> ChapterList | None:
+    source = _sources(request)[name]
+    try:
+        return await asyncio.wait_for(source.chapters(manga, lang), SOURCE_TIMEOUT)
+    except Exception as exc:  # a broken source is skipped, the others still answer
+        log.warning("manga: source %s failed for %s: %s", name, manga.get("id"), exc)
+        return None
 
 
-def _wanted_lang(user_locale: str, lang: str | None, available: list[str]) -> str | None:
-    if lang:
+def _ordered_languages(codes: set[str]) -> list[str]:
+    """pt-br and English first, then the rest alphabetically."""
+    first = [c for c in ("pt-br", "en") if c in codes]
+    return first + sorted(codes - set(first))
+
+
+def _wanted_lang(user: User, lang: str | None, available: list[str]) -> str | None:
+    """The language asked for, else the user's default (or site language), else the first one
+    that exists. None only when nothing is available."""
+    if lang and lang in available:
         return lang
-    for candidate in LOCALE_LANGS.get(user_locale, ("en",)):
+    default = user.manga_lang
+    candidates = (default,) if default else LOCALE_LANGS.get(user.locale, ("en",))
+    for candidate in (*candidates, *LOCALE_LANGS.get(user.locale, ("en",)), "en"):
         if candidate in available:
             return candidate
-    return None
+    return available[0] if available else None
 
 
 @router.get("/{manga_id}/chapters", response_model=ChaptersOut)
@@ -406,21 +402,45 @@ async def chapters(
     user: CurrentUser,
     session: Session,
     lang: Annotated[str | None, Query(max_length=10)] = None,
+    source: Annotated[str | None, Query(max_length=32)] = None,
 ):
     """The chapter list, with where the user is in each chapter. Separate from the details so
-    a slow source never holds the title page back."""
+    a slow source never holds the title page back. Every enabled source is asked at once; the
+    language menu is the union of what they have and the list comes from one source: the one
+    asked for, else the first in the configured order that has the language."""
     manga = await _mal(request).visible_manga(manga_id, user.show_nsfw)
-    found = await _first_listing(request, manga, lang)
-    if found is None:
-        raise ApiError(404, "not_available", "No source has this title")
-    name, listed = found
-    # The user's language when the source has it and no language was asked for; the source
-    # already answered in its own best language, so only re-ask when that differs.
-    wanted = _wanted_lang(user.locale, lang, listed.languages)
-    if wanted and listed.chapters and listed.chapters[0].lang != wanted:
-        relisted = await _first_listing(request, manga, wanted)
-        if relisted is not None:
-            name, listed = relisted
+    names = list(_sources(request))
+    answers = dict(
+        zip(
+            names,
+            await asyncio.gather(*(_ask(request, n, manga, None) for n in names)),
+            strict=True,
+        )
+    )
+    # What each source can list: the languages of those with readable chapters. Sources that
+    # only know the title stay as the answer of last resort.
+    readable = {n: a for n, a in answers.items() if a is not None and a.chapters}
+    by_lang: dict[str, list[str]] = {}
+    for name, answer in readable.items():
+        for code in answer.languages:
+            by_lang.setdefault(code, []).append(name)
+    if not by_lang:
+        empty = next(((n, a) for n, a in answers.items() if a is not None and a.languages), None)
+        if empty is None:
+            raise ApiError(404, "not_available", "No source has this title")
+        name, listed = empty
+        picked = None
+    else:
+        languages = _ordered_languages(set(by_lang))
+        picked = _wanted_lang(user, lang, languages)
+        carriers = by_lang[picked] if picked else []
+        name = source if source in carriers else carriers[0]
+        listed = readable[name]
+        if listed.chapters[0].lang != picked:
+            # A source with several languages answered in its own best one: ask for ours.
+            relisted = await _ask(request, name, manga, picked)
+            if relisted is not None and relisted.chapters:
+                listed = relisted
     rows = await session.scalars(
         select(MangaProgress).where(
             MangaProgress.user_id == user.id, MangaProgress.manga_id == manga_id
@@ -433,7 +453,8 @@ async def chapters(
         source_id=listed.source_id,
         source_title=listed.source_title,
         lang=listed.chapters[0].lang if listed.chapters else None,
-        languages=listed.languages,
+        languages=_ordered_languages(set(by_lang)) if by_lang else listed.languages,
+        sources=by_lang.get(picked, []) if picked else [],
         chapters=[chapter_out(c) for c in listed.chapters],
         progress=progress,
     )

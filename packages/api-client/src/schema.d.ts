@@ -534,7 +534,9 @@ export interface paths {
         /**
          * Chapters
          * @description The chapter list, with where the user is in each chapter. Separate from the details so
-         *     a slow source never holds the title page back.
+         *     a slow source never holds the title page back. Every enabled source is asked at once; the
+         *     language menu is the union of what they have and the list comes from one source: the one
+         *     asked for, else the first in the configured order that has the language.
          */
         get: operations["chapters_manga__manga_id__chapters_get"];
         put?: never;
@@ -1710,6 +1712,8 @@ export interface components {
             source_id: string;
             /** Source Title */
             source_title: string;
+            /** Sources */
+            sources?: string[];
         };
         /** ChatIn */
         ChatIn: {
@@ -2206,6 +2210,8 @@ export interface components {
              * @enum {string}
              */
             locale: "pt" | "en";
+            /** Manga Lang */
+            manga_lang: string | null;
             /** Share Activity */
             share_activity: boolean;
             /** Show Nsfw */
@@ -2219,6 +2225,8 @@ export interface components {
         MeUpdate: {
             /** Locale */
             locale?: ("pt" | "en") | null;
+            /** Manga Lang */
+            manga_lang?: string | null;
             /** Share Activity */
             share_activity?: boolean | null;
             /** Show Nsfw */
@@ -3785,6 +3793,7 @@ export interface operations {
         parameters: {
             query?: {
                 lang?: string | null;
+                source?: string | null;
             };
             header?: never;
             path: {

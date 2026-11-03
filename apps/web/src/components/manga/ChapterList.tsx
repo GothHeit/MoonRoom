@@ -3,7 +3,7 @@
 import { useFormatter, useTranslations } from "next-intl";
 
 import { Link, useRouter } from "@/i18n/navigation";
-import { languageName, progressKey, readHref, type Chapter, type ChaptersOut } from "@/lib/manga";
+import { languageName, progressKey, sourceName, readHref, type Chapter, type ChaptersOut } from "@/lib/manga";
 
 type Props = {
   mangaId: number;
@@ -24,7 +24,7 @@ export function ChapterList({ mangaId, listing }: Props) {
   const t = useTranslations("manga.page");
   const format = useFormatter();
   const router = useRouter();
-  const { source, source_title, lang, languages = [], chapters = [], progress = {} } = listing;
+  const { source, sources = [], lang, languages = [], chapters = [], progress = {} } = listing;
   const latest = chapters[chapters.length - 1];
 
   return (
@@ -51,7 +51,27 @@ export function ChapterList({ mangaId, listing }: Props) {
             </select>
           </label>
         )}
-        <span className="text-sm text-muted">{t("from", { source: source_title })}</span>
+        {sources.length > 1 ? (
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <span>{t("source")}</span>
+            <select
+              aria-label={t("source")}
+              value={source}
+              onChange={(e) =>
+                router.replace({ pathname: `/manga/${mangaId}`, query: { ...(lang ? { lang } : {}), source: e.target.value } })
+              }
+              className="h-11 rounded-full border border-line-strong bg-bg px-4 text-sm text-fg focus:border-accent"
+            >
+              {sources.map((name) => (
+                <option key={name} value={name}>
+                  {sourceName(name)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="text-sm text-muted">{t("from", { source: sourceName(source) })}</span>
+        )}
       </div>
       {chapters.length === 0 ? (
         <p className="py-6 text-muted">{t("noChapters")}</p>

@@ -8,9 +8,18 @@ import { useToast } from "@/components/ui/Toast";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
 import { api } from "@/lib/api";
+import { languageName } from "@/lib/manga";
 
 /** Saves each change right away (a switch has no submit button) and tells the user it worked. */
-export function PreferencesForm({ showNsfw, shareActivity }: { showNsfw: boolean; shareActivity: boolean }) {
+export function PreferencesForm({
+  showNsfw,
+  shareActivity,
+  mangaLang,
+}: {
+  showNsfw: boolean;
+  shareActivity: boolean;
+  mangaLang: string | null;
+}) {
   const t = useTranslations("account.settings");
   const tLocale = useTranslations("locale");
   const locale = useLocale();
@@ -19,9 +28,10 @@ export function PreferencesForm({ showNsfw, shareActivity }: { showNsfw: boolean
   const toast = useToast();
   const [nsfw, setNsfw] = useState(showNsfw);
   const [share, setShare] = useState(shareActivity);
+  const [manga, setManga] = useState(mangaLang ?? "auto");
   const [busy, setBusy] = useState(false);
 
-  async function save(body: { locale?: "pt" | "en"; show_nsfw?: boolean; share_activity?: boolean }) {
+  async function save(body: { locale?: "pt" | "en"; show_nsfw?: boolean; share_activity?: boolean; manga_lang?: string }) {
     setBusy(true);
     const { response } = await api.PATCH("/me", { body }).catch(() => ({ response: null }));
     setBusy(false);
@@ -48,6 +58,12 @@ export function PreferencesForm({ showNsfw, shareActivity }: { showNsfw: boolean
     if (await save({ locale: next })) router.replace(pathname, { locale: next });
   }
 
+  async function onManga(next: string) {
+    const before = manga;
+    setManga(next);
+    if (!(await save({ manga_lang: next }))) setManga(before);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <label className="flex flex-col gap-1">
@@ -65,6 +81,21 @@ export function PreferencesForm({ showNsfw, shareActivity }: { showNsfw: boolean
           ))}
         </select>
         <span className="text-xs text-muted">{t("languageHint")}</span>
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-sm text-muted">{t("mangaLanguage")}</span>
+        <select
+          value={manga}
+          disabled={busy}
+          onChange={(e) => onManga(e.target.value)}
+          className="w-full max-w-xs rounded-ui border border-line bg-bg px-3 py-2 text-fg"
+        >
+          <option value="auto">{t("mangaLanguageAuto")}</option>
+          <option value="pt-br">{languageName("pt-br")}</option>
+          <option value="en">{languageName("en")}</option>
+        </select>
+        <span className="text-xs text-muted">{t("mangaLanguageHint")}</span>
       </label>
 
       <div className="flex items-start justify-between gap-4">
