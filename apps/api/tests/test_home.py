@@ -292,3 +292,28 @@ async def test_home_survives_a_timing_out_mal_list(client, session):
     r = await client.get("/me/animelist", headers=headers)
     assert r.status_code == 502
     assert r.json()["error"]["code"] == "mal_unavailable"
+
+
+@respx.mock
+async def test_similar_row_recommends_from_the_last_title_watched(client, session):
+    _, headers = await make_user(session, "kafka")
+    mock_season(node(1))
+    mock_ranking(node(10))
+    mock_details(1)
+    await watch(client, headers, 20, 3)
+    mock_details(
+        20,
+        title="Last one",
+        num_episodes=12,
+        recommendations=[
+            {"node": {"id": n, "title": f"R{n}"}, "num_recommendations": 3} for n in range(50, 56)
+        ],
+    )
+    for n in range(50, 56):
+        mock_details(n)
+
+    rows = (await client.get("/home", headers=headers)).json()["rows"]
+    similar = next(r for r in rows if r["id"] == "similar")
+    assert similar["about"]["id"] == 20
+    assert [i["anime"]["id"] for i in similar["items"]] == list(range(50, 56))
+    assert rows[0]["id"] == "continue_watching"

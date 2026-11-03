@@ -180,9 +180,13 @@ class HomeItem(BaseModel):
 
 
 class HomeRow(BaseModel):
-    id: Literal["continue_watching", "my_list", "friends_popular", "seasonal", "top", "genre"]
+    id: Literal[
+        "continue_watching", "my_list", "similar", "friends_popular", "seasonal", "top", "genre"
+    ]
     # Set on genre rows only: the MAL genre, named in English (the web translates it).
     genre: GenreOut | None = None
+    # Set on the similar row only: the title the recommendations are about.
+    about: AnimeCard | None = None
     items: list[HomeItem]
 
 

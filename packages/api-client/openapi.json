@@ -1071,6 +1071,16 @@
       },
       "HomeRow": {
         "properties": {
+          "about": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnimeCard"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "genre": {
             "anyOf": [
               {
@@ -1085,6 +1095,7 @@
             "enum": [
               "continue_watching",
               "my_list",
+              "similar",
               "friends_popular",
               "seasonal",
               "top",

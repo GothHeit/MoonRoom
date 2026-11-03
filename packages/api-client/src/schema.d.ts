@@ -1822,12 +1822,13 @@ export interface components {
         };
         /** HomeRow */
         HomeRow: {
+            about?: components["schemas"]["AnimeCard"] | null;
             genre?: components["schemas"]["GenreOut"] | null;
             /**
              * Id
              * @enum {string}
              */
-            id: "continue_watching" | "my_list" | "friends_popular" | "seasonal" | "top" | "genre";
+            id: "continue_watching" | "my_list" | "similar" | "friends_popular" | "seasonal" | "top" | "genre";
             /** Items */
             items: components["schemas"]["HomeItem"][];
         };

@@ -14,12 +14,17 @@ const RANKED = "w-auto";
 export async function HomeRows({ rows }: { rows: HomeOut["rows"] }) {
   const t = await getTranslations("home");
   const tGenres = await getTranslations("genres");
+  const titleOf = (row: HomeOut["rows"][number]) => {
+    if (row.genre) return t("rows.genre", { genre: genreName(tGenres, row.genre) });
+    if (row.about) return t("rows.similar", { title: row.about.title });
+    return t(`rows.${row.id}`);
+  };
   return (
     <div className="space-y-10 py-8">
       {rows.map((row) => (
         <Row
           key={row.genre ? `genre-${row.genre.id}` : row.id}
-          title={row.genre ? t("rows.genre", { genre: genreName(tGenres, row.genre) }) : t(`rows.${row.id}`)}
+          title={titleOf(row)}
           itemClassName={row.id === "continue_watching" ? WIDE : row.id === "top" ? RANKED : undefined}
         >
           {row.items.map(({ anime, progress, resume_episode, from_mal }, i) =>

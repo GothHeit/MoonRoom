@@ -12,6 +12,7 @@ from app.errors import ApiError
 from app.mal.client import MalClient, is_safe
 from app.mal.genres import GENRE_IDS
 from app.models import ContinueHidden, MalLink, WatchProgress
+from app.routers.anime import only_safe
 from app.routers.friends import sharing_friend_ids
 from app.routers.progress import latest_per_anime, to_out
 from app.schemas import AnimeCard, GenreOut, HomeHero, HomeItem, HomeOut, HomeRow
@@ -207,6 +208,24 @@ async def _heroes(
     return list(await asyncio.gather(*(one(p) for p in picks)))
 
 
+async def _similar_row(
+    mal: MalClient, watched: list[WatchProgress], allow_nsfw: bool
+) -> HomeRow | None:
+    """What viewers of the title watched last also recommend, from its (cached) details."""
+    for row in watched:
+        about = await mal.details(row.anime_id)
+        if not allow_nsfw and not is_safe(about):
+            continue
+        recommended = about.get("recommendations") or []
+        if not allow_nsfw:
+            (recommended,) = await only_safe(mal, recommended)
+        nodes = [r["node"] for r in recommended]
+        if len(nodes) < MIN_ROW // 2:
+            return None
+        return HomeRow(id="similar", items=_items(nodes), about=AnimeCard.from_node(about))
+    return None
+
+
 @router.get("/home", response_model=HomeOut)
 async def home(
     request: Request,
@@ -240,6 +259,7 @@ async def home(
         continuing,
         mal_rows,
         genre_rows,
+        similar,
     ) = await asyncio.gather(
         seasonal_with_heroes(),
         _friends_popular_row(mal, friend_ids, user.show_nsfw),
@@ -249,6 +269,7 @@ async def home(
             _mal_rows(request, user, session, {p.anime_id for p in progress}, hidden), "MAL lists"
         ),
         soft(_genre_rows(mal, user.show_nsfw), "genre rows"),
+        soft(_similar_row(mal, progress, user.show_nsfw), "similar row"),
     )
     seasonal, heroes = seasonal_and_heroes
     my_list, from_mal = mal_rows or ([], [])
@@ -262,6 +283,7 @@ async def home(
     rows = [
         HomeRow(id="continue_watching", items=continuing),
         HomeRow(id="my_list", items=my_list),
+        *([similar] if similar else []),
         HomeRow(id="seasonal", items=_items(seasonal_nodes)),
         HomeRow(id="friends_popular", items=friends_popular),
         HomeRow(id="top", items=_items(top_nodes)),

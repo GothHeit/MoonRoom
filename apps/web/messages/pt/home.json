@@ -9,6 +9,7 @@
     "rows": {
       "continue_watching": "Continuar assistindo",
       "my_list": "Minha lista",
+      "similar": "Parecidos com {title}",
       "seasonal": "Nesta temporada",
       "top": "Mais bem avaliados",
       "friends_popular": "Popular entre amigos",

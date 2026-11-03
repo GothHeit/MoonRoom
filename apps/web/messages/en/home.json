@@ -9,6 +9,7 @@
     "rows": {
       "continue_watching": "Continue watching",
       "my_list": "My list",
+      "similar": "More like {title}",
       "seasonal": "This season",
       "top": "Top rated",
       "friends_popular": "Popular with friends",
