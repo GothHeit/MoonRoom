@@ -143,6 +143,16 @@ export function ReaderBars({ shown, title, titleHref, chapter, page, count, mode
           )}
         </div>
       </div>
+      {!shown && (
+        // The way out stays on screen while the bars are away: an installed iPhone app has no browser back.
+        <Link
+          href={titleHref}
+          aria-label={t("back", { title })}
+          className="press absolute left-[calc(0.75rem+env(safe-area-inset-left))] top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-11 w-11 items-center justify-center rounded-full border border-line-strong bg-bg/80 text-fg hover:border-accent"
+        >
+          <Chevron left />
+        </Link>
+      )}
       {!shown && <button type="button" onClick={onToggle} className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-20">{showLabel}</button>}
     </div>
   );
