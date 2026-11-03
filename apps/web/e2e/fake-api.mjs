@@ -1,7 +1,7 @@
 // Minimal stand-in for the API, so the web e2e tests need no database.
 import { createServer } from "node:http";
 
-import { handleManga } from "./fake-manga.mjs";
+import { handleManga, MANGA } from "./fake-manga.mjs";
 import { choiceFor, handleWatch, streamFor } from "./fake-watch.mjs";
 
 // The saved subtitle choice, like the real account setting.
@@ -148,6 +148,26 @@ createServer(async (req, res) => {
     }
   }
   if (await handleWatch(req, res, { url, send, error, body, authed })) return;
+  if (url.pathname === "/users/00000000-0000-4000-8000-000000000001/profile") {
+    if (!authed) return send(401, error("not_authenticated"));
+    const at = "2026-01-01T00:00:00Z";
+    const read = (id, chapter, page, completed) => ({ manga: MANGA.find((m) => m.id === id), chapter, page, pages: 20, completed, at });
+    return send(200, {
+      user: { id: "00000000-0000-4000-8000-000000000001", username: "kafka", avatar: { kind: "none", version: 0 } },
+      relation: "self",
+      joined_at: at,
+      friends_since: null,
+      friends: 2,
+      activity_shared: true,
+      stats: { titles: 2, episodes: 14, friends: 2 },
+      watching: [{ anime: CATALOG[0], episode: 3, completed: false }],
+      recent: [],
+      manga_stats: { titles: 3, chapters: 41 },
+      reading: [read(1, "12", 7, false), read(2, "88", 15, false)],
+      recent_manga: [read(3, "9", 19, true)],
+      manga_genres: [{ id: 2, name: "Adventure" }, { id: 10, name: "Fantasy" }],
+    });
+  }
   if (url.pathname === "/me") {
     if (!authed) return send(401, error("not_authenticated"));
     if (req.method === "PATCH") {

@@ -52,6 +52,15 @@
     "locked": "Only friends can see this profile.",
     "lockedHint": "Send a friend request and wait for them to accept.",
     "toFriends": "Go to friends",
-    "edit": "Settings"
+    "edit": "Settings",
+    "manga": "Manga",
+    "favoriteGenres": "Favorite genres",
+    "mangaStats": {
+      "titles": "Titles started",
+      "chapters": "Chapters read"
+    },
+    "reading": "Reading",
+    "recentManga": "Recently finished",
+    "chapter": "Ch. {n}"
   }
 }

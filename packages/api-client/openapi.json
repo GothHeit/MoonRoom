@@ -3005,6 +3005,62 @@
         "title": "PresetIn",
         "type": "object"
       },
+      "ProfileMangaStats": {
+        "properties": {
+          "chapters": {
+            "title": "Chapters",
+            "type": "integer"
+          },
+          "titles": {
+            "title": "Titles",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "titles",
+          "chapters"
+        ],
+        "title": "ProfileMangaStats",
+        "type": "object"
+      },
+      "ProfileMangaTitle": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "chapter": {
+            "title": "Chapter",
+            "type": "string"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "boolean"
+          },
+          "manga": {
+            "$ref": "#/components/schemas/MangaCard"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "pages": {
+            "title": "Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "manga",
+          "chapter",
+          "page",
+          "pages",
+          "completed",
+          "at"
+        ],
+        "title": "ProfileMangaTitle",
+        "type": "object"
+      },
       "ProfileOut": {
         "properties": {
           "activity_shared": {
@@ -3039,6 +3095,44 @@
             "title": "Joined At",
             "type": "string"
           },
+          "manga_genres": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Genre"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manga Genres"
+          },
+          "manga_stats": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfileMangaStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProfileMangaTitle"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading"
+          },
           "recent": {
             "anyOf": [
               {
@@ -3052,6 +3146,20 @@
               }
             ],
             "title": "Recent"
+          },
+          "recent_manga": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProfileMangaTitle"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recent Manga"
           },
           "relation": {
             "enum": [

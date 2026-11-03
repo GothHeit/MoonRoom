@@ -218,3 +218,34 @@ async def test_simultaneous_requests_end_as_friends(client, session, monkeypatch
     r = await client.post("/friends/requests", json={"username": "bob"}, headers=ana)
     assert r.status_code == 201
     assert r.json()["relation"] == "friends"
+
+
+async def read(client, headers, manga_id, chapter, finished=True):
+    await client.put(
+        f"/manga/{manga_id}/progress/{chapter}",
+        json={"page": 9 if finished else 2, "pages": 10},
+        headers=headers,
+    )
+
+
+@respx.mock
+async def test_profile_shows_manga_stats_and_titles(client, session):
+    from tests.test_manga import mock_details as mock_manga
+
+    _, ana = await make_user(session, "ana")
+    bob_user, bob = await make_user(session, "bob")
+    await befriend(client, ana, bob, "bob")
+    mock_manga(30, genres=[(1, "Action"), (2, "Adventure")])
+    mock_manga(31, genres=[(1, "Action")])
+    await read(client, bob, 30, "1")
+    await read(client, bob, 30, "2")
+    await read(client, bob, 31, "7", finished=False)
+    body = (await client.get(f"/users/{bob_user.id}/profile", headers=ana)).json()
+    assert body["manga_stats"] == {"titles": 2, "chapters": 2}
+    assert {t["manga"]["id"] for t in body["reading"]} == {30, 31}
+    assert [(t["manga"]["id"], t["chapter"]) for t in body["recent_manga"]] == [(30, "2")]
+    assert [g["name"] for g in body["manga_genres"]] == ["Action", "Adventure"]
+    await client.patch("/me", json={"share_activity": False}, headers=bob)
+    hidden = (await client.get(f"/users/{bob_user.id}/profile", headers=ana)).json()
+    assert hidden["manga_stats"] is None and hidden["reading"] is None
+    assert hidden["recent_manga"] is None and hidden["manga_genres"] is None

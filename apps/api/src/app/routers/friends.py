@@ -16,10 +16,10 @@ from app.db import utcnow
 from app.deps import CurrentUser, Session, throttle
 from app.errors import ApiError
 from app.mal.client import MalClient, is_safe
-from app.models import Friendship, MalLink, User, WatchProgress
+from app.models import Friendship, MalLink, MangaProgress, User, WatchProgress
 from app.notifications import forget_pair, notify, withdraw
 from app.routers.progress import latest_per_anime
-from app.schemas import AnimeCard
+from app.schemas import AnimeCard, Genre, MangaCard
 from app.soft import soft
 
 router = APIRouter(tags=["friends"])
@@ -84,6 +84,20 @@ class ProfileStats(BaseModel):
     friends: int
 
 
+class ProfileMangaTitle(BaseModel):
+    manga: MangaCard
+    chapter: str
+    page: int
+    pages: int
+    completed: bool
+    at: datetime
+
+
+class ProfileMangaStats(BaseModel):
+    titles: int
+    chapters: int
+
+
 class ProfileOut(BaseModel):
     user: UserSummary
     relation: Literal["self", "friends"]
@@ -95,6 +109,12 @@ class ProfileOut(BaseModel):
     stats: ProfileStats | None
     watching: list[ProfileTitle] | None
     recent: list[ActivityOut] | None
+    # Manga, same rules: None when activity is private. `manga_genres` are the most common
+    # genres among the titles shown above, most common first.
+    manga_stats: ProfileMangaStats | None = None
+    reading: list[ProfileMangaTitle] | None = None
+    recent_manga: list[ProfileMangaTitle] | None = None
+    manga_genres: list[Genre] | None = None
 
 
 # ---------------------------------------------------------------- helpers
@@ -432,4 +452,61 @@ async def profile(
         if p.anime_id in cards
     ]
     out.recent = await _activity(request, user, session, [target.id], 10)
+    await _manga_profile(request, user, session, target.id, out)
     return out
+
+
+async def _manga_profile(
+    request: Request, viewer: User, session: Session, target_id: uuid.UUID, out: ProfileOut
+) -> None:
+    """The manga half of a profile: totals, what they are reading, the last chapter finished."""
+    from app.routers.manga import latest_per_manga  # manga -> home -> friends: import late
+
+    titles, chapters = (
+        await session.execute(
+            select(
+                func.count(func.distinct(MangaProgress.manga_id)),
+                func.count().filter(MangaProgress.completed.is_(True)),
+            ).where(MangaProgress.user_id == target_id)
+        )
+    ).one()
+    out.manga_stats = ProfileMangaStats(titles=titles, chapters=chapters)
+    reading = await latest_per_manga(session, target_id, 8)
+    finished = (
+        select(MangaProgress)
+        .where(MangaProgress.user_id == target_id, MangaProgress.completed.is_(True))
+        .ext(distinct_on(MangaProgress.manga_id))
+        .order_by(MangaProgress.manga_id, MangaProgress.updated_at.desc())
+        .subquery()
+    )
+    recent_rows = (
+        await session.execute(select(finished).order_by(finished.c.updated_at.desc()).limit(10))
+    ).all()
+    await session.commit()  # MAL lookups below: don't hold a connection through them
+    ids = list({*(r.manga_id for r in reading), *(r.manga_id for r in recent_rows)})
+    mal = request.app.state.mal
+    found = await asyncio.gather(*(soft(mal.manga_details(i), "profile: manga") for i in ids))
+    cards = {
+        i: MangaCard.from_node(node)
+        for i, node in zip(ids, found, strict=True)
+        if node is not None and (viewer.show_nsfw or is_safe(node))
+    }
+
+    def title(r) -> ProfileMangaTitle:
+        return ProfileMangaTitle(
+            manga=cards[r.manga_id],
+            chapter=r.chapter,
+            page=r.page,
+            pages=r.pages,
+            completed=r.completed,
+            at=r.updated_at,
+        )
+
+    out.reading = [title(r) for r in reading if r.manga_id in cards]
+    out.recent_manga = [title(r) for r in recent_rows if r.manga_id in cards]
+    counts: dict[int, tuple[Genre, int]] = {}
+    for card in cards.values():
+        for g in card.genres:
+            counts[g.id] = (g, counts.get(g.id, (g, 0))[1] + 1)
+    ranked = sorted(counts.values(), key=lambda gc: (-gc[1], gc[0].name))
+    out.manga_genres = [g for g, _ in ranked[:4]]

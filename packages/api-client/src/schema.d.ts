@@ -2440,6 +2440,30 @@ export interface components {
             /** Preset */
             preset: string;
         };
+        /** ProfileMangaStats */
+        ProfileMangaStats: {
+            /** Chapters */
+            chapters: number;
+            /** Titles */
+            titles: number;
+        };
+        /** ProfileMangaTitle */
+        ProfileMangaTitle: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Chapter */
+            chapter: string;
+            /** Completed */
+            completed: boolean;
+            manga: components["schemas"]["MangaCard"];
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+        };
         /** ProfileOut */
         ProfileOut: {
             /** Activity Shared */
@@ -2453,8 +2477,15 @@ export interface components {
              * Format: date-time
              */
             joined_at: string;
+            /** Manga Genres */
+            manga_genres?: components["schemas"]["Genre"][] | null;
+            manga_stats?: components["schemas"]["ProfileMangaStats"] | null;
+            /** Reading */
+            reading?: components["schemas"]["ProfileMangaTitle"][] | null;
             /** Recent */
             recent: components["schemas"]["ActivityOut"][] | null;
+            /** Recent Manga */
+            recent_manga?: components["schemas"]["ProfileMangaTitle"][] | null;
             /**
              * Relation
              * @enum {string}
