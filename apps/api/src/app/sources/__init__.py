@@ -49,6 +49,14 @@ def load_sources(names: list[str]) -> dict[str, VideoSource]:
             from app.sources.uniquestream import UniqueStreamSource
 
             sources[name] = UniqueStreamSource()
+        elif name == "freak":
+            from app.sources.freak import FreakSource
+
+            sources[name] = FreakSource()
+        elif name == "animesbiz":
+            from app.sources.animesbiz import AnimesBizSource
+
+            sources[name] = AnimesBizSource()
         elif name == "local":
             from app.sources.local import LocalSource
 

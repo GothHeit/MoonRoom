@@ -28,6 +28,13 @@
       "uniquestream": {
         "sub": "AnimeStream · Subtitled",
         "dub": "AnimeStream · Dubbed"
+      },
+      "freak": {
+        "sub": "Freak · English subtitles",
+        "dub": "Freak · English dub"
+      },
+      "animesbiz": {
+        "sub": "AnimesBiz · Portuguese subtitles"
       }
     }
   }

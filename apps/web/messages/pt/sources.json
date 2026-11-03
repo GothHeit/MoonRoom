@@ -28,6 +28,13 @@
       "uniquestream": {
         "sub": "AnimeStream · Legendado",
         "dub": "AnimeStream · Dublado"
+      },
+      "freak": {
+        "sub": "Freak · Legendas em inglês",
+        "dub": "Freak · Dublagem em inglês"
+      },
+      "animesbiz": {
+        "sub": "AnimesBiz · Legendado em português"
       }
     }
   }
