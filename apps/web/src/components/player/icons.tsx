@@ -1,6 +1,6 @@
 const PATHS = {
   play: "M7 4l13 8-13 8z",
-  pause: "M7 4h4v16H7zM13 4h4v16h-4z",
+  pause: "M8.5 5v14M15.5 5v14",
   rewind: "M11 6L4 12l7 6zM20 6l-7 6 7 6z",
   forward: "M13 6l7 6-7 6zM4 6l7 6-7 6z",
   volume: "M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11",
@@ -17,7 +17,7 @@ const PATHS = {
 export type PlayerIconName = keyof typeof PATHS;
 
 export function PlayerIcon({ name }: { name: PlayerIconName }) {
-  const filled = name === "play" || name === "pause" || name === "rewind" || name === "forward";
+  const filled = name === "play" || name === "rewind" || name === "forward";
   return (
     <svg
       aria-hidden="true"
@@ -26,7 +26,7 @@ export function PlayerIcon({ name }: { name: PlayerIconName }) {
       height="24"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={name === "pause" ? 3.5 : 2}
       strokeLinecap="round"
       strokeLinejoin="round"
     >

@@ -50,8 +50,8 @@ function Row({ label, value, onClick }: { label: string; value: string; onClick:
       className="flex min-h-12 w-full items-center justify-between gap-4 rounded-ui px-3 text-left text-sm hover:bg-white/10 active:bg-white/10"
     >
       <span>{label}</span>
-      <span className="flex min-w-0 items-center gap-1 text-muted">
-        <span className="truncate">{value}</span>
+      <span className="flex min-w-0 items-center gap-1 text-right text-muted">
+        <span className="min-w-0 break-words">{value}</span>
         <span aria-hidden="true">›</span>
       </span>
     </button>

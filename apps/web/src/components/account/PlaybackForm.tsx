@@ -24,7 +24,7 @@ type Props = {
   maxResolution: number | null;
 };
 
-const selectClass = "w-full max-w-xs rounded-ui border border-line bg-bg px-3 py-2 text-fg";
+const selectClass = "w-full max-w-md rounded-ui border border-line bg-bg px-3 py-2 text-fg";
 
 /** What the automatic source choice looks for. Each change is saved right away. */
 export function PlaybackForm(props: Props) {
