@@ -1,9 +1,20 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
+import { useEffect, useRef, useState } from "react";
 
 import { Link, useRouter } from "@/i18n/navigation";
-import { languageName, progressKey, sourceName, readHref, type Chapter, type ChaptersOut } from "@/lib/manga";
+import {
+  CHAPTER_PAGE_SIZE,
+  chapterPageOf,
+  chapterRangeLabel,
+  languageName,
+  progressKey,
+  readHref,
+  sourceName,
+  type Chapter,
+  type ChaptersOut,
+} from "@/lib/manga";
 
 type Props = {
   mangaId: number;
@@ -26,6 +37,16 @@ export function ChapterList({ mangaId, listing }: Props) {
   const router = useRouter();
   const { source, sources = [], lang, languages = [], chapters = [], progress = {} } = listing;
   const latest = chapters[chapters.length - 1];
+  // Long series show one range of chapters at a time, starting at the one with the next unread.
+  const [page, setPage] = useState(() => chapterPageOf(chapters, progress));
+  const chips = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = chips.current;
+    const chip = row?.children[page] as HTMLElement | undefined;
+    if (row && chip) row.scrollLeft = chip.offsetLeft - row.clientWidth / 2 + chip.offsetWidth / 2;
+  }, [page]);
+  const pages = Math.ceil(chapters.length / CHAPTER_PAGE_SIZE);
+  const shown = chapters.slice(page * CHAPTER_PAGE_SIZE, (page + 1) * CHAPTER_PAGE_SIZE);
 
   return (
     <section aria-labelledby="chapters" className="px-4 sm:px-8">
@@ -73,11 +94,28 @@ export function ChapterList({ mangaId, listing }: Props) {
           <span className="text-sm text-muted">{t("from", { source: sourceName(source) })}</span>
         )}
       </div>
+      {pages > 1 && (
+        <div ref={chips} role="group" aria-label={t("range")} className="no-scrollbar relative -mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-8 sm:px-8">
+          {Array.from({ length: pages }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-pressed={i === page}
+              onClick={() => setPage(i)}
+              className={`press h-11 shrink-0 rounded-full border px-4 text-sm font-bold tabular-nums ${
+                i === page ? "border-accent bg-accent text-on-accent" : "border-line-strong text-soft hover:border-accent hover:text-fg"
+              }`}
+            >
+              {chapterRangeLabel(chapters, i)}
+            </button>
+          ))}
+        </div>
+      )}
       {chapters.length === 0 ? (
         <p className="py-6 text-muted">{t("noChapters")}</p>
       ) : (
         <ol reversed className="divide-y divide-line">
-          {[...chapters].reverse().map((chapter) => {
+          {[...shown].reverse().map((chapter) => {
             const p = progress[progressKey(chapter)];
             const read = !!p?.completed;
             const date = chapter.published_at ? new Date(chapter.published_at) : null;

@@ -49,6 +49,7 @@
       "trackingOnly": "Not available here",
       "trackingOnlyHint": "No source has this title yet.",
       "chapterList": "Chapters",
+      "range": "Chapters shown",
       "language": "Language",
       "source": "Source",
       "from": "From {source}",

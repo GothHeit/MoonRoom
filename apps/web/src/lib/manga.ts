@@ -64,6 +64,23 @@ export function nextChapter(chapters: Chapter[], progress: Record<string, MangaP
   return next ? { chapter: next, resume: false } : null;
 }
 
+/** Long series are split into ranges of this many chapters on the title page. */
+export const CHAPTER_PAGE_SIZE = 100;
+
+/** The range (0-based) holding the chapter the primary button opens; the first when there is none. */
+export function chapterPageOf(chapters: Chapter[], progress: Record<string, MangaProgress>) {
+  const up = nextChapter(chapters, progress);
+  const index = up ? chapters.indexOf(up.chapter) : chapters.length - 1;
+  return Math.max(0, Math.floor(Math.max(index, 0) / CHAPTER_PAGE_SIZE));
+}
+
+/** "1–100": the first and last chapter number of a range (the position when a chapter has no number). */
+export function chapterRangeLabel(chapters: Chapter[], page: number) {
+  const first = page * CHAPTER_PAGE_SIZE;
+  const last = Math.min(first + CHAPTER_PAGE_SIZE, chapters.length) - 1;
+  return `${chapters[first]?.number || first + 1}–${chapters[last]?.number || last + 1}`;
+}
+
 /** What the title page's primary pill says and opens, from the chapters and the user's progress. */
 export function readAction(listing: ChaptersOut, mangaId: number) {
   const { source, lang, chapters = [], progress = {} } = listing;

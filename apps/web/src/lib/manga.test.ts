@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultReading, nextChapter, progressKey, readFraction, readHref, type Chapter } from "./manga";
+import { chapterPageOf, chapterRangeLabel, defaultReading, nextChapter, progressKey, readFraction, readHref, type Chapter } from "./manga";
 
 const ch = (id: string, number: string): Chapter => ({ id, number, lang: "en" });
 const done = { manga_id: 1, chapter: "", page: 9, pages: 10, completed: true, updated_at: "" };
@@ -35,5 +35,16 @@ describe("manga helpers", () => {
     expect(readFraction(done)).toBe(1);
     expect(readFraction({ page: 3, pages: 7, completed: false })).toBe(0.5);
     expect(readFraction({ page: 0, pages: 1, completed: false })).toBe(0.02);
+  });
+
+  it("picks the range with the next unread chapter", () => {
+    const long = Array.from({ length: 250 }, (_, i) => ch(`c${i + 1}`, String(i + 1)));
+    const upTo = (n: number) => Object.fromEntries(long.slice(0, n).map((c) => [c.number, done]));
+    expect(chapterPageOf(long, {})).toBe(0);
+    expect(chapterPageOf(long, upTo(99))).toBe(0);
+    expect(chapterPageOf(long, upTo(100))).toBe(1);
+    expect(chapterPageOf(long, upTo(250))).toBe(2);
+    expect(chapterPageOf([], {})).toBe(0);
+    expect(chapterRangeLabel(long, 2)).toBe("201–250");
   });
 });

@@ -33,7 +33,8 @@ const GENRES = [
 ];
 
 // The user is partway through chapter 2 of title 1. Reading moves it; /manga/__reset puts it back.
-const initialProgress = () => new Map([["1:2", { manga_id: 1, chapter: "2", page: 1, pages: 4, completed: false, updated_at: "2026-01-01T00:00:00Z" }]]);
+const doneRow = (n) => [`4:${n}`, { manga_id: 4, chapter: String(n), page: 3, pages: 4, completed: true, updated_at: "2026-01-01T00:00:00Z" }];
+const initialProgress = () => new Map([...Array.from({ length: 149 }, (_, i) => doneRow(i + 1)), ["1:2", { manga_id: 1, chapter: "2", page: 1, pages: 4, completed: false, updated_at: "2026-01-01T00:00:00Z" }]]);
 let progress = initialProgress();
 
 const chapter = (id, number, title, lang = "en") => ({
@@ -47,8 +48,12 @@ const chapter = (id, number, title, lang = "en") => ({
   pages: 4,
 });
 
-const chaptersFor = (lang) =>
-  lang === "pt-br"
+// Title 4 is a long series: 250 chapters, the first 149 read.
+const LONG = Array.from({ length: 250 }, (_, i) => chapter(`l${i + 1}`, String(i + 1), `Floor ${i + 1}`));
+const chaptersFor = (lang, id = 1) =>
+  id === 4
+    ? LONG
+    : lang === "pt-br"
     ? [chapter("p1", "1", "O fim da jornada", "pt-br")]
     : [chapter("c1", "1", "The Journey's End"), chapter("c2", "2", "The Priest's Lie"), chapter("c3", "3", "Blue-Moon Weed")];
 
@@ -110,7 +115,7 @@ export function handleManga(url, req, send, res, body) {
     const lang = url.searchParams.get("lang") ?? "en";
     const saved = {};
     for (const p of progress.values()) if (p.manga_id === id) saved[p.chapter] = p;
-    return send(200, { source: "stub", source_id: "md-1", source_title: "Frieren", lang, languages: ["pt-br", "en"], chapters: chaptersFor(lang), progress: saved });
+    return send(200, { source: "stub", source_id: "md-1", source_title: "Frieren", lang, languages: ["pt-br", "en"], chapters: chaptersFor(lang, id), progress: saved });
   }
   const read = /^\/manga\/(\d+)\/read\/stub\/([^/]+)$/.exec(path);
   if (read) {

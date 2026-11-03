@@ -51,6 +51,19 @@ test("browses manga by genre", async ({ page }) => {
   await expect(page).toHaveURL(/manga\/browse\?row=manhwa$/);
 });
 
+test("splits a long series into ranges, opening the one with the next chapter", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/en/manga/4");
+  const chapters = page.getByRole("region", { name: "Chapters" });
+  const ranges = chapters.getByRole("group", { name: "Chapters shown" });
+  await expect(ranges.getByRole("button")).toHaveCount(3);
+  await expect(ranges.getByRole("button", { name: "101–200" })).toHaveAttribute("aria-pressed", "true");
+  await expect(chapters.getByRole("link")).toHaveCount(100);
+  await ranges.getByRole("button", { name: "201–250" }).click();
+  await expect(chapters.getByRole("link")).toHaveCount(50);
+  await expect(chapters.getByRole("link", { name: /Ch\. 250/ })).toBeVisible();
+});
+
 test("shows a title with its chapters and opens the reader", async ({ page }) => {
   await signIn(page);
   await page.goto("/en/manga/1");
