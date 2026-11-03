@@ -20,7 +20,13 @@ from app import hls
 from app.singleflight import SingleFlight
 from app.sources.adult import is_adult
 from app.sources.base import EpisodeList, Lang, Stream, Traits
-from app.sources.matching import Candidate, match, search_queries
+from app.sources.matching import (
+    STRICT_MIN_RATIO,
+    Candidate,
+    fallback_query,
+    match,
+    search_queries,
+)
 
 BASE = "https://hentaifreak.org"
 USER_AGENT = (
@@ -76,6 +82,10 @@ def episodes_for(posts: list[Post], title: str, lang: Lang) -> dict[int, str]:
     return {n: chosen[n].path for n in sorted(chosen)}
 
 
+def titles_of(posts: list[Post]) -> list[Candidate]:
+    return [Candidate(t, t) for t in sorted({p.title for p in posts})]
+
+
 def parse_video(page: str) -> tuple[str, int | None] | None:
     found = SOURCE.search(page)
     if not found:
@@ -123,12 +133,17 @@ class FreakSource:
     async def _read_listing(self, key: tuple, anime: dict):
         lang: Lang = key[1]
         posts: list[Post] = []
-        for query in search_queries(anime):
+        queries = search_queries(anime)
+        for query in queries:
             posts += parse_results(await self._get(f"{BASE}/search/{quote(query)}/"))
-        titles = {p.title for p in posts}
-        candidates = [Candidate(t, t) for t in sorted(titles)]
+        found = match(anime, lambda _q: titles_of(posts), lambda _t: [], STRICT_MIN_RATIO)
+        # The site searches the exact phrase, so a title spelled a little differently is looked
+        # for by one of its words.
+        if found is None and (word := fallback_query(anime)) and word not in queries:
+            posts += parse_results(await self._get(f"{BASE}/search/{quote(word)}/"))
+            found = match(anime, lambda _q: titles_of(posts), lambda _t: [], STRICT_MIN_RATIO)
         listing = None
-        if found := match(anime, lambda _q: candidates, lambda _t: []):
+        if found:
             if episodes := episodes_for(posts, found.name, lang):
                 listing = (found.name, episodes)
         if listing is None:

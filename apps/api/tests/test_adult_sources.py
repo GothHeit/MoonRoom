@@ -161,3 +161,19 @@ def test_registry():
     sources = load_sources(["freak", "animesbiz"])
     assert isinstance(sources["freak"], FreakSource)
     assert isinstance(sources["animesbiz"], AnimesBizSource)
+
+
+@respx.mock
+async def test_animesbiz_falls_back_to_one_word_and_handles_dot_titles():
+    base = animesbiz.BASE
+    anime = {"id": 3, "title": "Futsuma *jo Charlotte.", "genres": ADULT, "alternative_titles": {}}
+    respx.get(f"{base}/search/Futsuma%20%2Ajo%20Charlotte").respond(text="")
+    respx.get(f"{base}/search/Futsuma").respond(
+        text=article("futsuma-shoujo-charlotte", "Futsuma Shoujo Charlotte")
+    )
+    respx.get(f"{base}/hentai/futsuma-shoujo-charlotte/").respond(
+        text=title_page("futsuma-shoujo-charlotte", 2)
+    )
+    listed = await AnimesBizSource().episodes(anime, "sub")
+    assert listed and listed.source_title == "Futsuma Shoujo Charlotte"
+    assert listed.episodes == [1, 2]

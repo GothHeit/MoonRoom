@@ -17,6 +17,9 @@ from dataclasses import dataclass
 from rapidfuzz import fuzz
 
 MIN_RATIO = 70
+# For sites full of short titles that share words (adult releases), 70 lets "Harem Camp" take
+# "Harem Cult" and "Oni Chichi: Re-birth" take "Re-born".
+STRICT_MIN_RATIO = 75
 EXACT_ENOUGH = 90
 SEQUEL_PENALTY = 25
 SEQUEL_MARKERS = (
@@ -55,6 +58,70 @@ class Candidate:
 
 def normalize(s: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", s).lower().split())
+
+
+# MAL hides some words of adult titles ("Futsuma *jo Charlotte", "○-ssia Musume"): a token with
+# one of these marks stands for any word that fits around it.
+CENSOR_MARKS = "*○●"
+CENSORED = re.compile(rf"\S*[{re.escape(CENSOR_MARKS)}]\S*")
+# Romanisations that differ only in spelling ("Hikari wo" / "Hikari o").
+SPELLINGS = {"wo": "o"}
+# A suffix adult releases carry on MAL but often not on the sites ("X The Animation").
+DECORATIVE_SUFFIX = re.compile(r"\s+the animation$")
+MARK_HYPHEN = re.compile(rf"([{re.escape(CENSOR_MARKS)}])-")
+WORD_HYPHEN = re.compile(r"(?<=\w)-(?=\w)")
+EDGE_PUNCTUATION = re.compile(r"^\W+|\W+$")
+NOT_WORD = re.compile(rf"[^\w\s{re.escape(CENSOR_MARKS)}]+")
+
+
+def fuzzy_key(s: str, join_hyphens: bool = False) -> str:
+    """A title reduced to its words for scoring: no punctuation or symbols (♥, ☆, "!:"), one
+    spelling of the common romanisation variants and no "The Animation" suffix. Hyphenated words
+    are split, or joined with `join_hyphens` ("Re-born" / "Reborn")."""
+    text = MARK_HYPHEN.sub(r"\1", normalize(s).replace("_", " "))
+    if join_hyphens:
+        text = WORD_HYPHEN.sub("", text)
+    words = NOT_WORD.sub(" ", text).split()
+    return DECORATIVE_SUFFIX.sub("", " ".join(SPELLINGS.get(w, w) for w in words))
+
+
+def fuzzy_keys(s: str) -> set[str]:
+    return {fuzzy_key(s), fuzzy_key(s, join_hyphens=True)}
+
+
+def fill_censored(target: str, name: str) -> str:
+    """The target with each censored token replaced by the word of `name` it can stand for."""
+    if not CENSORED.search(target):
+        return target
+    words = name.split()
+    tokens = target.split()
+    out = []
+    for i, token in enumerate(tokens):
+        if not token.strip(CENSOR_MARKS):
+            # A word hidden whole ("** Kouhai") is taken to be the word in the same place, when
+            # both titles have as many words; otherwise it is left out.
+            if len(words) == len(tokens):
+                out.append(words[i])
+            continue
+        if CENSORED.fullmatch(token):
+            parts = [re.escape(p) for p in re.split(rf"[{re.escape(CENSOR_MARKS)}]+", token)]
+            pattern = re.compile(r"\w*".join(parts))
+            token = next((w for w in words if pattern.fullmatch(w)), token)
+        out.append(token)
+    return " ".join(out)
+
+
+def fallback_query(detail: dict) -> str | None:
+    """One distinctive word of the main title, for sites whose search needs the exact phrase and
+    so miss a title spelled a little differently ("Araiya-san!: Ore to..." vs "Araiya-san! Ore
+    to..."). Censored and short words are skipped."""
+    for raw in (detail.get("title") or "").split():
+        if CENSORED.fullmatch(raw):
+            continue
+        word = EDGE_PUNCTUATION.sub("", raw)
+        if len(word) >= 4:
+            return word
+    return None
 
 
 def mal_titles(detail: dict) -> set[str]:
@@ -96,13 +163,18 @@ def penalty(name: str, mal_joined: str) -> int:
 
 
 def _best_ratio(names: Iterable[str], targets: set[str]) -> float:
-    return max((fuzz.token_sort_ratio(t, normalize(n)) for n in names for t in targets), default=0)
+    keys = [fuzzy_key(n) for n in names]
+    return max(
+        (fuzz.token_sort_ratio(fill_censored(fuzzy_key(t), k), k) for k in keys for t in targets),
+        default=0,
+    )
 
 
 def match(
     detail: dict,
     search: Callable[[str], list[Candidate]],
     alternative_names: Callable[[str], list[str]],
+    min_ratio: int = MIN_RATIO,
 ) -> Candidate | None:
     raw = mal_titles(detail)
     targets = {normalize(t) for t in raw}
@@ -123,6 +195,6 @@ def match(
         if score > best_score:
             best, best_score, best_ratio = c, score, ratio
 
-    if best is None or best_ratio < MIN_RATIO:
+    if best is None or best_ratio < min_ratio:
         return None
     return best

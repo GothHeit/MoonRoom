@@ -23,7 +23,13 @@ from app.singleflight import SingleFlight
 from app.sources.adult import is_adult
 from app.sources.animesonlinecc import parse_player, parse_videos
 from app.sources.base import EpisodeList, Lang, Stream, Traits
-from app.sources.matching import Candidate, match, search_queries
+from app.sources.matching import (
+    STRICT_MIN_RATIO,
+    Candidate,
+    fallback_query,
+    match,
+    search_queries,
+)
 
 BASE = "https://animeshentai.biz"
 USER_AGENT = (
@@ -88,6 +94,15 @@ class AnimesBizSource:
         response.raise_for_status()
         return response.text
 
+    async def _search(self, query: str) -> str:
+        # A path ending in a dot is a 404 on this site ("Natsuyasumi.").
+        try:
+            return await self._get(f"{BASE}/search/{quote(query.rstrip('. '))}")
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code == 404:
+                return ""
+            raise
+
     async def _listing(self, anime: dict):
         key = anime["id"]
         if key in self._listings:
@@ -100,9 +115,15 @@ class AnimesBizSource:
         key = anime["id"]
         listing = None
         queries = search_queries(anime)
-        pages = await asyncio.gather(*(self._get(f"{BASE}/search/{quote(q)}") for q in queries))
+        pages = await asyncio.gather(*(self._search(q) for q in queries))
         candidates = [c for page in pages for c in parse_results(page)]
-        if found := match(anime, lambda _q: candidates, lambda _slug: []):
+        found = match(anime, lambda _q: candidates, lambda _slug: [], STRICT_MIN_RATIO)
+        # The site searches the exact phrase, so a title spelled a little differently is looked
+        # for by one of its words.
+        if found is None and (word := fallback_query(anime)) and word not in queries:
+            loose = parse_results(await self._search(word))
+            found = match(anime, lambda _q: loose, lambda _slug: [], STRICT_MIN_RATIO)
+        if found:
             page = await self._get(f"{BASE}/hentai/{found.identifier}/")
             if episodes := parse_episodes(page):
                 listing = (found.name, episodes)
