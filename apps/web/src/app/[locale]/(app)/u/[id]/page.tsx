@@ -13,6 +13,10 @@ import { coverOf, mangaHref } from "@/lib/manga";
 import { titled } from "@/lib/page-title";
 import { serverApi, unwrap } from "@/lib/server-api";
 
+// One poster size for every row, and rows pulled out to the page edge so their headings line up with the stats grid.
+const ITEM = "w-32 sm:w-40";
+const BLEED = "-mx-4 sm:-mx-8";
+
 export async function generateMetadata({ params }: PageProps<"/[locale]/u/[id]">): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "profile" });
@@ -81,14 +85,14 @@ export default async function ProfilePage({ params }: PageProps<"/[locale]/u/[id
             ))}
           </dl>
           {profile.watching!.length > 0 && (
-            <Row title={t("watching")}>
+            <Row title={t("watching")} itemClassName={ITEM} className={BLEED}>
               {profile.watching!.map(({ anime, episode }) => (
                 <PosterCard key={anime.id} href={animeHref(anime.id)} title={anime.title} image={posterOf(anime)} caption={t("episode", { n: episode })} />
               ))}
             </Row>
           )}
           {profile.recent!.length > 0 && (
-            <Row title={t("recent")}>
+            <Row title={t("recent")} itemClassName={ITEM} className={BLEED}>
               {profile.recent!.map(({ anime, episode }) => (
                 <PosterCard key={anime.id} href={animeHref(anime.id)} title={anime.title} image={posterOf(anime)} caption={t("finished", { n: episode })} />
               ))}
@@ -120,7 +124,7 @@ export default async function ProfilePage({ params }: PageProps<"/[locale]/u/[id
                 ))}
               </dl>
               {reading.length > 0 && (
-                <Row title={t("reading")} itemClassName="w-32 sm:w-40">
+                <Row title={t("reading")} itemClassName={ITEM} className={BLEED}>
                   {reading.map(({ manga, chapter, page, pages }) => (
                     <CoverCard
                       key={manga.id}
@@ -135,7 +139,7 @@ export default async function ProfilePage({ params }: PageProps<"/[locale]/u/[id
                 </Row>
               )}
               {recentManga.length > 0 && (
-                <Row title={t("recentManga")} itemClassName="w-32 sm:w-40">
+                <Row title={t("recentManga")} itemClassName={ITEM} className={BLEED}>
                   {recentManga.map(({ manga, chapter }) => (
                     <CoverCard
                       key={manga.id}

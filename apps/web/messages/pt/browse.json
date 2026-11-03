@@ -25,6 +25,8 @@
     "resultsFor": "Resultados para “{q}”",
     "prompt": "Digite um título para buscar.",
     "empty": "Nada encontrado para “{q}”.",
+    "emptyHint": "Confira a grafia, tente um nome mais curto ou explore por gênero.",
+    "browse": "Explorar títulos",
     "suggestions": "Sugestões",
     "noSuggestions": "Sem sugestões",
     "viewAll": "Ver todos os resultados"

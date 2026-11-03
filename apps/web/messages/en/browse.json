@@ -25,6 +25,8 @@
     "resultsFor": "Results for “{q}”",
     "prompt": "Type a title to search.",
     "empty": "Nothing found for “{q}”.",
+    "emptyHint": "Check the spelling, try a shorter name, or browse by genre.",
+    "browse": "Browse titles",
     "suggestions": "Suggestions",
     "noSuggestions": "No suggestions",
     "viewAll": "See all results"

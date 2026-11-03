@@ -5,7 +5,7 @@ import { FriendsActivity } from "@/components/rows/FriendsActivity";
 import { HomeRows } from "@/components/rows/HomeRows";
 import { HomeSkeleton } from "@/components/rows/HomeSkeleton";
 import { HeroCarousel } from "@/components/ui/HeroCarousel";
-import { animeHref } from "@/lib/catalog";
+import { animeHref, posterOf } from "@/lib/catalog";
 import { genreName } from "@/lib/genres";
 import { serverApi, unwrap } from "@/lib/server-api";
 import { cleanSynopsis } from "@/lib/synopsis";
@@ -37,7 +37,7 @@ async function HomeContent({ locale }: { locale: string }) {
         .join(" · ") || undefined,
     synopsis: cleanSynopsis(synopsis) || undefined,
     synopsisNote: locale === "pt" && synopsis_lang === "en" ? t("synopsisEnglish") : undefined,
-    image: backdrop,
+    image: backdrop ?? posterOf(anime),
     wideArt: wide_art,
   }));
 

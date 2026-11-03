@@ -8,10 +8,12 @@ type Props = {
   children: ReactNode;
   /** Tailwind width class for each item. Tall posters are narrower than wide cards. */
   itemClassName?: string;
+  /** Extra classes on the section, e.g. negative margins. */
+  className?: string;
 };
 
 /** Horizontal scroller with arrow buttons and Left/Right keys. */
-export function Row({ title, children, itemClassName = "w-36 sm:w-44" }: Props) {
+export function Row({ title, children, itemClassName = "w-36 sm:w-44", className = "" }: Props) {
   const t = useTranslations("row");
   const scroller = useRef<HTMLUListElement>(null);
   const [edge, setEdge] = useState({ start: true, end: false });
@@ -45,7 +47,7 @@ export function Row({ title, children, itemClassName = "w-36 sm:w-44" }: Props) 
   const hiddenProps = (hidden: boolean) => (hidden ? { "aria-hidden": true, tabIndex: -1 } : {});
 
   return (
-    <section aria-label={title} className="group/row relative">
+    <section aria-label={title} className={`group/row relative ${className}`}>
       <h2 className="mb-4 px-4 text-2xl sm:px-8 sm:text-[1.75rem]">{title}</h2>
       <div className="relative">
         <button type="button" aria-label={t("previous")} onClick={() => scroll(-1)} className={`${arrow(edge.start)} left-2`} {...hiddenProps(edge.start)}>

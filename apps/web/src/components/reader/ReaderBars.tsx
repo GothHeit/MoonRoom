@@ -148,7 +148,7 @@ export function ReaderBars({ shown, title, titleHref, chapter, page, count, mode
         <Link
           href={titleHref}
           aria-label={t("back", { title })}
-          className="press absolute left-[calc(0.75rem+env(safe-area-inset-left))] top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-11 w-11 items-center justify-center rounded-full border border-line-strong bg-bg/80 text-fg hover:border-accent"
+          className="press absolute left-[calc(0.75rem+env(safe-area-inset-left))] top-[calc(0.25rem+env(safe-area-inset-top))] z-10 flex h-9 w-9 items-center justify-center rounded-full border border-line-strong bg-bg/80 text-fg hover:border-accent"
         >
           <Chevron left />
         </Link>

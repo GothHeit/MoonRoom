@@ -6,7 +6,7 @@ type Props = {
   href: string;
   title: string;
   image?: string | null;
-  /** "Ch. 12": stays visible when a long title is cut. */
+  /** "Ch. 12": on its own line under the title. */
   caption?: string;
   /** 0 to 1. Shows the progress bar when set. */
   progress?: number;
@@ -38,10 +38,8 @@ export function CoverCard({ href, title, image, caption, progress, seed = title 
           </div>
         )}
       </div>
-      <p className="mt-2.5 flex min-w-0 text-sm font-bold">
-        <span className="truncate">{title}</span>
-        {caption && <span className="shrink-0 whitespace-pre text-muted">{` · ${caption}`}</span>}
-      </p>
+      <p className="mt-2.5 line-clamp-2 text-sm font-bold">{title}</p>
+      {caption && <p className="text-xs text-muted">{caption}</p>}
     </Link>
   );
 }

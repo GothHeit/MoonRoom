@@ -28,7 +28,7 @@ export function HeroSplit({ art, poster, posterAlt = "", eager = true, overlay, 
     <div className="grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <div className="flex min-w-0 flex-col px-4 pb-10 pt-6 sm:px-8 md:justify-center md:py-12">{children}</div>
       <div
-        className={`relative order-first aspect-video md:order-none md:aspect-auto md:min-h-[clamp(24rem,36vw,44rem)] md:rounded-bl-ui ${art ? "" : "bg-surface"}`}
+        className={`relative order-first aspect-video md:order-none md:aspect-auto md:min-h-[clamp(24rem,36vw,44rem)] md:rounded-bl-ui ${art ? "" : "overflow-hidden bg-surface"}`}
       >
         {image &&
           (art ? (
@@ -41,14 +41,27 @@ export function HeroSplit({ art, poster, posterAlt = "", eager = true, overlay, 
               className="absolute inset-0 h-full w-full object-cover md:rounded-bl-ui"
             />
           ) : (
-            // eslint-disable-next-line @next/next/no-img-element -- remote catalog poster
-            <img
-              src={image}
-              alt={posterAlt}
-              {...loading}
-              decoding="async"
-              className="absolute inset-y-4 left-1/2 h-[calc(100%-2rem)] w-auto -translate-x-1/2 rounded-ui object-contain md:inset-y-10 md:h-[calc(100%-5rem)]"
-            />
+            <>
+              {/* No wide art: the poster, blurred and darkened, fills the side; the sharp poster stands on it. */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- remote catalog poster */}
+              <img
+                src={image}
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+                decoding="async"
+                className="absolute inset-0 h-full w-full scale-125 object-cover opacity-60 blur-2xl"
+              />
+              <div aria-hidden="true" className="absolute inset-0 bg-bg/40" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- remote catalog poster */}
+              <img
+                src={image}
+                alt={posterAlt}
+                {...loading}
+                decoding="async"
+                className="absolute inset-y-4 left-1/2 h-[calc(100%-2rem)] w-auto -translate-x-1/2 rounded-ui object-contain shadow-2xl shadow-black/50 md:inset-y-10 md:h-[calc(100%-5rem)]"
+              />
+            </>
           ))}
         {overlay}
       </div>

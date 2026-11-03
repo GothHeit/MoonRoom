@@ -39,7 +39,7 @@ export async function MangaRows({ rows }: { rows: Rows }) {
             ) : row.id === "top" ? (
               <div key={manga.id} className="flex items-start">
                 {/* As tall as the cover, so the numeral sits on its bottom edge whatever the caption. */}
-                <span aria-hidden="true" className="-mr-3 flex h-48 items-end font-display text-[6.5rem] leading-[0.75] tracking-[-0.04em] text-numeral select-none sm:h-60">
+                <span aria-hidden="true" className="mr-1 flex h-48 items-end font-display text-[6.5rem] leading-[0.75] tracking-[-0.04em] text-numeral select-none sm:h-60">
                   {i + 1}
                 </span>
                 <div className="relative w-32 sm:w-40">

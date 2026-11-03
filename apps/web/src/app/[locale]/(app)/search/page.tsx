@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { SearchForm } from "@/components/shell/SearchForm";
 import { GridSkeleton, PosterGrid } from "@/components/grid/PosterGrid";
+import { ButtonLink } from "@/components/ui/Button";
 import { PosterCard } from "@/components/ui/PosterCard";
 import { animeHref, captionOf, posterOf } from "@/lib/catalog";
 import { titled } from "@/lib/page-title";
@@ -12,7 +13,15 @@ import { serverApi, unwrap } from "@/lib/server-api";
 async function Results({ q, locale }: { q: string; locale: string }) {
   const t = await getTranslations("search");
   const { data } = await unwrap((await serverApi()).GET("/anime/search", { params: { query: { q } } }), locale);
-  if (data.length === 0) return <p className="py-12 text-center text-muted">{t("empty", { q })}</p>;
+  if (data.length === 0) return (
+      <div className="flex flex-col items-center gap-4 py-16 text-center">
+        <p className="font-display text-3xl">{t("empty", { q })}</p>
+        <p className="max-w-md text-muted">{t("emptyHint")}</p>
+        <ButtonLink href="/browse" variant="secondary">
+          {t("browse")}
+        </ButtonLink>
+      </div>
+    );
   return (
     <PosterGrid>
       {data.map((a) => (

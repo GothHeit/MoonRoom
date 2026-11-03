@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { GridSkeleton } from "@/components/grid/PosterGrid";
-import { KindSwitch } from "@/components/list/KindSwitch";
 import { LinkMalCard } from "@/components/list/LinkMalCard";
 import { ListView } from "@/components/list/ListView";
 import { LIST_STATUSES, type ListKind } from "@/lib/catalog";
@@ -38,16 +37,13 @@ function failed(error: unknown, response: Response, locale: string) {
   throw toApiError(response.status, error);
 }
 
-/** My list: the user's MyAnimeList anime or manga list, with the other one a pill away. */
+/** My list: the user's MyAnimeList anime or manga list, the header switch picks which. */
 export async function ListPage(props: Props) {
   setRequestLocale(props.locale);
   const t = await getTranslations("list");
   return (
     <section className="px-4 pb-8 pt-24 sm:px-8">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-4xl sm:text-5xl">{t("title")}</h1>
-        <KindSwitch kind={props.kind} />
-      </div>
+      <h1 className="mb-5 text-4xl sm:text-5xl">{t("title")}</h1>
       <Suspense fallback={<GridSkeleton />}>
         <Entries {...props} />
       </Suspense>
