@@ -2,6 +2,7 @@
   "manga": {
     "title": "Manga",
     "chapterShort": "Ch. {n}",
+    "removeFromContinue": "Remove {title} from Continue reading",
     "rows": {
       "continue_reading": "Continue reading",
       "my_list": "My list",

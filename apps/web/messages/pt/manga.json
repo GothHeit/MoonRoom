@@ -2,6 +2,7 @@
   "manga": {
     "title": "Mangá",
     "chapterShort": "Cap. {n}",
+    "removeFromContinue": "Remover {title} de Continuar lendo",
     "rows": {
       "continue_reading": "Continuar lendo",
       "my_list": "Minha lista",

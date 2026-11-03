@@ -145,6 +145,20 @@ class ContinueHidden(Base):
     hidden_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
+class MangaContinueHidden(Base):
+    """A manga the user removed from Continue reading. Their reading history is left alone.
+
+    The title comes back once they read something of it after `hidden_at`."""
+
+    __tablename__ = "manga_continue_hidden"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    manga_id: Mapped[int] = mapped_column(primary_key=True)
+    hidden_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
 class PlayerPreferences(Base):
     """How a user likes the player. One row per user, created on first save."""
 

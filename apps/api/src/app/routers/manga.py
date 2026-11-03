@@ -11,7 +11,7 @@ import httpx
 from fastapi import APIRouter, Query, Request, Response
 from fastapi import Path as PathParam
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +23,7 @@ from app.mal.client import MANGA_RANKINGS, MalClient, is_safe
 from app.mal.genres import GENRE_IDS, GENRES
 from app.manga.base import Chapter, ChapterList, MangaSource
 from app.manga.pagecache import MAX_PAGE_BYTES, PageCache
-from app.models import MalLink, MangaProgress, User
+from app.models import MalLink, MangaContinueHidden, MangaProgress, User
 from app.routers.anime import only_safe
 from app.routers.home import MIN_ROW, todays_genres
 from app.routers.watch import session_open
@@ -129,7 +129,23 @@ async def latest_per_manga(
         .order_by(MangaProgress.manga_id, MangaProgress.updated_at.desc())
         .subquery()
     )
-    rows = await session.execute(select(latest).order_by(latest.c.updated_at.desc()).limit(limit))
+    rows = await session.execute(
+        select(latest)
+        .outerjoin(
+            MangaContinueHidden,
+            (MangaContinueHidden.user_id == user_id)
+            & (MangaContinueHidden.manga_id == latest.c.manga_id),
+        )
+        # Removed from Continue reading, and not read since.
+        .where(
+            or_(
+                MangaContinueHidden.hidden_at.is_(None),
+                latest.c.updated_at > MangaContinueHidden.hidden_at,
+            )
+        )
+        .order_by(latest.c.updated_at.desc())
+        .limit(limit)
+    )
     return [
         MangaProgress(
             user_id=r.user_id,
@@ -512,6 +528,23 @@ async def pages(
         next=chapter_out(following) if following else None,
         progress=progress_out(saved) if saved else None,
     )
+
+
+@router.delete("/{manga_id}/continue", status_code=204)
+async def remove_from_continue_reading(
+    manga_id: Annotated[int, PathParam(ge=1)], user: CurrentUser, session: Session
+):
+    """Hide a title from Continue reading. Progress is kept; reading it again brings it back."""
+    statement = insert(MangaContinueHidden).values(
+        user_id=user.id, manga_id=manga_id, hidden_at=utcnow()
+    )
+    await session.execute(
+        statement.on_conflict_do_update(
+            index_elements=["user_id", "manga_id"], set_={"hidden_at": statement.excluded.hidden_at}
+        )
+    )
+    await session.commit()
+    return Response(status_code=204)
 
 
 @router.put("/{manga_id}/progress/{chapter}", response_model=MangaProgressOut)

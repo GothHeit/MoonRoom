@@ -5804,6 +5804,48 @@
         ]
       }
     },
+    "/manga/{manga_id}/continue": {
+      "delete": {
+        "description": "Hide a title from Continue reading. Progress is kept; reading it again brings it back.",
+        "operationId": "remove_from_continue_reading_manga__manga_id__continue_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove From Continue Reading",
+        "tags": [
+          "manga"
+        ]
+      }
+    },
     "/manga/{manga_id}/progress/{chapter}": {
       "put": {
         "operationId": "put_progress_manga__manga_id__progress__chapter__put",

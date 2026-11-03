@@ -547,6 +547,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/manga/{manga_id}/continue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove From Continue Reading
+         * @description Hide a title from Continue reading. Progress is kept; reading it again brings it back.
+         */
+        delete: operations["remove_from_continue_reading_manga__manga_id__continue_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/manga/{manga_id}/progress/{chapter}": {
         parameters: {
             query?: never;
@@ -3811,6 +3831,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ChaptersOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_from_continue_reading_manga__manga_id__continue_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                manga_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

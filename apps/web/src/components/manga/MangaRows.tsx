@@ -1,7 +1,7 @@
 import type { components } from "@app/api-client";
 import { getTranslations } from "next-intl/server";
 
-import { CoverCard } from "@/components/manga/CoverCard";
+import { ContinueReadingCard } from "@/components/manga/ContinueReadingCard";
 import { PosterCard } from "@/components/ui/PosterCard";
 import { Row } from "@/components/ui/Row";
 import { genreName } from "@/lib/genres";
@@ -27,14 +27,14 @@ export async function MangaRows({ rows }: { rows: Rows }) {
         <Row key={row.genre ? `genre-${row.genre.id}` : row.id} title={titleOf(row)} itemClassName={row.id === "top" ? "w-auto" : undefined}>
           {row.items.map(({ manga, progress }, i) =>
             row.id === "continue_reading" ? (
-              <CoverCard
+              <ContinueReadingCard
                 key={manga.id}
+                mangaId={manga.id}
                 href={mangaHref(manga.id)}
                 title={manga.title}
                 image={coverOf(manga)}
                 caption={progress ? t("chapterShort", { n: progress.chapter }) : undefined}
                 progress={progress ? readFraction(progress) : undefined}
-                seed={manga.id}
               />
             ) : row.id === "top" ? (
               <div key={manga.id} className="flex items-start">

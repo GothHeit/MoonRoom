@@ -427,3 +427,31 @@ async def test_the_default_manga_language_beats_the_site_language(client, sessio
     assert (await client.get("/manga/1/chapters", headers=headers)).json()["lang"] == "en"
     bad = await client.patch("/me", json={"manga_lang": "fr!"}, headers=headers)
     assert bad.status_code == 422
+
+
+@respx.mock
+async def test_removing_from_continue_reading_keeps_progress_until_read_again(client, session):
+    _, headers = await make_user(session, "kafka")
+    _, friend = await make_user(session, "friend")
+    mock_ranking(manga(1, "One"), manga(2, "Two"))
+    mock_details(1)
+    for who in (headers, friend):
+        await client.put("/manga/1/progress/3", json={"page": 4, "pages": 20}, headers=who)
+
+    r = await client.delete("/manga/1/continue", headers=headers)
+    assert r.status_code == 204
+    # Idempotent.
+    assert (await client.delete("/manga/1/continue", headers=headers)).status_code == 204
+
+    def ids(home):
+        return [row["id"] for row in home["rows"]]
+
+    assert "continue_reading" not in ids((await client.get("/manga/home", headers=headers)).json())
+    assert "continue_reading" in ids((await client.get("/manga/home", headers=friend)).json())
+
+    await client.put("/manga/1/progress/4", json={"page": 1, "pages": 20}, headers=headers)
+    assert "continue_reading" in ids((await client.get("/manga/home", headers=headers)).json())
+
+
+async def test_remove_from_continue_reading_needs_login(client):
+    assert (await client.delete("/manga/1/continue")).status_code == 401
