@@ -303,6 +303,8 @@ class ChaptersOut(BaseModel):
     languages: list[str] = Field(default_factory=list)
     # The sources that have the listed language, in order of preference: the source menu.
     sources: list[str] = Field(default_factory=list)
+    # Chapters each of those sources has in the listed language.
+    source_counts: dict[str, int] = Field(default_factory=dict)
     chapters: list[ChapterOut] = Field(default_factory=list)
     # Chapter number -> where the user is in it.
     progress: dict[str, MangaProgressOut] = Field(default_factory=dict)

@@ -52,6 +52,7 @@
       "range": "Capítulos exibidos",
       "language": "Idioma",
       "source": "Fonte",
+      "sourceChapters": "{count, plural, one {# capítulo} other {# capítulos}}",
       "from": "De {source}",
       "start": "Começar a ler",
       "continue": "Continuar · Cap. {n}",

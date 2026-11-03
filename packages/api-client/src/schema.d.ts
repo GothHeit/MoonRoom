@@ -536,7 +536,7 @@ export interface paths {
          * @description The chapter list, with where the user is in each chapter. Separate from the details so
          *     a slow source never holds the title page back. Every enabled source is asked at once; the
          *     language menu is the union of what they have and the list comes from one source: the one
-         *     asked for, else the first in the configured order that has the language.
+         *     asked for, else the one with the most chapters in the language (ties go to the earlier one).
          */
         get: operations["chapters_manga__manga_id__chapters_get"];
         put?: never;
@@ -1728,6 +1728,10 @@ export interface components {
             };
             /** Source */
             source: string;
+            /** Source Counts */
+            source_counts?: {
+                [key: string]: number;
+            };
             /** Source Id */
             source_id: string;
             /** Source Title */

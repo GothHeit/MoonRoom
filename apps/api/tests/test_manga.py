@@ -366,14 +366,17 @@ async def test_home_shows_the_users_mal_manga_list(client, session):
 class OneLanguage:
     """A site with a single language, like MangaPill or a pt-BR scraper."""
 
-    def __init__(self, name, lang):
+    def __init__(self, name, lang, count=1):
         self.name = name
         self._lang = lang
+        self._count = count
 
     async def chapters(self, detail, lang):
-        return ChapterList(
-            self.name, "Book", [self._lang], [Chapter(f"{self.name}1", "1", None, None, self._lang)]
-        )
+        chapters = [
+            Chapter(f"{self.name}{n}", str(n), None, None, self._lang)
+            for n in range(1, self._count + 1)
+        ]
+        return ChapterList(self.name, "Book", [self._lang], chapters)
 
     async def pages(self, detail, chapter_id):
         return None
@@ -479,3 +482,23 @@ async def test_removing_from_continue_reading_keeps_progress_until_read_again(cl
 
 async def test_remove_from_continue_reading_needs_login(client):
     assert (await client.delete("/manga/1/continue")).status_code == 401
+
+
+@respx.mock
+async def test_the_most_complete_source_in_the_language_is_listed_first(client, session):
+    fastapi_app.state.manga_sources = {
+        "short": OneLanguage("short", "pt-br", 3),
+        "whole": OneLanguage("whole", "pt-br", 20),
+        "tie": OneLanguage("tie", "pt-br", 20),
+    }
+    _, headers = await make_user(session, "kafka")
+    mock_details(1)
+
+    body = (await client.get("/manga/1/chapters", headers=headers)).json()
+    assert body["source"] == "whole" and len(body["chapters"]) == 20
+    assert body["source_counts"] == {"short": 3, "whole": 20, "tie": 20}
+    # Asking for a source still wins over the count.
+    body = (
+        await client.get("/manga/1/chapters", params={"source": "short"}, headers=headers)
+    ).json()
+    assert body["source"] == "short" and len(body["chapters"]) == 3

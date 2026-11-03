@@ -726,6 +726,13 @@
             "title": "Source",
             "type": "string"
           },
+          "source_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Source Counts",
+            "type": "object"
+          },
           "source_id": {
             "title": "Source Id",
             "type": "string"
@@ -5724,7 +5731,7 @@
     },
     "/manga/{manga_id}/chapters": {
       "get": {
-        "description": "The chapter list, with where the user is in each chapter. Separate from the details so\na slow source never holds the title page back. Every enabled source is asked at once; the\nlanguage menu is the union of what they have and the list comes from one source: the one\nasked for, else the first in the configured order that has the language.",
+        "description": "The chapter list, with where the user is in each chapter. Separate from the details so\na slow source never holds the title page back. Every enabled source is asked at once; the\nlanguage menu is the union of what they have and the list comes from one source: the one\nasked for, else the one with the most chapters in the language (ties go to the earlier one).",
         "operationId": "chapters_manga__manga_id__chapters_get",
         "parameters": [
           {

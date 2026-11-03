@@ -35,7 +35,7 @@ export function ChapterList({ mangaId, listing }: Props) {
   const t = useTranslations("manga.page");
   const format = useFormatter();
   const router = useRouter();
-  const { source, sources = [], lang, languages = [], chapters = [], progress = {} } = listing;
+  const { source, sources = [], source_counts = {}, lang, languages = [], chapters = [], progress = {} } = listing;
   const latest = chapters[chapters.length - 1];
   // Long series show one range of chapters at a time, starting at the one with the next unread.
   const [page, setPage] = useState(() => chapterPageOf(chapters, progress));
@@ -85,7 +85,7 @@ export function ChapterList({ mangaId, listing }: Props) {
             >
               {sources.map((name) => (
                 <option key={name} value={name}>
-                  {sourceName(name)}
+                  {sourceName(name)} · {t("sourceChapters", { count: source_counts[name] ?? 0 })}
                 </option>
               ))}
             </select>

@@ -423,7 +423,7 @@ async def chapters(
     """The chapter list, with where the user is in each chapter. Separate from the details so
     a slow source never holds the title page back. Every enabled source is asked at once; the
     language menu is the union of what they have and the list comes from one source: the one
-    asked for, else the first in the configured order that has the language."""
+    asked for, else the one with the most chapters in the language (ties go to the earlier one)."""
     manga = await _mal(request).visible_manga(manga_id, user.show_nsfw)
     names = list(_sources(request))
     answers = dict(
@@ -446,22 +446,35 @@ async def chapters(
             raise ApiError(404, "not_available", "No source has this title")
         name, listed = empty
         picked = None
+        counts: dict[str, int] = {}
     else:
         languages = _ordered_languages(set(by_lang))
         picked = _wanted_lang(user, lang, languages)
         carriers = by_lang[picked] if picked else []
-        # The one asked for first, then the others in the configured order: a source can list
-        # a language without having readable chapters in it (only the publisher's own links).
-        order = [c for c in carriers if c == source] + [c for c in carriers if c != source]
-        name, listed = order[0], readable[order[0]]
-        for candidate in order:
+
+        # How many chapters each source has in this language: a source answers in its own best
+        # language first, so those that differ are asked again (they are cached by the source).
+        # A source can list a language without readable chapters in it (only the publisher's
+        # own links), so it counts as none.
+        async def in_language(candidate: str) -> ChapterList | None:
             got: ChapterList | None = readable[candidate]
             if got is not None and got.chapters[0].lang != picked:
-                # A source with several languages answered in its own best one: ask for ours.
                 got = await _ask(request, candidate, manga, picked)
             if got is not None and got.chapters and got.chapters[0].lang == picked:
-                name, listed = candidate, got
-                break
+                return got
+            return None
+
+        found = dict(
+            zip(carriers, await asyncio.gather(*(in_language(c) for c in carriers)), strict=True)
+        )
+        have = {c: got for c, got in found.items() if got is not None}
+        counts = {c: len(got.chapters) for c, got in have.items()}
+        if have:
+            # The one asked for, else the most complete; a tie goes to the earlier source.
+            name = source if source in have else max(have, key=lambda c: counts[c])
+            listed = have[name]
+        else:
+            name, listed = carriers[0], readable[carriers[0]]
     rows = await session.scalars(
         select(MangaProgress).where(
             MangaProgress.user_id == user.id, MangaProgress.manga_id == manga_id
@@ -475,7 +488,8 @@ async def chapters(
         source_title=listed.source_title,
         lang=listed.chapters[0].lang if listed.chapters else None,
         languages=_ordered_languages(set(by_lang)) if by_lang else listed.languages,
-        sources=by_lang.get(picked, []) if picked else [],
+        sources=list(counts),
+        source_counts=counts,
         chapters=[chapter_out(c) for c in listed.chapters],
         progress=progress,
     )

@@ -52,6 +52,7 @@
       "range": "Chapters shown",
       "language": "Language",
       "source": "Source",
+      "sourceChapters": "{count, plural, one {# chapter} other {# chapters}}",
       "from": "From {source}",
       "start": "Start reading",
       "continue": "Continue · Ch. {n}",
