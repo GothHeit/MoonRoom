@@ -60,7 +60,7 @@ describe("EpisodeList", () => {
   it("opens on the current episode's page and switches pages", async () => {
     renderList(230);
     expect(screen.getByRole("link", { name: /Episode 230/ })).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText("Episodes shown"), "0");
+    await userEvent.click(screen.getByRole("button", { name: "1–100" }));
     expect(screen.getByRole("link", { name: /Episode 1$/ })).toBeInTheDocument();
   });
 });

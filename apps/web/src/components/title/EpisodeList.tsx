@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { artImage } from "@/components/ui/artImage";
 import { placeholderFor } from "@/components/ui/PosterCard";
@@ -40,36 +40,44 @@ type EpisodeArt = { title?: string | null; image?: string | null };
 export function EpisodeList({ source, lang = "sub", animeId, episodes, progress, current, thumbnails, art }: Props) {
   const t = useTranslations("titlePage");
   const [page, setPage] = useState(current === undefined ? 0 : pageOf(episodes, current));
+  const chips = useRef<HTMLDivElement>(null);
+  // Keep the chosen range visible in the scrolling row (sideways only, never the page).
+  useEffect(() => {
+    const row = chips.current;
+    const chip = row?.children[page] as HTMLElement | undefined;
+    if (row && chip) row.scrollLeft = chip.offsetLeft - row.clientWidth / 2 + chip.offsetWidth / 2;
+  }, [page]);
   const pages = Math.ceil(episodes.length / PAGE_SIZE);
   const shown = episodes.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const byEpisode = new Map(progress.map((p) => [p.episode, p]));
 
   return (
     <section aria-labelledby="episodes-heading" className="px-4 sm:px-8">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 id="episodes-heading" className="text-2xl">
-          {t("episodeList")}
-        </h2>
-        {pages > 1 && (
-          <label className="text-sm text-muted">
-            <span className="sr-only">{t("range")}</span>
-            <select
-              value={page}
-              onChange={(e) => setPage(Number(e.target.value))}
-              className="h-11 rounded-full border border-line-strong bg-bg px-4 text-fg"
-            >
-              {Array.from({ length: pages }, (_, i) => {
-                const slice = episodes.slice(i * PAGE_SIZE, (i + 1) * PAGE_SIZE);
-                return (
-                  <option key={i} value={i}>
-                    {slice[0]}–{slice[slice.length - 1]}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-        )}
-      </div>
+      <h2 id="episodes-heading" className="mb-3 flex items-baseline gap-3 text-2xl">
+        {t("episodeList")}
+        <span className="font-sans text-sm text-muted">{episodes.length}</span>
+      </h2>
+      {pages > 1 && (
+        <div ref={chips} role="group" aria-label={t("range")} className="no-scrollbar relative -mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-8 sm:px-8">
+          {Array.from({ length: pages }, (_, i) => {
+            const slice = episodes.slice(i * PAGE_SIZE, (i + 1) * PAGE_SIZE);
+            const active = i === page;
+            return (
+              <button
+                key={i}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setPage(i)}
+                className={`press h-11 shrink-0 rounded-full border px-4 text-sm font-bold tabular-nums ${
+                  active ? "border-accent bg-accent text-on-accent" : "border-line-strong text-soft hover:border-accent hover:text-fg"
+                }`}
+              >
+                {slice[0]}–{slice[slice.length - 1]}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {/* Phones: a list with the still beside the text. Wider: a grid that fills the width. */}
       <ul className="grid gap-4 sm:grid-cols-2 sm:gap-y-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 min-[1800px]:grid-cols-6">
         {shown.map((ep) => {
