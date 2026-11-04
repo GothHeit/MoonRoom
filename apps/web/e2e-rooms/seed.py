@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.models import User
 from app.security import hash_password
 
-USERS = ("alice", "bob", "carol")
+USERS = ("alice", "bob", "carol", "dave", "erin")
 
 
 async def main() -> None:

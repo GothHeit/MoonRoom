@@ -10,7 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test:e2e": "playwright test",
     "test": "vitest run",
-    "test:e2e:rooms": "playwright test -c playwright.rooms.config.ts"
+    "test:e2e:rooms": "playwright test -c playwright.rooms.config.ts",
+    "test:e2e:sync": "playwright test -c playwright.sync.config.ts"
   },
   "dependencies": {
     "@app/api-client": "workspace:*",
