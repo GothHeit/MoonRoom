@@ -11,6 +11,7 @@ import { AUTO_SOURCE } from "@/lib/pick-stream";
 import { warmPlayback } from "@/lib/warm-playback";
 import { watchHref, type Lang, type StreamChoice } from "@/lib/watch-target";
 
+import { RoomNotices } from "@/components/room/RoomNotices";
 import { useRoomSync, type RoomBinding } from "@/components/room/useRoomSync";
 
 import { useAutoNext } from "./autoNext";
@@ -142,12 +143,21 @@ export function Player(props: Props) {
   const { save, onTime } = useProgressSaver(video, animeId, episode, dropped.check);
   const sync = useRoomSync(
     {
-      read: () => (video.current && video.current.readyState >= 1 ? video.current : null),
+      read: () => {
+        const v = video.current;
+        if (!v || v.readyState < 1) return null;
+        const wireless = (v as HTMLVideoElement & { webkitCurrentPlaybackTargetIsWireless?: boolean })
+          .webkitCurrentPlaybackTargetIsWireless;
+        return { currentTime: v.currentTime, paused: v.paused, playbackRate: v.playbackRate, seeking: v.seeking, wireless: wireless === true };
+      },
       seek: (seconds) => {
         if (video.current) video.current.currentTime = seconds;
       },
-      play: () => void video.current?.play().catch(() => undefined),
+      play: () => video.current?.play() ?? Promise.resolve(),
       pause: () => video.current?.pause(),
+      setRate: (rate) => {
+        if (video.current) video.current.playbackRate = rate;
+      },
     },
     room,
   );
@@ -319,7 +329,8 @@ export function Player(props: Props) {
           setVolume(video.current.volume);
           setMuted(video.current.muted);
         }}
-        onRateChange={() => video.current && setRate(video.current.playbackRate)}
+        // In a room the speed is the room's to nudge, never the viewer's to pick.
+        onRateChange={() => !room && video.current && setRate(video.current.playbackRate)}
         onError={() => url && setError("playback_failed")}
         className="absolute inset-0 h-full w-full"
       >
@@ -413,6 +424,22 @@ export function Player(props: Props) {
       </div>
 
       {room?.overlay}
+      {room && (
+        <RoomNotices
+          blocked={sync.blocked}
+          onUnblock={sync.unblock}
+          controlsShown={shown}
+          otherSource={
+            url && !automatic && answered !== source
+              ? {
+                  room: streamLabel(names, { source, lang }),
+                  onMove: room.switchStream ? () => void room.switchStream?.(playingFrom) : undefined,
+                }
+              : undefined
+          }
+          debug={room.debug && { stats: sync.stats, ...room.debug }}
+        />
+      )}
 
       {settingsOpen && !error && (
         <>
@@ -437,7 +464,7 @@ export function Player(props: Props) {
             subtitleNames={subtitleNames}
             subtitle={selected}
             onSubtitle={subtitles.chooseTrack}
-            speeds={SPEEDS}
+            speeds={room ? [] : SPEEDS}
             rate={rate}
             onRate={(r) => {
               if (video.current) video.current.playbackRate = r;

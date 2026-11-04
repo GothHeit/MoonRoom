@@ -31,14 +31,19 @@ type Props = {
   subtitleLang: string | null;
   subtitleStyle: SubtitleStyle;
   showSkips: boolean;
+  /** Show the sync numbers over the video (?debug=sync), for checking a phone or a TV by eye. */
+  debug?: boolean;
 };
 
-export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyle, showSkips }: Props) {
+export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyle, showSkips, debug = false }: Props) {
   const t = useTranslations("room");
   const toast = useToast();
   const {
     room,
     playback,
+    serverNow,
+    clockReady,
+    clock,
     messages,
     status,
     lastReaction,
@@ -150,12 +155,15 @@ export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyl
       showSkips={showSkips}
       room={{
         playback,
+        serverNow,
+        clockReady,
         canControl,
         send,
         setBuffering,
         pickEpisode: (episode) => void voteEpisode(episode),
         switchStream: room.host_id === meId ? switchStream : undefined,
         onLocked: () => toast(t("locked"), "error"),
+        debug: debug ? { offset: () => clock.offset.current, rtt: () => clock.rtt.current } : undefined,
         topBar,
         overlay,
       }}

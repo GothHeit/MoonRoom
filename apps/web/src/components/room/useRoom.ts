@@ -7,7 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { StreamChoice } from "@/lib/watch-target";
 
-import type { LocalEvent, Playback } from "./sync";
+import { useServerClock } from "./clock";
+import { newer, type LocalEvent, type Playback } from "./sync";
 
 export type RoomState = components["schemas"]["RoomOut"];
 export type ChatMessage = {
@@ -21,9 +22,13 @@ export type ChatMessage = {
 export type Status = "connecting" | "open" | { closed: "room_not_found" | "room_full" | "not_authenticated" | "network" };
 
 const CHAT_LIMIT = 100;
+/** The server sends a tick every 10 s; this long without anything and the stream is stuck. */
+const SILENT_MS = 25_000;
+/** Back from the background after this long, the connection is opened afresh. */
+const AWAY_MS = 3000;
 
-function stamp(playback: RoomState["playback"]): Playback {
-  return { playing: playback.playing, position: playback.position, receivedAt: Date.now() };
+function playbackOf(state: RoomState["playback"]): Playback {
+  return { playing: state.playing, position: state.position, at: state.at, version: state.version };
 }
 
 /** Joins a room over server-sent events and keeps its state, chat and playback up to date. */
@@ -34,55 +39,123 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
   });
   const code = initial.code;
   const [room, setRoom] = useState(initial);
-  const [playback, setPlayback] = useState(() => stamp(initial.playback));
+  const [playback, setPlayback] = useState(() => playbackOf(initial.playback));
+  const clock = useServerClock();
+  const measureClock = clock.measure;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<Status>("connecting");
   const [lastReaction, setLastReaction] = useState<ChatMessage | null>(null);
   const reactionTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    const source = new EventSource(`/api/proxy/watch/rooms/${encodeURIComponent(code)}/events`);
-    const on = <T,>(name: string, handler: (data: T) => void) =>
-      source.addEventListener(name, (event) => handler(JSON.parse((event as MessageEvent<string>).data) as T));
+    let revision = initial.revision;
+    let version = initial.playback.version;
+    let heard = Date.now();
+    let hiddenAt: number | null = null;
+    let stopped = false;
 
-    source.onopen = () => setStatus("open");
-    on<RoomState>("state", (state) => {
+    const applyState = (state: RoomState) => {
+      if (state.revision < revision) return;
+      revision = state.revision;
+      version = Math.max(version, state.playback.version);
       setRoom(state);
-      setPlayback(stamp(state.playback));
-    });
-    on<RoomState["playback"]>("playback", (data) => setPlayback(stamp(data)));
-    on<ChatMessage>("chat", (message) => {
-      if (message.reaction) {
-        setLastReaction(message);
-        clearTimeout(reactionTimer.current);
-        reactionTimer.current = setTimeout(() => setLastReaction(null), 2500);
-        return;
-      }
-      // A reconnect replays the history, so a message may arrive twice.
-      setMessages((list) => (list.some((m) => m.id === message.id) ? list : [...list, message].slice(-CHAT_LIMIT)));
-    });
-    source.onerror = () => {
-      // The browser retries a dropped connection on its own. It gives up (CLOSED) when the
-      // server refused it, so ask why.
-      if (source.readyState !== EventSource.CLOSED) {
-        setStatus("connecting");
-        return;
-      }
+      setPlayback((current) => newer(current, playbackOf(state.playback)));
+    };
+
+    /** Asks for the whole room again, when the stream seems to have missed something. */
+    const refetch = () =>
       void api
         .GET("/watch/rooms/{code}", { params: { path: { code } } })
-        .then(({ error }) => {
-          const reason = errorCode(error);
-          setStatus({
-            closed: reason === "room_not_found" || reason === "room_full" || reason === "not_authenticated" ? reason : "network",
-          });
-        })
-        .catch(() => setStatus({ closed: "network" }));
+        .then(({ data }) => data && !stopped && applyState(data))
+        .catch(() => undefined);
+
+    const open = () => {
+      const es = new EventSource(`/api/proxy/watch/rooms/${encodeURIComponent(code)}/events`);
+      const on = <T,>(name: string, handler: (data: T) => void) =>
+        es.addEventListener(name, (event) => {
+          heard = Date.now();
+          handler(JSON.parse((event as MessageEvent<string>).data) as T);
+        });
+
+      es.onopen = () => {
+        heard = Date.now();
+        setStatus("open");
+      };
+      on<RoomState>("state", applyState);
+      on<RoomState["playback"]>("playback", (data) => {
+        version = Math.max(version, data.version);
+        setPlayback((current) => newer(current, playbackOf(data)));
+      });
+      on<{ version: number; revision: number }>("tick", (tick) => {
+        if (tick.revision > revision || tick.version > version) refetch();
+      });
+      on<ChatMessage>("chat", (message) => {
+        if (message.reaction) {
+          setLastReaction(message);
+          clearTimeout(reactionTimer.current);
+          reactionTimer.current = setTimeout(() => setLastReaction(null), 2500);
+          return;
+        }
+        // A reconnect replays the history, so a message may arrive twice.
+        setMessages((list) => (list.some((m) => m.id === message.id) ? list : [...list, message].slice(-CHAT_LIMIT)));
+      });
+      es.onerror = () => {
+        // The browser retries a dropped connection on its own. It gives up (CLOSED) when the
+        // server refused it, so ask why.
+        if (es.readyState !== EventSource.CLOSED) {
+          setStatus("connecting");
+          return;
+        }
+        void api
+          .GET("/watch/rooms/{code}", { params: { path: { code } } })
+          .then(({ error }) => {
+            const reason = errorCode(error);
+            setStatus({
+              closed: reason === "room_not_found" || reason === "room_full" || reason === "not_authenticated" ? reason : "network",
+            });
+          })
+          .catch(() => setStatus({ closed: "network" }));
+      };
+      return es;
     };
+
+    let source = open();
+    // Opens the new connection before closing the old one, so the others never see a leave.
+    const reopen = () => {
+      const old = source;
+      heard = Date.now();
+      source = open();
+      old.close();
+    };
+
+    const watchdog = setInterval(() => {
+      if (source.readyState === EventSource.OPEN && Date.now() - heard > SILENT_MS) reopen();
+    }, 5000);
+    // A phone that slept (an iPhone PWA in the background) comes back to a dead connection and a
+    // clock that may have moved: start both afresh instead of waiting for the browser's retry.
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+      }
+      const away = hiddenAt !== null && Date.now() - hiddenAt > AWAY_MS;
+      hiddenAt = null;
+      if (!away || source.readyState === EventSource.CLOSED) return;
+      void measureClock();
+      reopen();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
+      stopped = true;
       source.close();
+      clearInterval(watchdog);
+      document.removeEventListener("visibilitychange", onVisibility);
       clearTimeout(reactionTimer.current);
     };
-  }, [code]);
+    // The initial snapshot only seeds the counters; the stream follows the code.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, measureClock]);
 
   const path = useMemo(() => ({ params: { path: { code } } }), [code]);
 
@@ -131,5 +204,22 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
     [path, report],
   );
 
-  return { room, playback, messages, status, lastReaction, send, setBuffering, say, react, voteEpisode, withdrawVote, setLocked, switchStream };
+  return {
+    room,
+    playback,
+    serverNow: clock.serverNow,
+    clockReady: clock.ready,
+    clock,
+    messages,
+    status,
+    lastReaction,
+    send,
+    setBuffering,
+    say,
+    react,
+    voteEpisode,
+    withdrawVote,
+    setLocked,
+    switchStream,
+  };
 }

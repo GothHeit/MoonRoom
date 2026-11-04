@@ -2,18 +2,23 @@
  * Runs in every viewer's page before the app does (page.addInitScript), so it must stay
  * self-contained: no imports, no closures over this module.
  *
- * - A network shim for the room's traffic only: room events (server-sent) and room commands
- *   (fetch) are delayed by the viewer's latency and jitter, in order, and a lost packet costs a
- *   retransmit. `__drop(ms)` cuts the room connection like a network blip and lets it come back.
+ * - A network shim for the room's traffic only: room events (server-sent) and room requests
+ *   (fetch, both ways) are delayed by the viewer's latency and jitter, in order, and a lost
+ *   packet costs a retransmit. `__drop(ms)` cuts the room connection like a network blip and
+ *   lets it come back.
+ * - A wrong clock: the page's Date.now() runs `skew` ms off, as a phone's clock can.
  * - A sampler that records the video's playhead every 50 ms and its media events, all on the
  *   machine's one clock, so viewers can be compared with each other afterwards.
  */
-export function installShim(initial?: { latency: number; jitter: number; loss: number }) {
-  type Net = { latency: number; jitter: number; loss: number; down: boolean };
+export function installShim(initial?: { latency: number; jitter: number; loss: number; skew: number }) {
+  type Net = { latency: number; jitter: number; loss: number; skew: number; down: boolean };
   type Listener = (event: Event) => void;
   const w = window as unknown as Record<string, unknown>;
-  const net: Net = { latency: 0, jitter: 0, loss: 0, ...initial, down: false };
+  const net: Net = { latency: 0, jitter: 0, loss: 0, skew: 0, ...initial, down: false };
   w.__net = net;
+  // Measurements keep the machine's true clock; the app gets the skewed one.
+  const trueNow = Date.now.bind(Date);
+  Date.now = () => trueNow() + net.skew;
 
   const delay = () => {
     let ms = net.latency + (Math.random() * 2 - 1) * net.jitter;
@@ -26,12 +31,12 @@ export function installShim(initial?: { latency: number; jitter: number; loss: n
   const events: { t: number; type: string }[] = [];
   w.__sync = { samples, events };
   for (const type of ["seeking", "waiting", "playing", "pause", "play", "ratechange"]) {
-    document.addEventListener(type, () => events.push({ t: Date.now(), type }), true);
+    document.addEventListener(type, () => events.push({ t: trueNow(), type }), true);
   }
   setInterval(() => {
     const v = document.querySelector("video");
     if (!v) return;
-    samples.push([Date.now(), v.currentTime, v.paused ? 1 : 0, v.playbackRate, v.readyState]);
+    samples.push([trueNow(), v.currentTime, v.paused ? 1 : 0, v.playbackRate, v.readyState]);
   }, 50);
 
   const Real = window.EventSource;
@@ -68,7 +73,7 @@ export function installShim(initial?: { latency: number; jitter: number; loss: n
 
     /** Delivers in order, each event no earlier than its own delay. */
     private later(run: () => void) {
-      const now = Date.now();
+      const now = trueNow();
       const at = Math.max(this.lastAt, now + delay());
       this.lastAt = at;
       setTimeout(run, at - now);
@@ -125,6 +130,9 @@ export function installShim(initial?: { latency: number; jitter: number; loss: n
       if (net.down) throw new TypeError("Failed to fetch");
       await new Promise((resolve) => setTimeout(resolve, delay()));
       if (net.down) throw new TypeError("Failed to fetch");
+      const response = await realFetch(input, init);
+      await new Promise((resolve) => setTimeout(resolve, delay()));
+      return response;
     }
     return realFetch(input, init);
   };

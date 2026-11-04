@@ -2,10 +2,11 @@ import { expect, test, type Browser } from "@playwright/test";
 
 import { SECONDS, Session, type NetProfile } from "./harness";
 
-// Networks seen in practice: same city, across the country, a phone on mobile data.
-const NEAR: NetProfile = { latency: 20, jitter: 10 };
-const MID: NetProfile = { latency: 150, jitter: 50, loss: 0.01 };
-const FAR: NetProfile = { latency: 300, jitter: 100, loss: 0.03 };
+// Networks seen in practice: same city, across the country, a phone on mobile data. Their
+// clocks are off too, as real devices' are.
+const NEAR: NetProfile = { latency: 20, jitter: 10, skew: 1200 };
+const MID: NetProfile = { latency: 150, jitter: 50, loss: 0.01, skew: -800 };
+const FAR: NetProfile = { latency: 300, jitter: 100, loss: 0.03, skew: 3500 };
 
 // Measuring starts once everyone has had a moment to line up after the first play.
 const SETTLE = 5;
@@ -122,9 +123,9 @@ test("a viewer drops off for ten seconds and comes back", async ({ browser }) =>
 test("five viewers on mixed networks", async ({ browser }) => {
   const { s, viewers } = await room(browser, "five", [
     ["alice", NEAR],
-    ["bob", { latency: 60, jitter: 20 }],
+    ["bob", { latency: 60, jitter: 20, skew: -2500 }],
     ["carol", MID],
-    ["dave", { latency: 200, jitter: 60, loss: 0.02 }],
+    ["dave", { latency: 200, jitter: 60, loss: 0.02, skew: 700 }],
     ["erin", FAR],
   ]);
   const from = await startPlaying(s, viewers[0]);

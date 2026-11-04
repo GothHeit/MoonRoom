@@ -772,6 +772,19 @@
         "title": "ChatIn",
         "type": "object"
       },
+      "ClockOut": {
+        "properties": {
+          "now": {
+            "title": "Now",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "now"
+        ],
+        "title": "ClockOut",
+        "type": "object"
+      },
       "ControlIn": {
         "properties": {
           "action": {
@@ -3677,6 +3690,10 @@
           "playback": {
             "$ref": "#/components/schemas/RoomPlaybackOut"
           },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -3705,13 +3722,18 @@
           "members",
           "votes",
           "buffering",
-          "playback"
+          "playback",
+          "revision"
         ],
         "title": "RoomOut",
         "type": "object"
       },
       "RoomPlaybackOut": {
         "properties": {
+          "at": {
+            "title": "At",
+            "type": "integer"
+          },
           "by": {
             "anyOf": [
               {
@@ -3730,11 +3752,17 @@
           "position": {
             "title": "Position",
             "type": "number"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
           }
         },
         "required": [
           "playing",
-          "position"
+          "position",
+          "at",
+          "version"
         ],
         "title": "RoomPlaybackOut",
         "type": "object"
@@ -7913,6 +7941,28 @@
         ]
       }
     },
+    "/watch/rooms/clock": {
+      "get": {
+        "description": "The server's clock, so viewers can line their own up with it. Declared before /{code}.",
+        "operationId": "clock_watch_rooms_clock_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClockOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Clock",
+        "tags": [
+          "rooms"
+        ]
+      }
+    },
     "/watch/rooms/{code}": {
       "get": {
         "operationId": "get_room_watch_rooms__code__get",
@@ -8200,7 +8250,7 @@
     },
     "/watch/rooms/{code}/events": {
       "get": {
-        "description": "Server-sent events: `state` (the whole room), `playback`, `chat`. Opening this joins the\nroom; closing it leaves.",
+        "description": "Server-sent events: `state` (the whole room), `playback`, `chat`, and every few seconds\n`tick` with the current playback version and snapshot revision. Opening this joins the\nroom; closing it leaves.",
         "operationId": "events_watch_rooms__code__events_get",
         "parameters": [
           {

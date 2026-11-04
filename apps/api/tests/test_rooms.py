@@ -8,7 +8,16 @@ import respx
 from app.errors import ApiError
 from app.main import app
 from app.mal.client import API_BASE
-from app.rooms import EMPTY_GRACE_SECONDS, HOST_GRACE_SECONDS, MAX_MEMBERS, Room, Rooms
+from app.rooms import (
+    EMPTY_GRACE_SECONDS,
+    EPISODE_LEAD_SECONDS,
+    HOST_GRACE_SECONDS,
+    MAX_MEMBERS,
+    SEEK_LEAD_SECONDS,
+    START_LEAD_SECONDS,
+    Room,
+    Rooms,
+)
 from tests.conftest import make_user
 from tests.mal_fixtures import node
 
@@ -68,7 +77,68 @@ async def test_play_pause_and_seek_reach_everyone():
     assert events[0][1]["playing"] is True
     assert events[1][1]["position"] >= 300
     room.control(guest, "pause", 301)
-    assert drain(q2)[-1][1] == {"playing": False, "position": 301, "by": str(guest)}
+    paused = drain(q2)[-1][1]
+    assert (paused["playing"], paused["position"], paused["by"]) == (False, 301, str(guest))
+
+
+async def test_starts_are_scheduled_a_moment_ahead_so_everyone_starts_together():
+    room, host = new_room()
+    q = room.join(host, "kafka")
+    drain(q)
+    before = time.time() * 1000
+    room.control(host, "play", 10)
+    started = drain(q)[-1][1]
+    assert started["playing"] is True and started["position"] == 10
+    # The start is a moment away: until then the room waits at 10.
+    assert started["at"] >= before + START_LEAD_SECONDS * 1000 - 5
+    assert room.now_position() == 10
+
+    room.control(host, "seek", 100)
+    sought = drain(q)[-1][1]
+    assert sought["at"] >= before + SEEK_LEAD_SECONDS * 1000 - 5
+
+    room.control(host, "pause", 100.5)
+    paused = drain(q)[-1][1]
+    assert paused["playing"] is False and paused["position"] == 100.5
+
+
+async def test_every_playback_change_has_a_newer_version():
+    room, host = new_room()
+    q = room.join(host, "kafka")
+    slow = uuid.uuid4()
+    room.join(slow, "slow")
+    versions = [room.version]
+    room.control(host, "play", 0)
+    versions.append(room.version)
+    room.set_buffering(slow, True)
+    versions.append(room.version)
+    room.set_buffering(slow, False)
+    versions.append(room.version)
+    room.vote_episode(host, 2)
+    versions.append(room.version)
+    assert versions == sorted(set(versions))
+    playbacks = [d for kind, d in drain(q) if kind == "playback"]
+    assert [p["version"] for p in playbacks] == sorted(p["version"] for p in playbacks)
+
+
+async def test_a_new_episode_starts_after_a_countdown():
+    room, host = new_room()
+    room.join(host, "kafka")
+    room.vote_episode(host, 2)
+    playback = room.playback()
+    assert playback["playing"] is True and playback["position"] == 0
+    assert playback["at"] >= time.time() * 1000 + EPISODE_LEAD_SECONDS * 1000 - 50
+
+
+async def test_each_snapshot_has_a_new_revision_and_a_joiner_has_the_latest():
+    room, host = new_room()
+    q = room.join(host, "kafka")
+    first = drain(q)[0][1]["revision"]
+    guest = uuid.uuid4()
+    q2 = room.join(guest, "friend")
+    told = drain(q)[0][1]["revision"]
+    assert told > first
+    assert drain(q2)[0][1]["revision"] == told == room.revision
 
 
 async def test_locked_controls_are_host_only():
@@ -231,6 +301,13 @@ async def test_the_api_creates_and_runs_a_room(client, session):
         f"/watch/rooms/{code}/stream", json=stream, headers=guest_headers
     )
     assert guest_switch.status_code == 403
+
+
+async def test_the_clock_tells_the_server_time(client):
+    before = time.time() * 1000
+    response = await client.get("/watch/rooms/clock")
+    assert response.status_code == 200
+    assert before - 5 <= response.json()["now"] <= time.time() * 1000 + 5
 
 
 async def test_creating_a_room_needs_login_and_an_enabled_source(client, session):

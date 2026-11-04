@@ -23,7 +23,8 @@ const room: RoomState = {
   ],
   votes: { a: 3 },
   buffering: [],
-  playback: { playing: false, position: 0, by: null },
+  playback: { playing: false, position: 0, at: 0, version: 1, by: null },
+  revision: 1,
 };
 
 function setup(meId: string, overrides: Partial<RoomState> = {}) {

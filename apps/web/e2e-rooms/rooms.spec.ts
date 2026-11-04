@@ -106,7 +106,9 @@ test("play and pause reach everyone", async ({ browser }) => {
 test("the host switches everyone to another source where the room is", async ({ browser }) => {
   const { host, guest } = await pair(browser);
   await guest.getByRole("button", { name: "Settings" }).click();
-  await expect(guest.getByRole("button", { name: /^Playback speed/ })).toBeVisible();
+  await expect(guest.getByRole("button", { name: "Close settings" })).toBeVisible();
+  // A room plays at the room's speed, and only the host picks the source.
+  await expect(guest.getByRole("button", { name: /^Playback speed/ })).toHaveCount(0);
   await expect(guest.getByRole("button", { name: /^Source/ })).toHaveCount(0);
   await guest.getByRole("button", { name: "Close settings" }).click();
 

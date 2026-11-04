@@ -13,8 +13,9 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/room/[co
   return titled(t("panel"));
 }
 
-export default async function RoomPage({ params }: PageProps<"/[locale]/room/[code]">) {
+export default async function RoomPage({ params, searchParams }: PageProps<"/[locale]/room/[code]">) {
   const { locale, code } = await params;
+  const { debug } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations("room");
   const api = await serverApi();
@@ -52,6 +53,7 @@ export default async function RoomPage({ params }: PageProps<"/[locale]/room/[co
       subtitleLang={me.subtitle_lang}
       subtitleStyle={styleOf(preferences?.data)}
       showSkips={preferences?.data?.show_skip_buttons ?? true}
+      debug={debug === "sync"}
     />
   );
 }

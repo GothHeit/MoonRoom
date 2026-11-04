@@ -1221,6 +1221,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/watch/rooms/clock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Clock
+         * @description The server's clock, so viewers can line their own up with it. Declared before /{code}.
+         */
+        get: operations["clock_watch_rooms_clock_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/watch/rooms/{code}": {
         parameters: {
             query?: never;
@@ -1316,7 +1336,8 @@ export interface paths {
         };
         /**
          * Events
-         * @description Server-sent events: `state` (the whole room), `playback`, `chat`. Opening this joins the
+         * @description Server-sent events: `state` (the whole room), `playback`, `chat`, and every few seconds
+         *     `tick` with the current playback version and snapshot revision. Opening this joins the
          *     room; closing it leaves.
          */
         get: operations["events_watch_rooms__code__events_get"];
@@ -1743,6 +1764,11 @@ export interface components {
         ChatIn: {
             /** Text */
             text: string;
+        };
+        /** ClockOut */
+        ClockOut: {
+            /** Now */
+            now: number;
         };
         /** ControlIn */
         ControlIn: {
@@ -2694,6 +2720,8 @@ export interface components {
             /** Members */
             members: components["schemas"]["MemberOut"][];
             playback: components["schemas"]["RoomPlaybackOut"];
+            /** Revision */
+            revision: number;
             /** Source */
             source: string;
             /** Title */
@@ -2705,12 +2733,16 @@ export interface components {
         };
         /** RoomPlaybackOut */
         RoomPlaybackOut: {
+            /** At */
+            at: number;
             /** By */
             by?: string | null;
             /** Playing */
             playing: boolean;
             /** Position */
             position: number;
+            /** Version */
+            version: number;
         };
         /** SeasonalOut */
         SeasonalOut: {
@@ -5178,6 +5210,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clock_watch_rooms_clock_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClockOut"];
                 };
             };
         };

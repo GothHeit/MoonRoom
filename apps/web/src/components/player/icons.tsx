@@ -12,6 +12,7 @@ const PATHS = {
   people: "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 19a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5.5M18 14a6 6 0 0 1 3 5",
   settings: "M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4",
   airplay: "M6 17H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1M12 15l5 6H7z",
+  close: "M6 6l12 12M18 6L6 18",
 } as const;
 
 export type PlayerIconName = keyof typeof PATHS;

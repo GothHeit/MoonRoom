@@ -35,6 +35,12 @@ BUFFER_COOLDOWN_SECONDS = 20
 REPLACE_EMPTY_AFTER_SECONDS = 5
 # A friend invited to a room can still see the invite for this long.
 INVITE_TTL_SECONDS = 30 * 60
+# Starts are scheduled a moment ahead, so every viewer starts on the same frame instead of
+# whenever the news reaches them. A seek needs longer, to load the new spot; a new episode or
+# stream longer still (the room counts it down).
+START_LEAD_SECONDS = 0.4
+SEEK_LEAD_SECONDS = 1.0
+EPISODE_LEAD_SECONDS = 3.0
 MAX_INVITES_PER_ROOM = 50
 MAX_INVITES_PER_PERSON = 10
 
@@ -58,9 +64,14 @@ class Room:
     lang: str
     locked: bool = False
     playing: bool = False
-    # Where the video was at `moved_at` (monotonic seconds).
+    # Where the video is at `moved_at` (monotonic seconds), which is in the future while a
+    # start is scheduled: until then a playing room waits at `position`.
     position: float = 0.0
     moved_at: float = field(default_factory=time.monotonic)
+    # Goes up with every change to playback, so a viewer can drop news older than what it has.
+    version: int = 0
+    # Goes up with every new snapshot, so a viewer whose stream missed one notices.
+    revision: int = 0
     members: dict[uuid.UUID, Member] = field(default_factory=dict)
     votes: dict[uuid.UUID, int] = field(default_factory=dict)
     chat: list[dict] = field(default_factory=list)
@@ -81,12 +92,23 @@ class Room:
     def now_position(self) -> float:
         if not self.playing:
             return self.position
-        return self.position + (time.monotonic() - self.moved_at)
+        return self.position + max(time.monotonic() - self.moved_at, 0.0)
+
+    def _move(self, position: float, playing: bool, lead: float = 0.0) -> None:
+        self.position = position
+        self.playing = playing
+        self.moved_at = time.monotonic() + (lead if playing else 0.0)
+        self.version += 1
 
     def playback(self, by: uuid.UUID | None = None) -> dict:
+        """Where the room is: at `position` at server time `at` (epoch ms, possibly a moment
+        ahead), moving on from there in real time while it plays."""
+        wall = time.time() + (self.moved_at - time.monotonic())
         return {
             "playing": self.playing,
-            "position": round(self.now_position(), 2),
+            "position": round(self.position, 3),
+            "at": round(wall * 1000),
+            "version": self.version,
             "by": str(by) if by else None,
         }
 
@@ -104,6 +126,7 @@ class Room:
             "votes": {str(user): episode for user, episode in self.votes.items()},
             "buffering": [str(user) for user in self.buffering],
             "playback": self.playback(),
+            "revision": self.revision,
         }
 
     def broadcast(
@@ -115,6 +138,7 @@ class Room:
                     queue.put_nowait((kind, data))
 
     def _state(self) -> None:
+        self.revision += 1
         self.broadcast("state", self.snapshot())
 
     def is_full_for(self, user_id: uuid.UUID) -> bool:
@@ -138,11 +162,14 @@ class Room:
         self.members.setdefault(user_id, Member(username)).queues.add(queue)
         self.empty_since = None
         self.invited.pop(user_id, None)
-        queue.put_nowait(("state", self.snapshot()))
+        if is_new:
+            self.revision += 1
+        snapshot = self.snapshot()
+        queue.put_nowait(("state", snapshot))
         for message in self.chat:
             queue.put_nowait(("chat", message))
         if is_new:
-            self.broadcast("state", self.snapshot(), skip=queue)
+            self.broadcast("state", snapshot, skip=queue)
         return queue
 
     def leave(self, user_id: uuid.UUID, queue: asyncio.Queue[Event | None]) -> None:
@@ -159,8 +186,7 @@ class Room:
             self.host_left_at = time.monotonic()
         if not self.members:
             self.empty_since = time.monotonic()
-            self.position = self.now_position()
-            self.playing = False
+            self._move(self.now_position(), False)
             return
         if user_id == self.host_id:
             asyncio.get_running_loop().call_later(HOST_GRACE_SECONDS, self._pass_host, user_id)
@@ -199,9 +225,10 @@ class Room:
                 if self._hold_timer is not None:
                     self._hold_timer.cancel()
                     self._hold_timer = None
-            self.playing = action == "play"
-        self.position = at
-        self.moved_at = time.monotonic()
+            playing = action == "play"
+            self._move(at, playing, START_LEAD_SECONDS)
+        else:
+            self._move(at, self.playing, SEEK_LEAD_SECONDS)
         self.broadcast("playback", self.playback(user_id))
 
     def set_locked(self, user_id: uuid.UUID, locked: bool) -> None:
@@ -222,8 +249,7 @@ class Room:
         if self._hold_timer is not None:
             self._hold_timer.cancel()
             self._hold_timer = None
-        self.position = self.now_position()
-        self.moved_at = time.monotonic()
+        self._move(self.now_position(), self.playing, EPISODE_LEAD_SECONDS)
         self.source = source
         self.lang = lang
         self._state()
@@ -241,9 +267,7 @@ class Room:
             # Nothing to hold in a paused room, and a locked room's playback is the host's.
             if not self.playing or (self.locked and user_id != self.host_id):
                 return
-            self.position = self.now_position()
-            self.moved_at = now
-            self.playing = False
+            self._move(self.now_position(), False)
             self.held = True
             self._hold_timer = asyncio.get_running_loop().call_later(
                 MAX_HOLD_SECONDS, self._release_hold
@@ -268,8 +292,7 @@ class Room:
         if not self.held:
             return
         self.held = False
-        self.playing = True
-        self.moved_at = time.monotonic()
+        self._move(self.position, True, START_LEAD_SECONDS)
         self.broadcast("playback", self.playback())
 
     def _release_hold(self) -> None:
@@ -291,9 +314,7 @@ class Room:
             self._hold_timer = None
         self.episode = episode
         self.votes.clear()
-        self.playing = True
-        self.position = 0.0
-        self.moved_at = time.monotonic()
+        self._move(0.0, True, EPISODE_LEAD_SECONDS)
         self._state()
 
     def vote_episode(self, user_id: uuid.UUID, episode: int) -> None:

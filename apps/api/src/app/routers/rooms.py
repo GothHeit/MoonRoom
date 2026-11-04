@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 import uuid
 from typing import Annotated, Literal
 
@@ -19,7 +20,8 @@ from app.routers.friends import friend_ids
 router = APIRouter(prefix="/watch/rooms", tags=["rooms"])
 _bearer = HTTPBearer(auto_error=False)
 
-KEEPALIVE_SECONDS = 15
+# Often enough that a viewer whose stream quietly missed something catches up within seconds.
+KEEPALIVE_SECONDS = 10
 
 
 class RoomCreate(BaseModel):
@@ -38,7 +40,12 @@ class MemberOut(BaseModel):
 
 class RoomPlaybackOut(BaseModel):
     playing: bool
+    # Where the video is at server time `at` (epoch ms); while playing it moves on from there.
+    # `at` can be a moment ahead: a scheduled start, waiting at `position` until then.
     position: float
+    at: int
+    # Goes up with every change, so older news can be dropped.
+    version: int
     by: str | None = None
 
 
@@ -57,6 +64,13 @@ class RoomOut(BaseModel):
     # Ids of the people whose video is loading; the room is held while there are any.
     buffering: list[str]
     playback: RoomPlaybackOut
+    # Goes up with every new snapshot; `tick` events carry it so a missed one is noticed.
+    revision: int
+
+
+class ClockOut(BaseModel):
+    # Server time, epoch ms: viewers measure their clock's offset from it.
+    now: int
 
 
 class ControlIn(BaseModel):
@@ -108,6 +122,12 @@ async def create_room(body: RoomCreate, request: Request, user: CurrentUser):
     rooms: Rooms = request.app.state.rooms
     room = rooms.create(user.id, body.source, body.anime_id, title, body.episode, body.lang)
     return room.snapshot()
+
+
+@router.get("/clock", response_model=ClockOut)
+async def clock():
+    """The server's clock, so viewers can line their own up with it. Declared before /{code}."""
+    return {"now": round(time.time() * 1000)}
 
 
 @router.get("/{code}", response_model=RoomOut)
@@ -204,7 +224,8 @@ def _frame(kind: str, data: dict) -> str:
 
 @router.get("/{code}/events", response_class=StreamingResponse)
 async def events(code: str, request: Request, user: Annotated[User, Depends(_stream_user)]):
-    """Server-sent events: `state` (the whole room), `playback`, `chat`. Opening this joins the
+    """Server-sent events: `state` (the whole room), `playback`, `chat`, and every few seconds
+    `tick` with the current playback version and snapshot revision. Opening this joins the
     room; closing it leaves."""
     room = _room(request, code)
     if room.is_full_for(user.id):
@@ -218,7 +239,7 @@ async def events(code: str, request: Request, user: Annotated[User, Depends(_str
                 try:
                     item = await asyncio.wait_for(queue.get(), KEEPALIVE_SECONDS)
                 except TimeoutError:
-                    yield ": keepalive\n\n"
+                    yield _frame("tick", {"version": room.version, "revision": room.revision})
                     continue
                 if item is None:
                     return

@@ -21,6 +21,8 @@ export type NetProfile = {
   loss?: number;
   /** Download speed for video segments, in kbit/s. Unset is unlimited. */
   segmentKbps?: number;
+  /** How far the viewer's clock is off, in ms. */
+  skew?: number;
 };
 
 export type Viewer = { name: string; page: Page; net: NetProfile };
@@ -72,7 +74,12 @@ export class Session {
     const context = await this.browser.newContext();
     this.contexts.push(context);
     const page = await context.newPage();
-    await page.addInitScript(installShim, { latency: net.latency ?? 0, jitter: net.jitter ?? 0, loss: net.loss ?? 0 });
+    await page.addInitScript(installShim, {
+      latency: net.latency ?? 0,
+      jitter: net.jitter ?? 0,
+      loss: net.loss ?? 0,
+      skew: net.skew ?? 0,
+    });
     await stubVideo(page, net);
     await signIn(page, "en", name);
     const viewer = { name, page, net };

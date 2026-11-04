@@ -216,7 +216,9 @@ export function SettingsMenu(props: Props) {
           {props.streams.length > 1 && <Row label={t("source")} value={props.streamName} onClick={() => setView("source")} />}
           {hasAudioTracks && <Row label={t("audio")} value={audioName ?? ""} onClick={() => setView("audio")} />}
           {hasSubtitles && <Row label={t("subtitles")} value={subtitleName} onClick={() => setView("subtitles")} />}
-          <Row label={t("speed")} value={t("speedValue", { rate: props.rate })} onClick={() => setView("speed")} />
+          {props.speeds.length > 0 && (
+            <Row label={t("speed")} value={t("speedValue", { rate: props.rate })} onClick={() => setView("speed")} />
+          )}
           {props.qualities.length > 1 && <Row label={t("settings.quality")} value={qualityName} onClick={() => setView("quality")} />}
         </>
       );
