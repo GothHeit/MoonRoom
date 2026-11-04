@@ -28,7 +28,8 @@ test("falls back to Portuguese for other languages", async ({ browser }) => {
 
 test("switches language on the login page and keeps the page", async ({ page }) => {
   await page.goto("/pt/login");
-  await page.getByLabel("Idioma").selectOption("en");
+  // The auth layout renders two switchers and shows one per orientation.
+  await page.locator('select[aria-label="Idioma"]:visible').selectOption("en");
   await expect(page).toHaveURL(/\/en\/login$/);
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });

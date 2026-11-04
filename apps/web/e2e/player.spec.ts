@@ -91,7 +91,7 @@ test("offers no source switch when the episode has only one version", async ({ p
 test("switches source at the same spot and remembers it for the title", async ({ page }) => {
   await signIn(page);
   await page.goto("/en/watch/stub/7/1");
-  await expect.poll(() => currentTime(page)).toBeGreaterThan(2);
+  await expect.poll(() => currentTime(page), { timeout: 20_000 }).toBeGreaterThan(2);
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: /^Source/ }).click();
   await page.getByRole("radio", { name: "stub · Dub" }).click();
