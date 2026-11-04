@@ -4,35 +4,30 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { styleOf } from "@/components/player/subtitleStyle";
 import { RoomClient } from "@/components/room/RoomClient";
+import { RoomEnded } from "@/components/room/RoomEnded";
 import { titled } from "@/lib/page-title";
 import { serverApi, unwrap } from "@/lib/server-api";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/room/[code]">): Promise<Metadata> {
-  const { locale } = await params;
+  const { locale, code } = await params;
   const t = await getTranslations({ locale, namespace: "room" });
-  return titled(t("panel"));
+  // The tab says what the room watches, so a friend's link reads as more than "Watch together".
+  const api = await serverApi();
+  const { data: room } = await api.GET("/watch/rooms/{code}", { params: { path: { code } } }).catch(() => ({ data: undefined }));
+  return titled(room ? t("pageTitle", { title: room.title }) : t("panel"));
 }
 
 export default async function RoomPage({ params, searchParams }: PageProps<"/[locale]/room/[code]">) {
   const { locale, code } = await params;
   const { debug } = await searchParams;
   setRequestLocale(locale);
-  const t = await getTranslations("room");
   const api = await serverApi();
 
   const [{ data: room, response }, me] = await Promise.all([
     api.GET("/watch/rooms/{code}", { params: { path: { code } } }),
     unwrap(api.GET("/me"), locale),
   ]);
-  if (response.status === 409) {
-    return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black p-6 text-center text-fg">
-        <p role="alert" className="max-w-md text-lg font-medium">
-          {t("closed.room_full")}
-        </p>
-      </div>
-    );
-  }
+  if (response.status === 409) return <RoomEnded reason="room_full" />;
   if (!room) notFound();
 
   const [episodes, preferences] = await Promise.all([

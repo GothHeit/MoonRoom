@@ -13,6 +13,9 @@ const PATHS = {
   settings: "M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4",
   airplay: "M6 17H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1M12 15l5 6H7z",
   close: "M6 6l12 12M18 6L6 18",
+  chat: "M4 5h16v11H9l-5 4z",
+  invite: "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 19a6 6 0 0 1 12 0M18 8v6M15 11h6",
+  send: "M5 12h14M13 6l6 6-6 6",
 } as const;
 
 export type PlayerIconName = keyof typeof PATHS;

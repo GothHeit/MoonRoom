@@ -27,6 +27,8 @@ export type RoomBinding = {
   debug?: { offset: () => number; rtt: () => number | null };
   /** Rendered in the player's top bar, after the title. */
   topBar: ReactNode;
+  /** Where the player sits on the screen (classes); unset fills it. The room shrinks it for its panel. */
+  frame?: string;
   /** Rendered over the video, outside the controls that fade away. */
   overlay: ReactNode;
 };

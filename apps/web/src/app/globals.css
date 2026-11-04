@@ -184,6 +184,28 @@ main:focus {
   }
 }
 
+/* A reaction rises over the video and fades out. Reduced motion keeps only the fade. */
+@utility float-up {
+  animation: float-up 2400ms var(--ease-out) forwards;
+}
+
+@keyframes float-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  15% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-160px);
+  }
+}
+
 /* Small caps line above a big title. */
 @utility kicker {
   @apply text-xs font-bold tracking-[0.14em] text-accent uppercase;
@@ -201,6 +223,9 @@ main:focus {
   }
   .press:active {
     transform: none;
+  }
+  .float-up {
+    animation-name: art-fade-in;
   }
 }
 

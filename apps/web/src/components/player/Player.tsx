@@ -281,7 +281,7 @@ export function Player(props: Props) {
       aria-label={t("region")}
       onMouseMove={poke}
       onTouchStart={poke}
-      className={`fixed inset-0 z-[60] bg-black text-fg ${shown ? "" : "cursor-none"}`}
+      className={`fixed z-[60] bg-black text-fg ${room?.frame ?? "inset-0"} ${shown ? "" : "cursor-none"}`}
     >
       <video
         ref={video}

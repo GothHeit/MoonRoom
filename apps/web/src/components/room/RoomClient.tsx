@@ -1,16 +1,17 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Player, type Lang } from "@/components/player/Player";
 import { PlayerIcon } from "@/components/player/icons";
 import type { SubtitleStyle } from "@/components/player/subtitleStyle";
 import { useToast } from "@/components/ui/Toast";
-import { Link } from "@/i18n/navigation";
 
-import { RoomPanel } from "./RoomPanel";
-import { useRoom, type RoomState } from "./useRoom";
+import { RoomEnded } from "./RoomEnded";
+import { RoomOverlay } from "./RoomOverlay";
+import { Avatar, RoomPanel, type PanelTab } from "./RoomPanel";
+import { useRoom, type ChatMessage, type RoomState } from "./useRoom";
 
 const ACTION_ERRORS = [
   "room_not_found",
@@ -23,6 +24,23 @@ const ACTION_ERRORS = [
   "source_not_found",
   "not_authenticated",
 ];
+
+/** A big landscape screen opens the room with the chat beside the video, as Twitch does. */
+const WIDE = "(min-width: 1024px) and (orientation: landscape)";
+function subscribeWide(onChange: () => void) {
+  const query = window.matchMedia(WIDE);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+// Sideways (and on a computer) the panel is a column on the right that the video shrinks for;
+// upright it sits under a 16:9 video, so the video is never covered.
+// Written out in full so the class names are found at build time: side min(22.5rem,42vw),
+// under the video at 16:9 of the width plus the notch.
+const PLAYER_BESIDE_PANEL =
+  "inset-0 landscape:right-[min(22.5rem,42vw)] portrait:bottom-auto portrait:h-[calc(56.25vw+env(safe-area-inset-top))]";
+const PANEL =
+  "landscape:inset-y-0 landscape:right-0 landscape:w-[min(22.5rem,42vw)] landscape:border-l landscape:pt-[env(safe-area-inset-top)] landscape:pr-[env(safe-area-inset-right)] portrait:inset-x-0 portrait:bottom-0 portrait:top-[calc(56.25vw+env(safe-area-inset-top))] portrait:border-t";
 
 type Props = {
   initial: RoomState;
@@ -46,7 +64,9 @@ export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyl
     clock,
     messages,
     status,
-    lastReaction,
+    reconnecting,
+    reactions,
+    toasts,
     send,
     setBuffering,
     say,
@@ -60,113 +80,150 @@ export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyl
     if (code === "controls_locked") return;
     toast(t(`actionErrors.${ACTION_ERRORS.includes(code) ? code : "unknown"}`), "error");
   });
-  const [open, setOpen] = useState(false);
-  const [seen, setSeen] = useState(0);
-  const unread = open ? 0 : messages.length - seen;
+  const wide = useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false);
+  // Null until the viewer opens or closes it: then the screen size decides.
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const [tab, setTab] = useState<PanelTab>("chat");
+  const [seenId, setSeenId] = useState<string | null>(null);
+  const open = chosen ?? wide;
 
-  if (typeof status === "object") {
-    return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black p-6 text-fg">
-        <div role="alert" className="max-w-md text-center">
-          <p className="text-lg font-medium">{t(`closed.${status.closed}`)}</p>
-          <Link href="/room" className="mt-6 press inline-flex min-h-11 items-center justify-center rounded-full bg-accent px-5 py-2 text-sm font-bold text-on-accent">
-            {t("back")}
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  if (typeof status === "object") return <RoomEnded reason={status.closed} />;
 
-  function toggle() {
-    if (open) setSeen(messages.length);
-    setOpen(!open);
+  const chat = messages.filter((m): m is ChatMessage => !("event" in m));
+  const reading = open && tab === "chat";
+  const seenAt = seenId === null ? -1 : chat.findIndex((m) => m.id === seenId);
+  const unread = reading ? 0 : chat.slice(seenAt + 1).filter((m) => m.user_id !== meId).length;
+  const latest = chat.at(-1)?.id ?? null;
+
+  /** Opens the panel on a tab, or closes it when that tab is already showing. */
+  function show(next: PanelTab) {
+    if (reading) setSeenId(latest);
+    if (open && tab === next) {
+      setChosen(false);
+      return;
+    }
+    setTab(next);
+    setChosen(true);
   }
 
   const canControl = !room.locked || room.host_id === meId;
+  const pill = "press flex h-11 shrink-0 items-center gap-2 rounded-full text-sm font-bold";
   const topBar = (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-expanded={open}
-      aria-label={t("togglePanel", { count: room.members.length })}
-      className="relative ml-auto flex h-10 items-center gap-2 rounded-ui px-3 text-fg hover:bg-white/10"
-    >
-      <PlayerIcon name="people" />
-      <span className="text-sm font-bold tabular-nums">{room.members.length}</span>
-      {unread > 0 && (
-        <span className="absolute -right-1 -top-1 rounded-full bg-accent px-1.5 text-xs font-bold text-on-accent">
-          {unread}
+    <div className="ml-auto flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        onClick={() => show("people")}
+        aria-pressed={open && tab === "people"}
+        aria-label={t("peopleButton", { count: room.members.length })}
+        className={`${pill} px-2 text-soft hover:text-fg`}
+      >
+        <span className="hidden -space-x-2 sm:flex short:hidden">
+          {room.members.slice(0, 3).map((m) => (
+            <span key={m.id} className="rounded-full ring-2 ring-black">
+              <Avatar id={m.id} name={m.username} small />
+            </span>
+          ))}
         </span>
-      )}
-    </button>
+        <span className="sm:hidden short:inline">
+          <PlayerIcon name="people" />
+        </span>
+        <span className="font-medium tabular-nums">
+          <span className="sm:hidden short:inline">{room.members.length}</span>
+          <span className="hidden sm:inline short:hidden">{t("watching", { count: room.members.length })}</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => show("people")}
+        className={`${pill} hidden border border-line-strong px-4 text-fg hover:bg-line md:flex short:hidden`}
+      >
+        <PlayerIcon name="invite" />
+        {t("inviteButton")}
+      </button>
+      <button
+        type="button"
+        onClick={() => show("chat")}
+        aria-pressed={reading}
+        aria-label={t("chatButtonLabel", { open: String(reading), count: unread })}
+        className={`${pill} relative px-3 sm:px-4 short:px-3 ${reading ? "bg-accent text-on-accent" : "border border-line-strong text-fg hover:bg-line"}`}
+      >
+        <PlayerIcon name="chat" />
+        <span className="hidden sm:inline short:hidden">{t("chatButton")}</span>
+        {unread > 0 && (
+          <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-bold tabular-nums text-on-accent max-sm:absolute max-sm:-right-1 max-sm:-top-1 short:absolute short:-right-1 short:-top-1">
+            {unread > 99 ? "99+" : unread}
+          </span>
+        )}
+      </button>
+    </div>
   );
 
   const waitingFor = room.members.filter((m) => room.buffering.includes(m.id)).map((m) => m.username);
   const overlay = (
+    <RoomOverlay
+      playback={playback}
+      serverNow={serverNow}
+      // With the panel open the chat is a tap away, and on a phone the video is too small for them.
+      toasts={open ? [] : toasts.filter((m) => m.user_id !== meId)}
+      reactions={reactions}
+      reconnecting={reconnecting}
+      waitingFor={waitingFor}
+    />
+  );
+
+  return (
     <>
-      {waitingFor.length > 0 && (
-        <p
-          role="status"
-          className="pointer-events-none absolute left-1/2 top-24 -translate-x-1/2 rounded-ui bg-black/80 px-4 py-2 text-sm font-medium"
-        >
-          {t("waitingFor", { names: waitingFor.join(", ") })}
-        </p>
-      )}
+      <Player
+        key={`${room.source}-${room.anime_id}-${room.episode}-${room.lang}`}
+        source={room.source}
+        animeId={room.anime_id}
+        episode={room.episode}
+        title={room.title}
+        episodes={episodes}
+        lang={room.lang as Lang}
+        startAt={0}
+        subtitleLang={subtitleLang}
+        subtitleStyle={subtitleStyle}
+        showSkips={showSkips}
+        room={{
+          playback,
+          serverNow,
+          clockReady,
+          canControl,
+          send,
+          setBuffering,
+          pickEpisode: (episode) => void voteEpisode(episode),
+          switchStream: room.host_id === meId ? switchStream : undefined,
+          onLocked: () => toast(t("locked"), "error"),
+          debug: debug ? { offset: () => clock.offset.current, rtt: () => clock.rtt.current } : undefined,
+          frame: open ? PLAYER_BESIDE_PANEL : undefined,
+          topBar,
+          overlay,
+        }}
+      />
       {open && (
-        <div className="absolute inset-y-20 right-4 z-10 w-[min(22rem,calc(100%-2rem))] sm:right-8">
+        <aside
+          aria-label={t("panel")}
+          className={`fixed z-[60] flex flex-col border-line bg-surface pb-[env(safe-area-inset-bottom)] text-fg ${PANEL}`}
+        >
           <RoomPanel
             room={room}
             meId={meId}
             messages={messages}
             episodes={episodes}
+            tab={tab}
+            onTab={(next) => {
+              if (reading) setSeenId(latest);
+              setTab(next);
+            }}
             onSay={(text) => void say(text)}
             onReact={(emoji) => void react(emoji)}
             onVote={(episode) => void voteEpisode(episode)}
             onWithdraw={() => void withdrawVote()}
             onLock={(locked) => void setLocked(locked)}
           />
-        </div>
-      )}
-      {lastReaction && (
-        <div
-          key={lastReaction.id}
-          role="status"
-          className="pointer-events-none absolute bottom-32 left-4 rounded-ui bg-black/70 px-3 py-2 text-2xl sm:left-8"
-        >
-          {lastReaction.text}
-          <span className="ml-2 text-xs text-muted">{lastReaction.username}</span>
-        </div>
+        </aside>
       )}
     </>
-  );
-
-  return (
-    <Player
-      key={`${room.source}-${room.anime_id}-${room.episode}-${room.lang}`}
-      source={room.source}
-      animeId={room.anime_id}
-      episode={room.episode}
-      title={room.title}
-      episodes={episodes}
-      lang={room.lang as Lang}
-      startAt={0}
-      subtitleLang={subtitleLang}
-      subtitleStyle={subtitleStyle}
-      showSkips={showSkips}
-      room={{
-        playback,
-        serverNow,
-        clockReady,
-        canControl,
-        send,
-        setBuffering,
-        pickEpisode: (episode) => void voteEpisode(episode),
-        switchStream: room.host_id === meId ? switchStream : undefined,
-        onLocked: () => toast(t("locked"), "error"),
-        debug: debug ? { offset: () => clock.offset.current, rtt: () => clock.rtt.current } : undefined,
-        topBar,
-        overlay,
-      }}
-    />
   );
 }

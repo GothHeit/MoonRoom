@@ -49,7 +49,7 @@ export function InviteFriends({ code, memberIds }: Props) {
         type="button"
         aria-expanded={open}
         onClick={() => void toggle()}
-        className="press rounded-full border border-line-strong px-3 py-1.5 text-xs font-bold pointer-coarse:min-h-11 hover:bg-line"
+        className="press min-h-11 rounded-full border border-line-strong px-4 text-sm font-bold hover:bg-line"
       >
         {t("button")}
       </button>
@@ -61,7 +61,7 @@ export function InviteFriends({ code, memberIds }: Props) {
             </p>
           )}
           {friends !== null && candidates.length === 0 && <p className="text-muted">{t("none")}</p>}
-          <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
+          <ul className="flex flex-col gap-2">
             {candidates.map(({ user }) => (
               <li key={user.id} className="flex items-center justify-between gap-2">
                 <span className="truncate">{user.username}</span>
@@ -69,7 +69,7 @@ export function InviteFriends({ code, memberIds }: Props) {
                   type="button"
                   disabled={sent.has(user.id)}
                   onClick={() => void invite(user.id)}
-                  className="press rounded-full bg-accent px-3 py-1 pointer-coarse:min-h-11 text-xs font-bold text-on-accent disabled:opacity-60"
+                  className="press min-h-11 shrink-0 rounded-full bg-accent px-4 text-sm font-bold text-on-accent disabled:opacity-60"
                 >
                   {sent.has(user.id) ? t("sent") : t("send")}
                 </button>

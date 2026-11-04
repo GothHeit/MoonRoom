@@ -76,7 +76,7 @@ async function pair(browser: Browser) {
   await enter(host, code);
   await enter(guest, code);
   // Both have joined once each sees two people.
-  await expect(host.getByRole("button", { name: /Room panel, 2 watching/ })).toBeVisible();
+  await expect(host.getByRole("button", { name: /People, 2 watching/ })).toBeVisible();
   return { host, guest, code };
 }
 
@@ -154,9 +154,9 @@ test("a viewer who drifts is pulled back, and locked controls undo their seek", 
   await host.keyboard.press("Space");
   await expect.poll(() => playing(guest)).toBe(true);
 
-  await host.getByRole("button", { name: /Room panel/ }).click();
+  await host.getByRole("button", { name: /^People/ }).click();
   await host.getByRole("switch", { name: "Only the host controls playback" }).click();
-  await expect(guest.getByRole("button", { name: /Room panel/ })).toBeVisible();
+  await expect(guest.getByRole("button", { name: /^People/ })).toBeVisible();
 
   await settle(guest);
   await seek(guest, 30);
@@ -199,11 +199,22 @@ test("a stall that never ends stops holding the room after a timeout", async ({ 
   await expect(host.getByText("Waiting for bob…")).toBeHidden();
 });
 
-test("chat reaches the other viewer", async ({ browser }) => {
+test("chat reaches the other viewer, beside the video or over it", async ({ browser }) => {
   const { host, guest } = await pair(browser);
-  await guest.getByRole("button", { name: /Room panel/ }).click();
+  // A computer screen opens the room with the chat beside the video.
+  const hostPanel = host.getByRole("complementary", { name: "Watch together" });
+  await expect(hostPanel.getByText("bob joined")).toBeVisible();
   await guest.getByRole("textbox", { name: "Message" }).fill("hello moon");
   await guest.keyboard.press("Enter");
-  await host.getByRole("button", { name: /Room panel/ }).click();
-  await expect(host.getByText("hello moon")).toBeVisible();
+  await expect(hostPanel.getByText("hello moon")).toBeVisible();
+
+  // With the chat closed, a new message shows over the video and the button counts it.
+  await host.getByRole("button", { name: /^Close chat/ }).click();
+  await expect(hostPanel).toBeHidden();
+  await guest.getByRole("textbox", { name: "Message" }).fill("over the video");
+  await guest.keyboard.press("Enter");
+  await expect(host.getByText("over the video")).toBeVisible();
+  await expect(host.getByRole("button", { name: "Open chat, 1 new message" })).toBeVisible();
+  await host.getByRole("button", { name: /^Open chat/ }).click();
+  await expect(hostPanel.getByText("over the video")).toBeVisible();
 });

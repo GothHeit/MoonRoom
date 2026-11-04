@@ -22,7 +22,6 @@
     "message": "Message",
     "send": "Send",
     "reactions": "Reactions",
-    "togglePanel": "Room panel, {count} watching",
     "back": "Join another room",
     "closed": {
       "room_not_found": "This room has ended or the code is wrong.",
@@ -59,6 +58,39 @@
       "not_in_room": "Join the room first.",
       "source_not_found": "Streaming is turned off on this server.",
       "not_authenticated": "Your session expired. Sign in again."
-    }
+    },
+    "tabs": {
+      "chat": "Chat",
+      "people": "People",
+      "episode": "Episode"
+    },
+    "tabsLabel": "Room panel",
+    "peopleButton": "People, {count} watching",
+    "watching": "{count} watching",
+    "chatButton": "Chat",
+    "chatButtonLabel": "{open, select, true {Close chat} other {Open chat}}{count, plural, =0 {} one {, # new message} other {, # new messages}}",
+    "inviteButton": "Invite",
+    "you": "you",
+    "loadingVideo": "loading",
+    "shareTitle": "Share the room",
+    "shareHint": "Friends with the code or link join in the same moment of the episode.",
+    "events": {
+      "joined": "{name} joined",
+      "left": "{name} left",
+      "played": "{name} played",
+      "paused": "{name} paused at {time}",
+      "jumped": "{name} jumped to {time}",
+      "episode": "Episode {episode} is starting"
+    },
+    "countdown": "Starting for everyone",
+    "reconnecting": "Reconnecting to the room…",
+    "ended": {
+      "room_not_found": "This room has ended",
+      "room_full": "This room is full",
+      "not_authenticated": "Your session expired",
+      "network": "The room is out of reach"
+    },
+    "pageTitle": "{title} · Watch together",
+    "signIn": "Sign in"
   }
 }

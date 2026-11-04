@@ -110,7 +110,7 @@ export class Session {
   async waitForMembers(count: number) {
     for (const { name, page } of this.entered) {
       await expect(
-        page.getByRole("button", { name: new RegExp(`Room panel, ${count} watching`) }),
+        page.getByRole("button", { name: new RegExp(`People, ${count} watching`) }),
         `${name} sees ${count} people in the room`,
       ).toBeVisible({ timeout: 20_000 });
     }
