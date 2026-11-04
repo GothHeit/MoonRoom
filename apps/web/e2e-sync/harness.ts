@@ -5,6 +5,8 @@ import { expect, type Browser, type BrowserContext, type Page } from "@playwrigh
 
 import { signIn } from "../e2e/helpers";
 
+import { CONTROL_PORT } from "./ports";
+
 import { FIXTURE_DIR } from "./fixture";
 import { installShim } from "./shim";
 
@@ -137,6 +139,12 @@ export class Session {
   async drop(viewer: Viewer, ms: number) {
     this.mark(`${viewer.name} drops for ${ms / 1000} s`);
     await viewer.page.evaluate((m) => (window as unknown as { __drop: (ms: number) => void }).__drop(m), ms);
+  }
+
+  /** Kills the API without warning and starts it again after `downMs`. */
+  async restartServer(downMs: number) {
+    const response = await fetch(`http://localhost:${CONTROL_PORT}/restart?down=${downMs}`, { method: "POST" });
+    expect(response.ok).toBe(true);
   }
 
   async wait(seconds: number) {

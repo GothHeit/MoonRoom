@@ -132,3 +132,17 @@ test("five viewers on mixed networks", async ({ browser }) => {
   await s.wait(SECONDS);
   await s.finish(from);
 });
+
+test("the server restarts while everyone watches", async ({ browser }) => {
+  const { s, viewers } = await room(browser, "restart", [["alice", NEAR], ["bob", MID], ["carol", FAR]]);
+  const from = await startPlaying(s, viewers[0]);
+  await s.wait(SECONDS / 4);
+  // Killed without warning, as a deploy does, and back after a few seconds.
+  s.mark("server restarts");
+  await s.restartServer(3000);
+  await s.wait(SECONDS * 0.75);
+  const r = await s.finish(from);
+  // Nobody was sent away: the room came back and everyone is playing it together again.
+  for (const v of viewers) await expect(v.page.locator("video")).toBeVisible();
+  expect(r.recover[0].seconds).not.toBeNull();
+});

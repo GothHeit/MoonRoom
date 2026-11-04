@@ -26,6 +26,10 @@ const CHAT_LIMIT = 100;
 const SILENT_MS = 25_000;
 /** Back from the background after this long, the connection is opened afresh. */
 const AWAY_MS = 3000;
+/** While the server is unreachable (a restart, a deploy) the room keeps trying this long. */
+const GIVE_UP_MS = 120_000;
+const RETRY_MS = [1000, 2000, 4000, 8000];
+const ENDED = ["room_not_found", "room_full", "not_authenticated"] as const;
 
 function playbackOf(state: RoomState["playback"]): Playback {
   return { playing: state.playing, position: state.position, at: state.at, version: state.version };
@@ -53,6 +57,10 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
     let heard = Date.now();
     let hiddenAt: number | null = null;
     let stopped = false;
+    // Since when the server has been out of reach, and the pending retry.
+    let unreachableSince: number | null = null;
+    let retries = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
     const applyState = (state: RoomState) => {
       if (state.revision < revision) return;
@@ -79,6 +87,8 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
 
       es.onopen = () => {
         heard = Date.now();
+        unreachableSince = null;
+        retries = 0;
         setStatus("open");
       };
       on<RoomState>("state", applyState);
@@ -106,15 +116,28 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
           setStatus("connecting");
           return;
         }
+        if (es !== source || stopped) return;
+        // The room is gone or refused us: say so. Anything else (the server restarting, a bad
+        // gateway, no network) is worth waiting out: the room comes back after a restart.
+        const retry = () => {
+          unreachableSince ??= Date.now();
+          if (Date.now() - unreachableSince > GIVE_UP_MS) {
+            setStatus({ closed: "network" });
+            return;
+          }
+          setStatus("connecting");
+          retryTimer = setTimeout(reopen, RETRY_MS[Math.min(retries++, RETRY_MS.length - 1)]);
+        };
         void api
           .GET("/watch/rooms/{code}", { params: { path: { code } } })
           .then(({ error }) => {
+            if (stopped) return;
             const reason = errorCode(error);
-            setStatus({
-              closed: reason === "room_not_found" || reason === "room_full" || reason === "not_authenticated" ? reason : "network",
-            });
+            const ended = ENDED.find((e) => e === reason);
+            if (ended) setStatus({ closed: ended });
+            else retry();
           })
-          .catch(() => setStatus({ closed: "network" }));
+          .catch(() => !stopped && retry());
       };
       return es;
     };
@@ -148,6 +171,7 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
 
     return () => {
       stopped = true;
+      clearTimeout(retryTimer);
       source.close();
       clearInterval(watchdog);
       document.removeEventListener("visibilitychange", onVisibility);

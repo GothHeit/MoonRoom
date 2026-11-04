@@ -19,6 +19,7 @@ from app.manga import load_manga_sources
 from app.notifications import check_new_episodes
 from app.probes import StreamProbes
 from app.ratelimit import ActionLimits, AuthLimits
+from app.room_store import RoomStore, keep_saved, restore
 from app.rooms import Rooms
 from app.routers import (
     anime,
@@ -101,6 +102,8 @@ async def lifespan(app: FastAPI):
         app.state.action_limits = ActionLimits()
         app.state.session_check = SessionCheck()
         app.state.rooms = Rooms(settings.max_rooms_per_host)
+        app.state.room_store = RoomStore(settings.redis_url)
+        await restore(app.state.rooms, app.state.room_store)
         app.state.source_hints = new_source_hints()
         app.state.probes = StreamProbes(http)
         app.state.watch = watch.WatchCaches()
@@ -120,6 +123,7 @@ async def lifespan(app: FastAPI):
             )
         )
         pruner = asyncio.create_task(_prune())
+        room_saver = asyncio.create_task(keep_saved(app.state.rooms, app.state.room_store))
         checker = (
             asyncio.create_task(_episode_checks(app, settings.episode_check_hours))
             if settings.episode_check_hours > 0
@@ -130,6 +134,7 @@ async def lifespan(app: FastAPI):
         finally:
             sweeper.cancel()
             pruner.cancel()
+            room_saver.cancel()
             for task in list(app.state.watch.tasks):
                 task.cancel()
             if checker is not None:
@@ -138,6 +143,7 @@ async def lifespan(app: FastAPI):
                 if hasattr(source, "aclose"):
                     await source.aclose()
             await app.state.shared_cache.aclose()
+            await app.state.room_store.aclose()
     await db.dispose_engine()
 
 

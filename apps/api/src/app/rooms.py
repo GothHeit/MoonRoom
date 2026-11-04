@@ -1,14 +1,16 @@
-"""Watch-together rooms, kept in memory.
+"""Watch-together rooms, kept in memory and mirrored to Redis.
 
 A room is one episode watched in sync by up to MAX_MEMBERS people. It lives only as long as
 someone is in it (plus a short grace period, so a page reload doesn't lose it), which is why
-there is no table: the API runs as a single process.
+there is no table: the API runs as a single process. Every change is copied to Redis (see
+RoomStore) so a restart or a deploy picks the rooms up again and viewers just reconnect.
 """
 
 import asyncio
 import secrets
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from app.errors import ApiError
@@ -88,6 +90,12 @@ class Room:
     # can be handed to whoever joins next.
     host_left_at: float | None = None
     _hold_timer: asyncio.TimerHandle | None = None
+    # Called with the room's code whenever something worth keeping changed.
+    on_change: Callable[[str], None] | None = None
+
+    def changed(self) -> None:
+        if self.on_change is not None:
+            self.on_change(self.code)
 
     def now_position(self) -> float:
         if not self.playing:
@@ -132,6 +140,7 @@ class Room:
     def broadcast(
         self, kind: str, data: dict, skip: asyncio.Queue[Event | None] | None = None
     ) -> None:
+        self.changed()
         for member in self.members.values():
             for queue in member.queues:
                 if queue is not skip:
@@ -162,6 +171,7 @@ class Room:
         self.members.setdefault(user_id, Member(username)).queues.add(queue)
         self.empty_since = None
         self.invited.pop(user_id, None)
+        self.changed()
         if is_new:
             self.revision += 1
         snapshot = self.snapshot()
@@ -187,6 +197,7 @@ class Room:
         if not self.members:
             self.empty_since = time.monotonic()
             self._move(self.now_position(), False)
+            self.changed()
             return
         if user_id == self.host_id:
             asyncio.get_running_loop().call_later(HOST_GRACE_SECONDS, self._pass_host, user_id)
@@ -351,6 +362,7 @@ class Room:
         ):
             raise ApiError(429, "too_many_invites", "Too many invites for this room")
         self.invited[target_id] = (inviter_id, now)
+        self.changed()
 
     def say(self, user_id: uuid.UUID, text: str) -> None:
         self._require_member(user_id)
@@ -383,11 +395,110 @@ class Room:
             },
         )
 
+    def dump(self) -> dict:
+        """What a restart needs to bring the room back. Members are left out: they reconnect.
+        Times are wall-clock seconds, since monotonic ones mean nothing to the next process."""
+        now = time.time()
+        mono = time.monotonic()
+        return {
+            "code": self.code,
+            "host_id": str(self.host_id),
+            "source": self.source,
+            "anime_id": self.anime_id,
+            "title": self.title,
+            "episode": self.episode,
+            "lang": self.lang,
+            "locked": self.locked,
+            "playing": self.playing,
+            "position": self.position,
+            # When (wall clock) the room was at `position`.
+            "at": now + (self.moved_at - mono),
+            "version": self.version,
+            "revision": self.revision,
+            "chat": self.chat,
+            "invited": {
+                str(user): [str(by), now - (mono - at)] for user, (by, at) in self.invited.items()
+            },
+            "saved_at": now,
+        }
+
+    @classmethod
+    def load(cls, data: dict) -> "Room":
+        """A room from `dump`. One that was playing has kept playing all along: the viewers'
+        players did, while the server was away, so they carry on without a jump."""
+        now = time.time()
+        mono = time.monotonic()
+        room = cls(
+            code=data["code"],
+            host_id=uuid.UUID(data["host_id"]),
+            source=data["source"],
+            anime_id=int(data["anime_id"]),
+            title=data["title"],
+            episode=int(data["episode"]),
+            lang=data["lang"],
+            locked=bool(data["locked"]),
+            playing=bool(data["playing"]),
+            position=float(data["position"]),
+            moved_at=mono + (float(data["at"]) - now),
+            # Ahead of anything a viewer saw before the restart, so nothing they hold wins.
+            version=int(data["version"]) + 1,
+            revision=int(data["revision"]) + 1,
+            chat=list(data.get("chat", []))[-CHAT_HISTORY:],
+        )
+        for user, (by, at) in data.get("invited", {}).items():
+            if now - at < INVITE_TTL_SECONDS:
+                room.invited[uuid.UUID(user)] = (uuid.UUID(by), mono - (now - at))
+        # The host gets the usual grace to come back before someone else may take over.
+        room.host_left_at = mono
+        return room
+
 
 class Rooms:
     def __init__(self, max_per_host: int = MAX_ROOMS_PER_HOST) -> None:
         self._rooms: dict[str, Room] = {}
         self._max_per_host = max_per_host
+        # Codes changed or removed since the store last saved them.
+        self.dirty: set[str] = set()
+        self.removed: set[str] = set()
+
+    def _changed(self, code: str) -> None:
+        self.dirty.add(code)
+
+    def _add(self, room: Room) -> None:
+        room.on_change = self._changed
+        self._rooms[room.code] = room
+        self.dirty.add(room.code)
+        self.removed.discard(room.code)
+
+    def _remove(self, code: str) -> None:
+        del self._rooms[code]
+        self.dirty.discard(code)
+        self.removed.add(code)
+
+    def restore(self, saved: list[dict]) -> int:
+        """Brings back rooms saved before a restart. Returns how many."""
+        count = 0
+        for data in saved:
+            try:
+                room = Room.load(data)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if room.code in self._rooms:
+                continue
+            room.on_change = self._changed
+            self._rooms[room.code] = room
+            count += 1
+        return count
+
+    def pending(self) -> tuple[list[dict], list[str]]:
+        """Rooms to save and codes to delete since the last call. Rooms with people in them
+        are always saved, so a restart resumes them from close to where they were."""
+        codes = self.dirty | {code for code, room in self._rooms.items() if room.members}
+        saves = [self._rooms[code].dump() for code in codes if code in self._rooms]
+        removed = list(self.removed)
+        self.dirty.clear()
+        self.removed.clear()
+        return saves, removed
 
     def get(self, code: str) -> Room:
         room = self._rooms.get(code.strip().upper())
@@ -402,7 +513,7 @@ class Rooms:
         for old_code, old in list(self._rooms.items()):
             idle = old.empty_since is not None and time.monotonic() - old.empty_since
             if old.host_id == host_id and not old.members and idle > REPLACE_EMPTY_AFTER_SECONDS:
-                del self._rooms[old_code]
+                self._remove(old_code)
         hosted = sum(1 for r in self._rooms.values() if r.host_id == host_id)
         if len(self._rooms) >= MAX_ROOMS or hosted >= self._max_per_host:
             raise ApiError(429, "too_many_rooms", "Too many rooms are open")
@@ -410,7 +521,7 @@ class Rooms:
         while code in self._rooms:
             code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
         room = Room(code, host_id, source, anime_id, title, episode, lang)
-        self._rooms[code] = room
+        self._add(room)
         return room
 
     def sweep(self) -> None:
@@ -422,7 +533,7 @@ class Rooms:
                 and room.empty_since is not None
                 and now - room.empty_since > EMPTY_GRACE_SECONDS
             ):
-                del self._rooms[code]
+                self._remove(code)
 
     def __len__(self) -> int:
         return len(self._rooms)
