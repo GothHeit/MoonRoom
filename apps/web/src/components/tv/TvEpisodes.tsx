@@ -11,6 +11,7 @@ import { watchHref, type Lang } from "@/lib/watch-target";
 
 import { TvButton } from "./TvButton";
 import { TvGroup } from "./TvGroup";
+import { tvHref } from "./paths";
 import { TvLink } from "./TvLink";
 
 const STILL_SIZES = "26rem";
@@ -76,7 +77,7 @@ export function TvEpisodes({ source, lang, animeId, episodes, progress, current,
                   : undefined;
             return (
               <li key={ep}>
-                <TvLink href={watchHref(source, animeId, ep, lang)} focusKey={`tv-episode-${ep}`} label={[t("episode", { episode: ep }), extra?.title, status?.text].filter(Boolean).join(", ")}>
+                <TvLink href={tvHref(watchHref(source, animeId, ep, lang))} focusKey={`tv-episode-${ep}`} label={[t("episode", { episode: ep }), extra?.title, status?.text].filter(Boolean).join(", ")}>
                   <div
                     className={`relative aspect-video overflow-hidden rounded-ui outline-[3px] outline-offset-4 outline-solid outline-transparent transition-transform duration-[160ms] ease-out group-data-[focused=true]:scale-[1.06] group-data-[focused=true]:outline-accent ${placeholderFor(animeId + ep)}`}
                   >

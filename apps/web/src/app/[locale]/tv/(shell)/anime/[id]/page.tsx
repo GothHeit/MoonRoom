@@ -43,7 +43,7 @@ async function Play({ id }: { id: number }) {
   const [plan, t, tv] = await Promise.all([watchPlan(id), getTranslations("titlePage"), getTranslations("tv.title")]);
   if (!plan) return <p className="text-[1.75rem] text-muted">{tv("unavailable")}</p>;
   return (
-    <TvPillLink href={plan.href} focusKey="tv-title-play">
+    <TvPillLink href={tvHref(plan.href)} focusKey="tv-title-play">
       <span aria-hidden="true">▶</span>
       {plan.next.resume ? t("continue", { episode: plan.next.episode }) : plan.next.rewatch ? t("rewatch") : t("play", { episode: plan.next.episode })}
     </TvPillLink>

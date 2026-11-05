@@ -60,6 +60,21 @@
       "failed": "Couldn't get a code. Check the TV's internet connection.",
       "newCode": "Show a new code",
       "password": "Use my password instead"
+    },
+    "player": {
+      "timeline": "Timeline",
+      "timeOf": "{time} of {total}",
+      "errorTitle": "This episode won’t play",
+      "upNext": "Up next",
+      "startsIn": "Starts in {seconds, plural, one {# second} other {# seconds}}",
+      "paused": "Ready when you are.",
+      "autoNextOn": "Autoplay: on",
+      "autoNextOff": "Autoplay: off",
+      "subtitleLanguage": "Language",
+      "subtitleLook": "Subtitle look",
+      "styled": "As released (styled)",
+      "plain": "Simple (lighter for the TV)",
+      "nothingElse": "Nothing else to pick for this episode."
     }
   },
   "tvLink": {

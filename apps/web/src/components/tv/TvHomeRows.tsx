@@ -32,7 +32,7 @@ export async function TvHomeRows({ rows }: { rows: HomeOut["rows"] }) {
                   <TvWideCard
                     key={anime.id}
                     focusKey={focusKey}
-                    href={resume_episode ? watchHref(anime.id, resume_episode) : tvHref(animeHref(anime.id))}
+                    href={tvHref(resume_episode ? watchHref(anime.id, resume_episode) : animeHref(anime.id))}
                     title={anime.title}
                     image={posterOf(anime)}
                     caption={resume_episode ? t("episodeShort", { n: resume_episode }) : undefined}

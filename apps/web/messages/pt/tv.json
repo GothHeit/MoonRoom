@@ -60,6 +60,21 @@
       "failed": "Não deu para gerar um código. Confira a internet da TV.",
       "newCode": "Mostrar um novo código",
       "password": "Usar minha senha"
+    },
+    "player": {
+      "timeline": "Linha do tempo",
+      "timeOf": "{time} de {total}",
+      "errorTitle": "Este episódio não quer tocar",
+      "upNext": "A seguir",
+      "startsIn": "Começa em {seconds, plural, one {# segundo} other {# segundos}}",
+      "paused": "Quando você quiser.",
+      "autoNextOn": "Reprodução automática: ligada",
+      "autoNextOff": "Reprodução automática: desligada",
+      "subtitleLanguage": "Idioma",
+      "subtitleLook": "Estilo das legendas",
+      "styled": "Original (estilizada)",
+      "plain": "Simples (mais leve para a TV)",
+      "nothingElse": "Nada mais para escolher neste episódio."
     }
   },
   "tvLink": {

@@ -4,30 +4,15 @@ import { useEffect, type ReactNode } from "react";
 
 import { usePathname, useRouter } from "@/i18n/navigation";
 
+import { isBack } from "./keys";
 import { NAV_KEY, setFocus } from "./spatial";
 
-// Back on each platform: Tizen (Samsung) 10009, webOS (LG) 461, and Escape/Backspace in a browser.
-const BACK_CODES = [10009, 461];
 const TOP_LEVEL = ["/tv", "/tv/search", "/tv/list", "/tv/settings"];
 
 type TvWindow = Window & {
   tizen?: { application?: { getCurrentApplication?: () => { exit: () => void } } };
   webOS?: { platformBack?: () => void };
 };
-
-function isTyping(target: EventTarget | null) {
-  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-}
-
-function isBack(event: KeyboardEvent) {
-  return (
-    BACK_CODES.includes(event.keyCode) ||
-    event.key === "Escape" ||
-    event.key === "GoBack" ||
-    event.key === "BrowserBack" ||
-    (event.key === "Backspace" && !isTyping(event.target))
-  );
-}
 
 /** Leaves the TV app when it runs inside a TV wrapper; a plain browser has nowhere to go. */
 function exitApp() {
