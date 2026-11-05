@@ -25,6 +25,7 @@ from app.routers import (
     anime,
     auth,
     avatars,
+    device_login,
     friends,
     home,
     invites,
@@ -175,6 +176,7 @@ def create_app() -> FastAPI:
     # rooms before watch: /watch/rooms/... must not be read as /watch/{source}/....
     for module in (
         auth,
+        device_login,
         avatars,
         friends,
         invites,

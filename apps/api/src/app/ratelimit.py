@@ -108,6 +108,10 @@ ACTION_RULES: dict[str, tuple[int, float]] = {
     # Minting a stream link, and starting a playback from one (each looks the stream up upstream).
     "stream_link": (120, 600),
     "stream_start": (120, 600),
+    # TV sign-in: showing a code and polling it per address, entering codes per user.
+    "device_start": (20, 600),
+    "device_poll": (300, 600),
+    "device_code": (20, 600),
     "room_chat": (40, 60),
     "room_reaction": (60, 60),
 }

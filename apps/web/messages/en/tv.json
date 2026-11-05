@@ -1,0 +1,91 @@
+{
+  "tv": {
+    "nav": {
+      "label": "TV navigation",
+      "home": "Home",
+      "search": "Search",
+      "list": "My list",
+      "settings": "Settings"
+    },
+    "title": {
+      "unavailable": "This title isn't available to watch here yet."
+    },
+    "home": {
+      "featured": "Featured",
+      "play": "Watch now",
+      "slide": "Featured title {n} of {total}",
+      "flipHint": "Press left or right for more featured titles"
+    },
+    "search": {
+      "title": "Search",
+      "label": "Search anime",
+      "placeholder": "Search anime",
+      "prompt": "Type a title, or pick a genre above.",
+      "byGenre": "Browse by genre",
+      "resultsFor": "Results for “{q}”",
+      "empty": "Nothing found for “{q}”.",
+      "emptyGenre": "Nothing in this genre yet.",
+      "emptyHint": "Check the spelling, try a shorter name, or pick a genre."
+    },
+    "list": {
+      "unlinkedTitle": "Link MyAnimeList on your phone",
+      "expiredTitle": "Your MyAnimeList link expired",
+      "unlinkedBody": "Your list lives on MyAnimeList. Open MoonRoom on your phone or computer, go to your profile and link it. Your list shows up here right after."
+    },
+    "settings": {
+      "title": "Settings",
+      "language": "Language",
+      "adult": "+18 titles",
+      "adultHint": "Applies to every device signed in to your account.",
+      "show": "Show",
+      "hide": "Hide",
+      "account": "Account",
+      "signedInAs": "Signed in as {name}",
+      "signOut": "Sign out of this TV",
+      "saved": "Saved.",
+      "saveFailed": "Couldn't save. Try again.",
+      "elsewhere": "Your profile, MyAnimeList, password and signed-in devices are managed on your phone or computer."
+    },
+    "login": {
+      "title": "Sign in on your TV",
+      "step1": "On your phone, open <address></address>",
+      "step2": "Enter this code and approve the TV",
+      "codeLabel": "Sign-in code",
+      "expiresIn": "The code expires in {time}",
+      "waiting": "Waiting for your phone…",
+      "scan": "Or scan this with your phone's camera",
+      "expired": "This code expired.",
+      "declined": "The sign-in was declined on the phone.",
+      "rateLimited": "Too many codes in a short time. Wait a few minutes and try again.",
+      "failed": "Couldn't get a code. Check the TV's internet connection.",
+      "newCode": "Show a new code",
+      "password": "Use my password instead"
+    }
+  },
+  "tvLink": {
+    "title": "Sign in a TV",
+    "intro": "Enter the code your TV shows.",
+    "code": "Code",
+    "continue": "Continue",
+    "confirmTitle": "Sign in this TV?",
+    "device": "Device",
+    "started": "Asked",
+    "address": "Address",
+    "samsung": "Samsung TV",
+    "lg": "LG TV",
+    "unknownDevice": "Unknown device",
+    "warning": "Only approve a code shown on a TV in front of you. Approving gives that TV access to your account until you sign it out in Settings, under “Where you’re signed in”.",
+    "approve": "Sign in the TV",
+    "deny": "Not me, decline",
+    "doneTitle": "Your TV is signed in",
+    "doneBody": "It opens your Home in a few seconds. You can sign it out any time in Settings, under “Where you’re signed in”.",
+    "declinedTitle": "Declined",
+    "declinedBody": "The TV was not signed in.",
+    "home": "Back to Home",
+    "errors": {
+      "invalid": "That code is wrong or expired. Check the TV and try again.",
+      "rateLimited": "Too many tries. Wait a few minutes and try again.",
+      "unknown": "Something went wrong. Try again."
+    }
+  }
+}

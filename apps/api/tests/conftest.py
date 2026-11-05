@@ -36,7 +36,10 @@ async def client():
     async with fastapi_app.router.lifespan_context(fastapi_app):
         async for session in db.get_session():
             await session.execute(
-                text("TRUNCATE users, invites, refresh_tokens, mal_links, mal_oauth_states CASCADE")
+                text(
+                    "TRUNCATE users, invites, refresh_tokens, mal_links, mal_oauth_states,"
+                    " device_logins CASCADE"
+                )
             )
             await session.commit()
         transport = httpx.ASGITransport(app=fastapi_app)

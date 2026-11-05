@@ -36,6 +36,16 @@ describe("auth middleware", () => {
     expect(where(await proxy(req("/pt/login", "mr_access=a")))).toBe("/pt");
   });
 
+  it("sends a signed-out TV to the TV sign-in screen", async () => {
+    expect(where(await proxy(req("/en/tv/anime/1")))).toBe("/en/tv/login");
+    expect(where(await proxy(req("/pt/tv")))).toBe("/pt/tv/login");
+    expect(where(await proxy(req("/pt/tv/login")))).toBeNull();
+  });
+
+  it("sends a signed-in TV from its sign-in screen to the TV home", async () => {
+    expect(where(await proxy(req("/pt/tv/login", "mr_access=a")))).toBe("/pt/tv");
+  });
+
   it("renews an expired access cookie from the refresh cookie", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json(tokens)));
     const res = await proxy(req("/pt", "mr_refresh=r"));

@@ -288,3 +288,25 @@ class TrustedDevice(TimestampMixin, Base):
     )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime]
+
+
+class DeviceLogin(TimestampMixin, Base):
+    """A TV asking to be signed in: it shows `user_code` and polls with its own secret until a
+    signed-in phone approves. Only hashes of both are stored; each row signs in once."""
+
+    __tablename__ = "device_logins"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    # The secret only the TV holds, and the short code the person types or scans.
+    device_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(index=True)
+    # The TV's browser and address, shown on the phone and stored with the session.
+    user_agent: Mapped[str | None] = mapped_column(String(255), default=None)
+    ip: Mapped[str | None] = mapped_column(String(64), default=None)
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), default=None
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(default=None)
+    denied_at: Mapped[datetime | None] = mapped_column(default=None)
+    used_at: Mapped[datetime | None] = mapped_column(default=None)

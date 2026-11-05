@@ -816,6 +816,136 @@
         "title": "ControlIn",
         "type": "object"
       },
+      "DeviceCodeIn": {
+        "properties": {
+          "code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "DeviceCodeIn",
+        "type": "object"
+      },
+      "DeviceInfoOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          }
+        },
+        "required": [
+          "user_agent",
+          "ip",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "DeviceInfoOut",
+        "type": "object"
+      },
+      "DevicePollIn": {
+        "properties": {
+          "device_token": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Device Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_token"
+        ],
+        "title": "DevicePollIn",
+        "type": "object"
+      },
+      "DevicePollOut": {
+        "description": "`approved` carries the session tokens, which this answer hands out exactly once.",
+        "properties": {
+          "status": {
+            "enum": [
+              "pending",
+              "approved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokensOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DevicePollOut",
+        "type": "object"
+      },
+      "DeviceStartOut": {
+        "properties": {
+          "device_token": {
+            "title": "Device Token",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "interval": {
+            "title": "Interval",
+            "type": "integer"
+          },
+          "user_code": {
+            "title": "User Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_token",
+          "user_code",
+          "expires_in",
+          "interval"
+        ],
+        "title": "DeviceStartOut",
+        "type": "object"
+      },
       "EpisodeArtOut": {
         "properties": {
           "image": {
@@ -4753,6 +4883,193 @@
         "summary": "Sources",
         "tags": [
           "anime"
+        ]
+      }
+    },
+    "/auth/device": {
+      "post": {
+        "operationId": "start_device_login_auth_device_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceStartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start Device Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/device/approve": {
+      "post": {
+        "operationId": "approve_device_login_auth_device_approve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Approve Device Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/device/deny": {
+      "post": {
+        "operationId": "deny_device_login_auth_device_deny_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Deny Device Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/device/lookup": {
+      "post": {
+        "description": "What the phone shows before asking \"Sign in this TV?\".",
+        "operationId": "lookup_device_login_auth_device_lookup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceInfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lookup Device Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/device/token": {
+      "post": {
+        "operationId": "poll_device_login_auth_device_token_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevicePollIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicePollOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Poll Device Login",
+        "tags": [
+          "auth"
         ]
       }
     },

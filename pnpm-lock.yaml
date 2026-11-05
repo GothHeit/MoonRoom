@@ -18,6 +18,9 @@ importers:
       '@app/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@noriginmedia/norigin-spatial-navigation':
+        specifier: 3.3.0
+        version: 3.3.0(react@19.3.1)
       hls.js:
         specifier: ^1.7.3
         version: 1.7.3
@@ -590,6 +593,17 @@ packages:
   '@nolyfill/is-core-module@1.0.39':
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
+
+  '@noriginmedia/norigin-spatial-navigation-core@4.2.0':
+    resolution: {integrity: sha512-lbfgO8G3SRhH8kPfkKInTn64U3KQrxs3dgrySc3qprPtruOf9Q0J/a3sphlff2jqn0CE4/7cDt40nxB3BFogFw==}
+
+  '@noriginmedia/norigin-spatial-navigation-react@3.3.0':
+    resolution: {integrity: sha512-YmiXFkczmfRTz6vmVmQoNhryi0j/09Ez77RPdCM2/VmXo7XcTVIYhrrQIqXkslLe2BzM2/k6ITqwTGhl2B/GTg==}
+    peerDependencies:
+      react: '>=16.8.0'
+
+  '@noriginmedia/norigin-spatial-navigation@3.3.0':
+    resolution: {integrity: sha512-8LfwMC3IRuDIntJpcNLEcf+nyXz9F52dCqnJBkLq1bypVibnAPE+uF3KReFFCHzH9VYZK7P0AWZvTtbx3vwjhQ==}
 
   '@oxc-project/types@0.155.0':
     resolution: {integrity: sha512-SeE8JPwW1xs1tHeNycjUtUBdhorRa8o4jlvjwk49R7/Z291i+4DQa7JJIgOm/TaYQZx+QrPQbVJ/9c8dMIZN8Q==}
@@ -2253,6 +2267,9 @@ packages:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
     engines: {node: '>=10'}
 
+  lodash-es@4.18.1:
+    resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
+
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
@@ -3520,6 +3537,23 @@ snapshots:
       fastq: 1.20.3
 
   '@nolyfill/is-core-module@1.0.39': {}
+
+  '@noriginmedia/norigin-spatial-navigation-core@4.2.0':
+    dependencies:
+      lodash-es: 4.18.1
+
+  '@noriginmedia/norigin-spatial-navigation-react@3.3.0(react@19.3.1)':
+    dependencies:
+      '@noriginmedia/norigin-spatial-navigation-core': 4.2.0
+      lodash-es: 4.18.1
+      react: 19.3.1
+
+  '@noriginmedia/norigin-spatial-navigation@3.3.0(react@19.3.1)':
+    dependencies:
+      '@noriginmedia/norigin-spatial-navigation-core': 4.2.0
+      '@noriginmedia/norigin-spatial-navigation-react': 3.3.0(react@19.3.1)
+    transitivePeerDependencies:
+      - react
 
   '@oxc-project/types@0.155.0': {}
 
@@ -5201,6 +5235,8 @@ snapshots:
   locate-path@6.0.0:
     dependencies:
       p-locate: 5.0.0
+
+  lodash-es@4.18.1: {}
 
   loose-envify@1.4.0:
     dependencies:

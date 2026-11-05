@@ -14,7 +14,10 @@ import { deviceHeaders, refreshSession } from "./lib/session";
 
 const intl = createIntlMiddleware(routing);
 
-const PUBLIC_PATHS = ["/login", "/register"];
+const PUBLIC_PATHS = ["/login", "/register", "/tv/login"];
+
+/** The TV mode (/tv) has its own sign-in screen: a code approved on a phone. */
+const isTv = (path: string) => path === "/tv" || path.startsWith("/tv/");
 
 function splitLocale(pathname: string) {
   const [, first, ...rest] = pathname.split("/");
@@ -63,11 +66,12 @@ export default async function proxy(request: NextRequest) {
     }
   }
 
+  if (!signedIn && !isPublic && isTv(path)) return redirect(request, `/${locale}/tv/login`, cookies);
   if (!signedIn && !isPublic) {
     const { search } = request.nextUrl;
     return redirect(request, `/${locale}/login`, cookies, path === "/" ? undefined : `${path}${search}`);
   }
-  if (signedIn && isPublic) return redirect(request, `/${locale}`, cookies);
+  if (signedIn && isPublic) return redirect(request, isTv(path) ? `/${locale}/tv` : `/${locale}`, cookies);
 
   const response = renewed ? intl(renewed) : first;
   applyCookies(response.cookies, cookies);

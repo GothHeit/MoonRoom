@@ -1,0 +1,82 @@
+"use client";
+
+import { useEffect, type ReactNode } from "react";
+
+import { usePathname, useRouter } from "@/i18n/navigation";
+
+import { NAV_KEY, setFocus } from "./spatial";
+
+// Back on each platform: Tizen (Samsung) 10009, webOS (LG) 461, and Escape/Backspace in a browser.
+const BACK_CODES = [10009, 461];
+const TOP_LEVEL = ["/tv", "/tv/search", "/tv/list", "/tv/settings"];
+
+type TvWindow = Window & {
+  tizen?: { application?: { getCurrentApplication?: () => { exit: () => void } } };
+  webOS?: { platformBack?: () => void };
+};
+
+function isTyping(target: EventTarget | null) {
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+}
+
+function isBack(event: KeyboardEvent) {
+  return (
+    BACK_CODES.includes(event.keyCode) ||
+    event.key === "Escape" ||
+    event.key === "GoBack" ||
+    event.key === "BrowserBack" ||
+    (event.key === "Backspace" && !isTyping(event.target))
+  );
+}
+
+/** Leaves the TV app when it runs inside a TV wrapper; a plain browser has nowhere to go. */
+function exitApp() {
+  const w = window as TvWindow;
+  try {
+    if (w.tizen?.application?.getCurrentApplication) w.tizen.application.getCurrentApplication().exit();
+    else w.webOS?.platformBack?.();
+  } catch {
+    // Not inside a TV wrapper.
+  }
+}
+
+/**
+ * The TV mode's frame: lays the screen out at 1920x1080 (every size is in rem, and the root size
+ * scales with the screen) and gives Back the meaning it has on TV apps: a title page goes back
+ * where it came from; a top-level screen first moves focus to the top bar, then goes Home; Back
+ * on Home's top bar leaves the app.
+ */
+export function TvRoot({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!isBack(event)) return;
+      event.preventDefault();
+      const inNav = !!document.activeElement?.closest("[data-tv-nav]");
+      if (pathname === "/tv/login") {
+        exitApp();
+      } else if (!TOP_LEVEL.includes(pathname)) {
+        if (window.history.length > 1) router.back();
+        else router.replace("/tv");
+      } else if (!inNav) {
+        setFocus(NAV_KEY);
+      } else if (pathname !== "/tv") {
+        router.replace("/tv");
+      } else {
+        exitApp();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pathname, router]);
+
+  return (
+    <div data-tv className="min-h-dvh [--tv-x:5rem]">
+      {/* 16px at 1920x1080; the page never shows a scrollbar, the remote does the scrolling. */}
+      <style>{"html{font-size:min(calc(100vw / 120),calc(100vh / 67.5));scrollbar-width:none}html::-webkit-scrollbar{display:none}"}</style>
+      {children}
+    </div>
+  );
+}

@@ -1,0 +1,91 @@
+{
+  "tv": {
+    "nav": {
+      "label": "Navegação da TV",
+      "home": "Início",
+      "search": "Buscar",
+      "list": "Minha lista",
+      "settings": "Ajustes"
+    },
+    "title": {
+      "unavailable": "Este título ainda não está disponível para assistir aqui."
+    },
+    "home": {
+      "featured": "Em destaque",
+      "play": "Assistir agora",
+      "slide": "Destaque {n} de {total}",
+      "flipHint": "Aperte esquerda ou direita para ver mais destaques"
+    },
+    "search": {
+      "title": "Buscar",
+      "label": "Buscar anime",
+      "placeholder": "Buscar anime",
+      "prompt": "Digite um título ou escolha um gênero acima.",
+      "byGenre": "Navegar por gênero",
+      "resultsFor": "Resultados para “{q}”",
+      "empty": "Nada encontrado para “{q}”.",
+      "emptyGenre": "Nada neste gênero ainda.",
+      "emptyHint": "Confira a grafia, tente um nome mais curto ou escolha um gênero."
+    },
+    "list": {
+      "unlinkedTitle": "Vincule o MyAnimeList no celular",
+      "expiredTitle": "Seu vínculo com o MyAnimeList expirou",
+      "unlinkedBody": "Sua lista fica no MyAnimeList. Abra o MoonRoom no celular ou no computador, vá ao seu perfil e faça o vínculo. A lista aparece aqui logo depois."
+    },
+    "settings": {
+      "title": "Ajustes",
+      "language": "Idioma",
+      "adult": "Títulos +18",
+      "adultHint": "Vale para todos os aparelhos conectados à sua conta.",
+      "show": "Mostrar",
+      "hide": "Ocultar",
+      "account": "Conta",
+      "signedInAs": "Conectado como {name}",
+      "signOut": "Sair desta TV",
+      "saved": "Salvo.",
+      "saveFailed": "Não deu para salvar. Tente de novo.",
+      "elsewhere": "Perfil, MyAnimeList, senha e aparelhos conectados são gerenciados no celular ou no computador."
+    },
+    "login": {
+      "title": "Entre na sua TV",
+      "step1": "No celular, abra <address></address>",
+      "step2": "Digite este código e aprove a TV",
+      "codeLabel": "Código de acesso",
+      "expiresIn": "O código expira em {time}",
+      "waiting": "Esperando o celular…",
+      "scan": "Ou aponte a câmera do celular para este código",
+      "expired": "Este código expirou.",
+      "declined": "O acesso foi recusado no celular.",
+      "rateLimited": "Muitos códigos em pouco tempo. Espere alguns minutos e tente de novo.",
+      "failed": "Não deu para gerar um código. Confira a internet da TV.",
+      "newCode": "Mostrar um novo código",
+      "password": "Usar minha senha"
+    }
+  },
+  "tvLink": {
+    "title": "Conectar uma TV",
+    "intro": "Digite o código que aparece na TV.",
+    "code": "Código",
+    "continue": "Continuar",
+    "confirmTitle": "Conectar esta TV?",
+    "device": "Aparelho",
+    "started": "Pedido",
+    "address": "Endereço",
+    "samsung": "TV Samsung",
+    "lg": "TV LG",
+    "unknownDevice": "Aparelho desconhecido",
+    "warning": "Só aprove um código que aparece numa TV na sua frente. Aprovar dá a essa TV acesso à sua conta até você desconectá-la em Configurações, em “Onde você está conectado”.",
+    "approve": "Conectar a TV",
+    "deny": "Não fui eu, recusar",
+    "doneTitle": "Sua TV está conectada",
+    "doneBody": "Ela abre o seu Início em alguns segundos. Você pode desconectá-la quando quiser em Configurações, em “Onde você está conectado”.",
+    "declinedTitle": "Recusado",
+    "declinedBody": "A TV não foi conectada.",
+    "home": "Voltar ao Início",
+    "errors": {
+      "invalid": "Esse código está errado ou expirou. Confira a TV e tente de novo.",
+      "rateLimited": "Muitas tentativas. Espere alguns minutos e tente de novo.",
+      "unknown": "Algo deu errado. Tente de novo."
+    }
+  }
+}

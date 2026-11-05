@@ -8,6 +8,9 @@ const unsafeSegment = (segment: string) => segment.startsWith("..") || segment =
 export function isProxyPathAllowed(path: string[]): boolean {
   const [first, second] = path;
   if (first === "mal") return path.length === 2 && second === "link";
+  // A signed-in phone approving a TV's code. Starting and polling a code go through
+  // /api/auth/device, which keeps the TV's secret in a cookie.
+  if (first === "auth") return path.length === 3 && second === "device" && ["lookup", "approve", "deny"].includes(path[2]);
   if (first === "users") {
     const clean = !path.some(unsafeSegment);
     // /users/lookup, /users/{id}/avatar and /users/{id}/profile

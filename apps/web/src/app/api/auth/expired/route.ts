@@ -16,7 +16,9 @@ export function GET(request: Request) {
   const url = new URL(request.url);
   const asked = url.searchParams.get("locale");
   const locale = routing.locales.find((l) => l === asked) ?? routing.defaultLocale;
-  const response = NextResponse.redirect(new URL(`/${locale}/login`, request.url));
+  // The TV mode signs in with a code shown on the screen, not the password form.
+  const page = url.searchParams.get("to") === "tv" ? "tv/login" : "login";
+  const response = NextResponse.redirect(new URL(`/${locale}/${page}`, request.url));
   applyCookies(response.cookies, clearedCookies());
   return response;
 }
