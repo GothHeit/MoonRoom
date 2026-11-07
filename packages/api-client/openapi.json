@@ -2709,6 +2709,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "manga_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manga Id"
+          },
           "read": {
             "title": "Read",
             "type": "boolean"
@@ -2754,6 +2765,7 @@
           "read",
           "actor",
           "anime_id",
+          "manga_id",
           "episode",
           "title",
           "room_code",

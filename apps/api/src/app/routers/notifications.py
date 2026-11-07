@@ -27,6 +27,7 @@ class NotificationOut(BaseModel):
     read: bool
     actor: UserSummary | None
     anime_id: int | None
+    manga_id: int | None
     episode: int | None
     title: str | None
     room_code: str | None
@@ -90,6 +91,7 @@ async def list_notifications(
                 read=r.read_at is not None,
                 actor=people.get(r.actor_id) if r.actor_id else None,
                 anime_id=r.anime_id,
+                manga_id=r.manga_id,
                 episode=r.episode,
                 title=r.title,
                 room_code=r.room_code,

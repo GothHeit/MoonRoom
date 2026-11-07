@@ -1,16 +1,20 @@
 import asyncio
 import logging
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import new_session, utcnow
 from app.mal.client import MalClient, is_safe
+from app.manga.base import MangaSource
 from app.models import (
     ContinueHidden,
     EpisodeSeen,
+    MangaChapterSeen,
+    MangaContinueHidden,
+    MangaProgress,
     Notification,
     NotificationMute,
     User,
@@ -20,7 +24,7 @@ from app.sources.base import VideoSource
 
 log = logging.getLogger(__name__)
 
-KINDS = ("friend_request", "friend_accepted", "room_invite", "new_episode")
+KINDS = ("friend_request", "friend_accepted", "room_invite", "new_episode", "new_chapter")
 RETENTION = timedelta(days=30)
 
 # Only titles someone watched lately are checked for new episodes.
@@ -37,6 +41,7 @@ async def notify(
     *,
     actor_id: uuid.UUID | None = None,
     anime_id: int | None = None,
+    manga_id: int | None = None,
     episode: int | None = None,
     title: str | None = None,
     room_code: str | None = None,
@@ -47,13 +52,14 @@ async def notify(
     several episodes leaves one entry."""
     if await session.get(NotificationMute, (user_id, kind)) is not None:
         return
-    await _forget(session, user_id, kind, actor_id, anime_id, room_code)
+    await _forget(session, user_id, kind, actor_id, anime_id, room_code, manga_id)
     session.add(
         Notification(
             user_id=user_id,
             kind=kind,
             actor_id=actor_id,
             anime_id=anime_id,
+            manga_id=manga_id,
             episode=episode,
             title=title,
             room_code=room_code,
@@ -68,6 +74,7 @@ async def _forget(
     actor_id: uuid.UUID | None,
     anime_id: int | None,
     room_code: str | None,
+    manga_id: int | None = None,
 ) -> None:
     await session.execute(
         delete(Notification).where(
@@ -75,6 +82,7 @@ async def _forget(
             Notification.kind == kind,
             Notification.actor_id.is_not_distinct_from(actor_id),
             Notification.anime_id.is_not_distinct_from(anime_id),
+            Notification.manga_id.is_not_distinct_from(manga_id),
             Notification.room_code.is_not_distinct_from(room_code),
         )
     )
@@ -197,5 +205,104 @@ async def check_new_episodes(mal: MalClient, sources: dict[str, VideoSource]) ->
                 await _check_title(mal, sources, anime_id)
             except Exception as exc:
                 log.warning("notifications: could not check %s: %s", anime_id, exc)
+
+    await asyncio.gather(*(one(i) for i in ids))
+
+
+# ---------------------------------------------------------------- new chapters
+
+
+def _whole_chapter(number: str) -> int | None:
+    """The whole chapter a number stands for ("12.5" counts as 12); None if it has none."""
+    try:
+        value = int(float(number))
+    except ValueError:
+        return None
+    return value if value >= 1 else None
+
+
+async def _latest_chapter(sources: dict[str, MangaSource], manga: dict) -> int | None:
+    """The newest numbered chapter the first source that has readable chapters lists."""
+    for source in sources.values():
+        try:
+            found = await asyncio.wait_for(source.chapters(manga, None), SOURCE_TIMEOUT_SECONDS)
+        except Exception as exc:  # a broken source just isn't consulted
+            log.warning("notifications: %s failed for manga %s: %s", source.name, manga["id"], exc)
+            continue
+        numbers = [n for c in (found.chapters if found else []) if (n := _whole_chapter(c.number))]
+        if numbers:
+            return max(numbers)
+    return None
+
+
+async def _check_manga(mal: MalClient, sources: dict[str, MangaSource], manga_id: int) -> None:
+    manga = await mal.manga_details(manga_id)
+    if manga.get("status") != "currently_publishing":
+        return
+    latest = await _latest_chapter(sources, manga)
+    if latest is None:
+        return
+    async with new_session() as session:
+        seen = await session.get(MangaChapterSeen, manga_id)
+        if seen is None:
+            # First look: remember where the title is without announcing what already exists.
+            session.add(MangaChapterSeen(manga_id=manga_id, latest_chapter=latest))
+            await session.commit()
+            return
+        seen.checked_at = utcnow()
+        if latest <= seen.latest_chapter:
+            await session.commit()
+            return
+        seen.latest_chapter = latest
+        title = (manga.get("title") or "")[:300]
+        rows = await session.execute(
+            select(MangaProgress.user_id, MangaProgress.chapter, MangaProgress.updated_at).where(
+                MangaProgress.manga_id == manga_id
+            )
+        )
+        # Per reader: the furthest whole chapter they have opened and when they last read.
+        readers: dict[uuid.UUID, tuple[int, datetime]] = {}
+        for user_id, chapter, updated_at in rows.all():
+            number = _whole_chapter(chapter) or 0
+            furthest, last = readers.get(user_id, (0, updated_at))
+            readers[user_id] = (max(furthest, number), max(last, updated_at))
+        cutoff = utcnow() - WATCH_WINDOW
+        for user_id, (furthest, last_read) in readers.items():
+            if furthest >= latest or last_read < cutoff:
+                continue
+            user = await session.get(User, user_id)
+            if user is None or (not user.show_nsfw and not is_safe(manga)):
+                continue
+            hidden = await session.get(MangaContinueHidden, (user_id, manga_id))
+            if hidden is not None and hidden.hidden_at >= last_read:
+                continue
+            await notify(
+                session, user_id, "new_chapter", manga_id=manga_id, episode=latest, title=title
+            )
+        await session.commit()
+
+
+async def check_new_chapters(mal: MalClient, sources: dict[str, MangaSource]) -> None:
+    """Tells people who are reading a publishing manga that it has a new chapter."""
+    if not sources:
+        return
+    async with new_session() as session:
+        ids = list(
+            await session.scalars(
+                select(MangaProgress.manga_id)
+                .where(MangaProgress.updated_at > utcnow() - WATCH_WINDOW)
+                .group_by(MangaProgress.manga_id)
+                .order_by(func.max(MangaProgress.updated_at).desc())
+                .limit(MAX_TITLES_PER_RUN)
+            )
+        )
+    gate = asyncio.Semaphore(CHECK_CONCURRENCY)
+
+    async def one(manga_id: int) -> None:
+        async with gate:
+            try:
+                await _check_manga(mal, sources, manga_id)
+            except Exception as exc:
+                log.warning("notifications: could not check manga %s: %s", manga_id, exc)
 
     await asyncio.gather(*(one(i) for i in ids))

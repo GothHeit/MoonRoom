@@ -11,9 +11,11 @@
     "friend_accepted": "{name} accepted your friend request",
     "room_invite": "{name} invited you to watch together",
     "new_episode": "New episode of {title}",
+    "new_chapter": "New chapter of {title}",
     "roomWhat": "{title}, episode {episode}",
     "roomEnded": "This room has closed.",
     "episode": "Episode {episode}",
+    "chapter": "Chapter {chapter}",
     "settings": {
       "title": "Notifications",
       "hint": "Choose what shows up in the bell.",
@@ -21,6 +23,7 @@
       "friend_accepted": "Accepted requests",
       "room_invite": "Watch-together invites",
       "new_episode": "New episodes of shows you're watching",
+      "new_chapter": "New chapters of manga you're reading",
       "saved": "Saved.",
       "saveFailed": "Couldn't save your choice."
     }

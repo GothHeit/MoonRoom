@@ -11,9 +11,11 @@
     "friend_accepted": "{name} aceitou seu pedido de amizade",
     "room_invite": "{name} convidou você para assistir junto",
     "new_episode": "Novo episódio de {title}",
+    "new_chapter": "Novo capítulo de {title}",
     "roomWhat": "{title}, episódio {episode}",
     "roomEnded": "Esta sala foi encerrada.",
     "episode": "Episódio {episode}",
+    "chapter": "Capítulo {chapter}",
     "settings": {
       "title": "Notificações",
       "hint": "Escolha o que aparece no sino.",
@@ -21,6 +23,7 @@
       "friend_accepted": "Pedidos aceitos",
       "room_invite": "Convites para assistir junto",
       "new_episode": "Novos episódios do que você está assistindo",
+      "new_chapter": "Novos capítulos dos mangás que você está lendo",
       "saved": "Salvo.",
       "saveFailed": "Não deu para salvar sua escolha."
     }

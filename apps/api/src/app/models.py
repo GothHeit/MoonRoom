@@ -216,10 +216,12 @@ class Notification(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    # friend_request, friend_accepted, room_invite or new_episode.
+    # friend_request, friend_accepted, room_invite, new_episode or new_chapter.
     kind: Mapped[str] = mapped_column(String(24))
     actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     anime_id: Mapped[int | None]
+    manga_id: Mapped[int | None]
+    # The episode, or for a new_chapter the whole chapter number.
     episode: Mapped[int | None]
     title: Mapped[str | None] = mapped_column(String(300))
     room_code: Mapped[str | None] = mapped_column(String(16))
@@ -245,6 +247,16 @@ class EpisodeSeen(Base):
 
     anime_id: Mapped[int] = mapped_column(primary_key=True)
     latest_episode: Mapped[int]
+    checked_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class MangaChapterSeen(Base):
+    """The newest chapter a manga source had for a publishing title when it was last checked."""
+
+    __tablename__ = "manga_chapter_seen"
+
+    manga_id: Mapped[int] = mapped_column(primary_key=True)
+    latest_chapter: Mapped[int]
     checked_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 

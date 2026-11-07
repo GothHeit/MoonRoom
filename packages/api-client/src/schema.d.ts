@@ -2488,6 +2488,8 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
+            /** Manga Id */
+            manga_id: number | null;
             /** Read */
             read: boolean;
             /** Room Active */

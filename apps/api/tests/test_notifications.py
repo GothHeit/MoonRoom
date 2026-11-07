@@ -254,3 +254,85 @@ async def test_unfriending_clears_what_the_two_sent_each_other(client, session):
     await client.delete(f"/friends/{ana_user.id}", headers=bob)
     assert (await bell(client, ana))["items"] == []
     assert (await bell(client, bob))["items"] == []
+
+
+class Publishing:
+    """A manga source whose newest chapter can be moved."""
+
+    name = "fake"
+
+    def __init__(self, latest):
+        self.latest = latest
+
+    async def chapters(self, manga, lang):
+        from app.manga.base import Chapter, ChapterList
+
+        return ChapterList(
+            "x",
+            "x",
+            ["en"],
+            [Chapter(f"c{n}", str(n), None, None, "en") for n in range(1, self.latest + 1)],
+        )
+
+
+async def read(client, headers, manga, chapter):
+    await client.put(
+        f"/manga/{manga}/progress/{chapter}", json={"page": 1, "pages": 5}, headers=headers
+    )
+
+
+async def check_manga(mal: FakeMal, source: Publishing) -> None:
+    from app.manga.base import MangaSource
+
+    await notifications.check_new_chapters(
+        cast(MalClient, mal), {"fake": cast(MangaSource, source)}
+    )
+
+
+async def test_new_chapters_reach_readers_who_are_behind(client, session):
+    _, ana = await make_user(session, "ana")
+    _, bob = await make_user(session, "bob")
+    _, cat = await make_user(session, "cat", nsfw=False)
+    _, dan = await make_user(session, "dan")
+    for who in (ana, bob, cat, dan):
+        await read(client, who, 9, 3)
+    await read(client, bob, 9, 5)  # already at the new chapter
+    await client.delete("/manga/9/continue", headers=dan)
+    await client.put("/notifications/settings", json={"muted": ["new_chapter"]}, headers=cat)
+    mal = FakeMal({9: {**node(9, "Running", status="currently_publishing", nsfw="white")}})
+    mal.manga_details = mal.details  # type: ignore[attr-defined]
+    source = Publishing(4)
+
+    await check_manga(mal, source)
+    assert await bell(client, ana) == {"items": [], "unread": 0}  # first look sends nothing
+
+    source.latest = 5
+    await check_manga(mal, source)
+    got = await bell(client, ana)
+    assert [(i["kind"], i["manga_id"], i["episode"], i["title"]) for i in got["items"]] == [
+        ("new_chapter", 9, 5, "Running")
+    ]
+    assert (await bell(client, bob))["items"] == []
+    assert (await bell(client, cat))["items"] == []
+    assert (await bell(client, dan))["items"] == []
+
+    await check_manga(mal, source)
+    assert (await bell(client, ana))["unread"] == 1
+
+
+async def test_new_chapter_checks_skip_finished_and_adult_titles(client, session):
+    _, ana = await make_user(session, "ana", nsfw=False)
+    await read(client, ana, 10, 1)
+    await read(client, ana, 11, 1)
+    mal = FakeMal(
+        {
+            10: node(10, "Adult", status="currently_publishing", rating="rx"),
+            11: node(11, "Done", status="finished", nsfw="white"),
+        }
+    )
+    mal.manga_details = mal.details  # type: ignore[attr-defined]
+    source = Publishing(1)
+    await check_manga(mal, source)
+    source.latest = 2
+    await check_manga(mal, source)
+    assert (await bell(client, ana))["items"] == []

@@ -7,7 +7,7 @@ import { Switch } from "@/components/account/Switch";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api";
 
-const KINDS = ["friend_request", "friend_accepted", "room_invite", "new_episode"] as const;
+const KINDS = ["friend_request", "friend_accepted", "room_invite", "new_episode", "new_chapter"] as const;
 
 /** One switch per kind of notification, saved as soon as it is flipped. */
 export function NotificationsForm({ muted }: { muted: string[] }) {

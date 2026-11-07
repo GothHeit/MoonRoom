@@ -25,9 +25,10 @@ const client = vi.hoisted(() => ({ GET: vi.fn(), POST: vi.fn(), DELETE: vi.fn() 
 vi.mock("@/lib/api", () => ({ api: client }));
 
 const none = { kind: "none", version: 0 } as const;
-const base = { read: false, created_at: new Date().toISOString(), anime_id: null, episode: null, title: null, room_code: null, room_active: null, actor: null };
+const base = { read: false, created_at: new Date().toISOString(), anime_id: null, manga_id: null, episode: null, title: null, room_code: null, room_active: null, actor: null };
 const friend = { ...base, id: "n1", kind: "friend_request", actor: { id: "u2", username: "ana", avatar: none } };
 const room = { ...base, id: "n2", kind: "room_invite", room_code: "ABC123", title: "One Piece", episode: 3, room_active: true, actor: { id: "u3", username: "bob", avatar: none } };
+const chapter = { ...base, id: "n4", kind: "new_chapter", manga_id: 9, episode: 12, title: "Running Manga" };
 const episode = { ...base, id: "n3", kind: "new_episode", anime_id: 5, episode: 4, title: "Airing Show" };
 
 afterEach(() => {
@@ -45,9 +46,9 @@ function renderBell() {
 
 describe("NotificationBell", () => {
   it("shows the unread count and lists what happened", async () => {
-    client.GET.mockResolvedValue({ data: { items: [friend, room, episode], unread: 3 } });
+    client.GET.mockResolvedValue({ data: { items: [friend, room, episode, chapter], unread: 4 } });
     renderBell();
-    const button = await screen.findByRole("button", { name: "Notifications, 3 unread" });
+    const button = await screen.findByRole("button", { name: "Notifications, 4 unread" });
     fireEvent.click(button);
     expect(await screen.findByText("ana wants to be your friend")).toBeInTheDocument();
     expect(screen.getByText("bob invited you to watch together")).toBeInTheDocument();
@@ -55,6 +56,8 @@ describe("NotificationBell", () => {
     expect(screen.getByText("New episode of Airing Show")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /bob invited you/ })).toHaveAttribute("href", "/room/ABC123");
     expect(screen.getByRole("link", { name: /Airing Show/ })).toHaveAttribute("href", "/anime/5");
+    expect(screen.getByText("New chapter of Running Manga")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Running Manga/ })).toHaveAttribute("href", "/manga/9");
   });
 
   it("marks an entry read when it is opened and everything read on request", async () => {

@@ -24,6 +24,8 @@ function hrefOf(item: Item) {
       return item.actor ? profileHref(item.actor.id) : "/friends";
     case "room_invite":
       return item.room_active && item.room_code ? `/room/${item.room_code}` : null;
+    case "new_chapter":
+      return item.manga_id ? `/manga/${item.manga_id}` : null;
     default:
       return item.anime_id ? `/anime/${item.anime_id}` : null;
   }
@@ -121,6 +123,7 @@ export function NotificationBell() {
       return item.room_active === false ? t("roomEnded") : t("roomWhat", { title: item.title ?? "", episode: item.episode ?? 0 });
     }
     if (item.kind === "new_episode") return t("episode", { episode: item.episode ?? 0 });
+    if (item.kind === "new_chapter") return t("chapter", { chapter: item.episode ?? 0 });
     return null;
   }
 

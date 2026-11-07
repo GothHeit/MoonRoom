@@ -16,7 +16,7 @@ from app.logs import install_logging
 from app.mal.account import MalAccounts
 from app.mal.client import MalClient
 from app.manga import load_manga_sources
-from app.notifications import check_new_episodes
+from app.notifications import check_new_chapters, check_new_episodes
 from app.probes import StreamProbes
 from app.ratelimit import ActionLimits, AuthLimits
 from app.room_store import RoomStore, keep_saved, restore
@@ -78,6 +78,10 @@ async def _episode_checks(app: FastAPI, hours: int) -> None:
             await check_new_episodes(app.state.mal, app.state.sources)
         except Exception:
             log.exception("new-episode check failed")
+        try:
+            await check_new_chapters(app.state.mal, app.state.manga_sources)
+        except Exception:
+            log.exception("new-chapter check failed")
         await asyncio.sleep(hours * 3600)
 
 
