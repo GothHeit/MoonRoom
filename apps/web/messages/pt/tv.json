@@ -104,6 +104,7 @@
       "locked": "O MoonRoom de {name} está bloqueado nesta TV",
       "entered": "{count, plural, one {# dígito digitado} other {# dígitos digitados}}",
       "delete": "Apagar",
+      "switch": "Trocar de conta",
       "unlock": "Desbloquear",
       "wrong": "PIN errado. Tente de novo.",
       "rateLimited": "Muitas tentativas. Espere alguns minutos.",

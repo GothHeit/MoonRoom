@@ -5,8 +5,9 @@ import { TvPinScreen } from "./TvPinScreen";
 
 const client = vi.hoisted(() => ({ POST: vi.fn() }));
 const refresh = vi.hoisted(() => vi.fn());
+const push = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({ api: client }));
-vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ refresh, push }) }));
 vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
 vi.mock("next/image", () => ({ default: () => null }));
 vi.mock("./TvPage", () => ({ TvPage: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
@@ -16,6 +17,7 @@ vi.mock("./useTvFocus", () => ({ useTvFocus: ({ onEnter }: { onEnter?: () => voi
 afterEach(() => {
   client.POST.mockReset();
   refresh.mockReset();
+  push.mockReset();
 });
 
 const avatar = { kind: "none" as const, version: 0 };
@@ -51,5 +53,13 @@ describe("TvPinScreen", () => {
     expect((screen.getByRole("button", { name: "unlock" }) as HTMLButtonElement).disabled).toBe(true);
     type("4");
     expect((screen.getByRole("button", { name: "unlock" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("leaves for the account picker from the switch button and on Back", () => {
+    render(<TvPinScreen userId="u" username="kafka" avatar={avatar} />);
+    fireEvent.click(screen.getByRole("button", { name: "switch" }));
+    fireEvent.keyDown(window, { key: "Escape", keyCode: 10009 });
+    expect(push).toHaveBeenCalledWith("/tv/accounts?back");
+    expect(push).toHaveBeenCalledTimes(2);
   });
 });
