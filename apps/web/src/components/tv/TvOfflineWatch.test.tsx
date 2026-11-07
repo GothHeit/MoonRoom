@@ -55,6 +55,31 @@ describe("TvOfflineWatch", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("leaves a playing episode alone, then covers it and lets go of it once it stops", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+    const video = document.createElement("video");
+    let paused = false;
+    Object.defineProperty(video, "paused", { get: () => paused });
+    Object.defineProperty(video, "readyState", { get: () => (paused ? 1 : 4) });
+    const pause = vi.spyOn(video, "pause").mockImplementation(() => {});
+    const load = vi.spyOn(video, "load").mockImplementation(() => {});
+    video.src = "blob:stream";
+    document.body.appendChild(video);
+    try {
+      show();
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+      expect(screen.queryByRole("status")).toBeNull();
+      expect(pause).not.toHaveBeenCalled();
+      paused = true;
+      await act(() => vi.advanceTimersByTimeAsync(5_000));
+      expect(screen.getByRole("status")).toBeTruthy();
+      expect(video.hasAttribute("src")).toBe(false);
+      expect(load).toHaveBeenCalled();
+    } finally {
+      video.remove();
+    }
+  });
+
   it("gives up on a check that hangs and counts it as a miss", async () => {
     vi.stubGlobal(
       "fetch",

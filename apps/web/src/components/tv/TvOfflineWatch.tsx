@@ -37,6 +37,34 @@ async function reachable() {
   }
 }
 
+/**
+ * Whether an episode is playing smoothly. It plays from what is already buffered, so a short
+ * outage doesn't touch it: covering it would hide the picture and subtitles and take the remote
+ * away (pause included) for nothing.
+ */
+function videoPlaying() {
+  return Array.from(document.querySelectorAll("video")).some(
+    (v) => !v.paused && !v.ended && v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA,
+  );
+}
+
+/**
+ * Stops every video and lets go of its stream. A TV draws video on its own layer; a page that
+ * covers or reloads over a live one can leave pieces of the last frame on screen and keep the
+ * TV's decoder busy.
+ */
+function releaseVideos() {
+  for (const v of Array.from(document.querySelectorAll("video"))) {
+    try {
+      v.pause();
+      v.removeAttribute("src");
+      v.load();
+    } catch {
+      // Already gone.
+    }
+  }
+}
+
 /** Leaves the TV app when it runs inside a TV wrapper. */
 function exitApp() {
   const w = window as Window & {
@@ -53,7 +81,8 @@ function exitApp() {
 
 /**
  * Covers the TV with the moon when the site stops answering (a restart, or the server being off),
- * and reloads the page once it answers again. The page is already in the TV's memory, so this
+ * and reloads the page once it answers again. A playing episode is left alone until it pauses or
+ * runs out of buffer. The page is already in the TV's memory, so this
  * works when nothing on the server can be reached.
  */
 export function TvOfflineWatch() {
@@ -74,6 +103,7 @@ export function TvOfflineWatch() {
       if (stopped) return;
       if (ok) {
         if (down) {
+          releaseVideos();
           window.location.reload();
           return;
         }
@@ -81,7 +111,8 @@ export function TvOfflineWatch() {
       } else {
         fails += 1;
         if (fails === 1) first = Date.now();
-        if (fails >= FAILS_BEFORE_SHOWING) {
+        if (fails >= FAILS_BEFORE_SHOWING && !videoPlaying()) {
+          releaseVideos();
           down = true;
           setSince(first);
           setLong(Date.now() - first > LONG_OFFLINE_MS);
