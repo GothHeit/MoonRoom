@@ -4,7 +4,7 @@ import { isAuthFailure, isProxyPathAllowed } from "./proxy-paths";
 
 describe("isProxyPathAllowed", () => {
   it("allows the API areas the browser uses", () => {
-    for (const path of [["me"], ["me", "sessions", "x"], ["anime", "1"], ["home"], ["watch", "hls"], ["invites"], ["mal", "link"], ["users", "x", "avatar"], ["users", "lookup"], ["users", "x", "profile"], ["friends"], ["friends", "requests", "x", "accept"], ["notifications"], ["notifications", "x", "read"]]) {
+    for (const path of [["me"], ["me", "sessions", "x"], ["anime", "1"], ["home"], ["watch", "hls"], ["invites"], ["mal", "link"], ["users", "x", "avatar"], ["users", "lookup"], ["users", "x", "profile"], ["friends"], ["friends", "requests", "x", "accept"], ["notifications"], ["notifications", "x", "read"], ["push", "subscription"], ["push", "test"]]) {
       expect(isProxyPathAllowed(path)).toBe(true);
     }
   });

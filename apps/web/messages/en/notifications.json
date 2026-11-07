@@ -18,7 +18,7 @@
     "chapter": "Chapter {chapter}",
     "settings": {
       "title": "Notifications",
-      "hint": "Choose what shows up in the bell.",
+      "hint": "Choose what shows up in the bell and on your phone.",
       "friend_request": "Friend requests",
       "friend_accepted": "Accepted requests",
       "room_invite": "Watch-together invites",
@@ -26,6 +26,20 @@
       "new_chapter": "New chapters of manga you're reading",
       "saved": "Saved.",
       "saveFailed": "Couldn't save your choice."
+    },
+    "push": {
+      "title": "Phone notifications",
+      "device": "Notifications on this device",
+      "hint": "Get the same alerts as a phone notification, even when MoonRoom is closed.",
+      "enabled": "Notifications are on for this device.",
+      "failed": "Couldn't change notifications for this device.",
+      "test": "Send a test notification",
+      "testSent": "Test sent. It should arrive in a moment.",
+      "testFailed": "The test couldn't be delivered.",
+      "denied": "Notifications are blocked for MoonRoom. Allow them in your browser or phone settings, then come back.",
+      "unsupported": "This browser can't show phone notifications. On an iPhone, use Safari; on Android, use Chrome.",
+      "install": "On iPhone and iPad, notifications work once MoonRoom is on your Home Screen (iOS 16.4 or later).",
+      "installSteps": "Tap the Share button in Safari, choose \"Add to Home Screen\", open MoonRoom from there, and come back to this page."
     }
   }
 }

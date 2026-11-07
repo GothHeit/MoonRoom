@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { postAuth } from "@/lib/bff";
 import type { AvatarInfo } from "@/lib/avatar";
 import { profileHref } from "@/lib/friends";
+import { forgetThisDevice } from "@/lib/push";
 import { usePresence } from "@/lib/use-presence";
 
 type Props = {
@@ -45,6 +46,7 @@ export function UserMenu({ userId, username, avatar, isAdmin = false, pending = 
   }, [open]);
 
   async function signOut() {
+    await forgetThisDevice();
     await postAuth("logout", {});
     setOpen(false);
     router.replace("/login");

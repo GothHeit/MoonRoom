@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
+import { PushSync } from "@/components/shell/PushSync";
 import { InstallHint } from "@/components/shell/InstallHint";
 import { TabBar } from "@/components/shell/TabBar";
 import { TopNav } from "@/components/shell/TopNav";
@@ -28,6 +29,7 @@ export default async function AppLayout({ children, params }: LayoutProps<"/[loc
       <TopNav userId={me.id} username={me.username} avatar={me.avatar} isAdmin={me.is_admin} pending={pending} />
       <main id="main" tabIndex={-1} className="pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-16 short:pb-[calc(4rem+env(safe-area-inset-bottom))]">{children}</main>
       <InstallHint />
+      <PushSync userId={me.id} />
       <TabBar userId={me.id} username={me.username} avatar={me.avatar} isAdmin={me.is_admin} pending={pending} />
     </>
   );

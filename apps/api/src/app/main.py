@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import db
+from app import push as phone_push
 from app.aniskip import AniSkip
 from app.anizip import AniZip
 from app.cleanup import prune
@@ -33,6 +34,7 @@ from app.routers import (
     manga,
     notifications,
     progress,
+    push,
     rooms,
     watch,
 )
@@ -134,9 +136,16 @@ async def lifespan(app: FastAPI):
             if settings.episode_check_hours > 0
             else None
         )
+        pusher = (
+            asyncio.create_task(phone_push.run(http, settings))
+            if settings.vapid_private_key
+            else None
+        )
         try:
             yield
         finally:
+            if pusher is not None:
+                pusher.cancel()
             sweeper.cancel()
             pruner.cancel()
             room_saver.cancel()
@@ -192,6 +201,7 @@ def create_app() -> FastAPI:
         progress,
         home,
         notifications,
+        push,
     ):
         app.include_router(module.router)
     return app

@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     # How often to look for new episodes of airing titles people are watching. 0 turns it off.
     episode_check_hours: int = 6
 
+    # Phone notifications (Web Push). The signing key is made with `python -m app.webpush`; with
+    # it unset, the feature is off. VAPID_SUBJECT is how push services can reach the operator.
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:admin@moonroom.stream"
+
     # Open watch-together rooms one person may host.
     max_rooms_per_host: int = 3
 

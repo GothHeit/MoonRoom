@@ -946,6 +946,20 @@
         "title": "DeviceStartOut",
         "type": "object"
       },
+      "EndpointIn": {
+        "properties": {
+          "endpoint": {
+            "maxLength": 1024,
+            "title": "Endpoint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint"
+        ],
+        "title": "EndpointIn",
+        "type": "object"
+      },
       "EpisodeArtOut": {
         "properties": {
           "image": {
@@ -1311,6 +1325,26 @@
           "used"
         ],
         "title": "InviteOut",
+        "type": "object"
+      },
+      "Keys": {
+        "properties": {
+          "auth": {
+            "maxLength": 64,
+            "title": "Auth",
+            "type": "string"
+          },
+          "p256dh": {
+            "maxLength": 128,
+            "title": "P256Dh",
+            "type": "string"
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "title": "Keys",
         "type": "object"
       },
       "ListEntryOut": {
@@ -3539,6 +3573,31 @@
         "title": "ProgressOut",
         "type": "object"
       },
+      "PushConfig": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Key"
+          }
+        },
+        "required": [
+          "enabled",
+          "public_key"
+        ],
+        "title": "PushConfig",
+        "type": "object"
+      },
       "ReactionIn": {
         "properties": {
           "emoji": {
@@ -4183,6 +4242,24 @@
           "name"
         ],
         "title": "Studio",
+        "type": "object"
+      },
+      "SubscriptionIn": {
+        "properties": {
+          "endpoint": {
+            "maxLength": 1024,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/Keys"
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ],
+        "title": "SubscriptionIn",
         "type": "object"
       },
       "SubtitleOut": {
@@ -7741,6 +7818,131 @@
         "summary": "Read One",
         "tags": [
           "notifications"
+        ]
+      }
+    },
+    "/push/config": {
+      "get": {
+        "operationId": "config_push_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushConfig"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Config",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/push/subscription": {
+      "put": {
+        "description": "Registers this device. Sending the same endpoint again updates it, and a device that was\nsigned in as someone else moves to the current user.",
+        "operationId": "subscribe_push_subscription_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Subscribe",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/push/test": {
+      "post": {
+        "description": "Sends a sample message to every device the user registered.",
+        "operationId": "test_push_test_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Test",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/push/unsubscribe": {
+      "post": {
+        "operationId": "unsubscribe_push_unsubscribe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndpointIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unsubscribe",
+        "tags": [
+          "push"
         ]
       }
     },

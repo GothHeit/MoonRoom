@@ -18,7 +18,7 @@
     "chapter": "Capítulo {chapter}",
     "settings": {
       "title": "Notificações",
-      "hint": "Escolha o que aparece no sino.",
+      "hint": "Escolha o que aparece no sino e no seu celular.",
       "friend_request": "Pedidos de amizade",
       "friend_accepted": "Pedidos aceitos",
       "room_invite": "Convites para assistir junto",
@@ -26,6 +26,20 @@
       "new_chapter": "Novos capítulos dos mangás que você está lendo",
       "saved": "Salvo.",
       "saveFailed": "Não deu para salvar sua escolha."
+    },
+    "push": {
+      "title": "Notificações no celular",
+      "device": "Notificações neste aparelho",
+      "hint": "Receba os mesmos avisos como notificação no celular, mesmo com o MoonRoom fechado.",
+      "enabled": "Notificações ativadas neste aparelho.",
+      "failed": "Não deu para alterar as notificações deste aparelho.",
+      "test": "Enviar notificação de teste",
+      "testSent": "Teste enviado. Ele deve chegar em instantes.",
+      "testFailed": "Não deu para entregar o teste.",
+      "denied": "As notificações estão bloqueadas para o MoonRoom. Permita nas configurações do navegador ou do celular e volte aqui.",
+      "unsupported": "Este navegador não mostra notificações no celular. No iPhone, use o Safari; no Android, use o Chrome.",
+      "install": "No iPhone e no iPad, as notificações funcionam depois de adicionar o MoonRoom à Tela de Início (iOS 16.4 ou mais novo).",
+      "installSteps": "Toque no botão Compartilhar do Safari, escolha \"Adicionar à Tela de Início\", abra o MoonRoom por lá e volte a esta página."
     }
   }
 }

@@ -47,6 +47,8 @@ services:
       MAL_CLIENT_SECRET: ${MAL_CLIENT_SECRET:-}
       MAL_REDIRECT_URI: ${PUBLIC_URL}/mal/callback
       REDIS_URL: redis://redis:6379/0
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@moonroom.stream}
       VIDEO_SOURCES: ${VIDEO_SOURCES:-}
       MANGA_SOURCES: ${MANGA_SOURCES:-mangadex,mangapill,mangalivre,toonbr,teca,leituramanga,kitsuneyako}
       MANGA_CACHE_DIR: /data/manga-pages

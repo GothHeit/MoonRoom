@@ -80,6 +80,19 @@ gunzip -c backups/moonroom-<stamp>.sql.gz | docker compose exec -T db psql -U ap
 Keep a copy off the PC too (cloud drive, another disk). Also back up `deploy/.env`: losing
 `TOKEN_ENCRYPTION_KEY` makes linked MAL accounts unreadable.
 
+### Phone notifications
+
+Notifications reach phones through Web Push, so no app is needed. Make the signing key once and
+put it in `deploy/.env`:
+
+```bash
+docker compose run --rm api python -m app.webpush   # prints VAPID_PRIVATE_KEY=...
+```
+
+Back the key up with the rest of `.env`: a new key means everyone turns notifications on again.
+On iPhone and iPad (iOS 16.4 or later) each person first adds MoonRoom to the Home Screen, opens it
+from there, and turns notifications on in Settings; Android works in the browser.
+
 ### Rotating JWT_SECRET
 
 Rotate it if it may have leaked, or once a year. Nobody is signed out:

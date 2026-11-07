@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Float, ForeignKey, Index, String, column, func
+from sqlalchemy import BigInteger, Float, ForeignKey, Index, String, column, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.crypto import EncryptedString
@@ -212,7 +212,12 @@ class Notification(Base):
     right after the thing it was about is gone."""
 
     __tablename__ = "notifications"
-    __table_args__ = (Index("ix_notifications_user_created", "user_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_notifications_user_created", "user_id", "created_at"),
+        Index(
+            "ix_notifications_unpushed", "created_at", postgresql_where=text("pushed_at IS NULL")
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
@@ -227,6 +232,26 @@ class Notification(Base):
     room_code: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     read_at: Mapped[datetime | None]
+    # When it was handed to the phone-push sender (or skipped); None means not looked at yet.
+    pushed_at: Mapped[datetime | None]
+
+
+class PushSubscription(Base):
+    """One browser or installed app that agreed to receive phone notifications. The endpoint is
+    the push service's address for it; the two keys let only that device read the message."""
+
+    __tablename__ = "push_subscriptions"
+    __table_args__ = (Index("ix_push_subscriptions_user", "user_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    endpoint: Mapped[str] = mapped_column(String(1024), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(128))
+    auth: Mapped[str] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # Pushes in a row the push service did not take; the subscription is dropped after a few.
+    failures: Mapped[int] = mapped_column(default=0, server_default="0")
 
 
 class NotificationMute(Base):

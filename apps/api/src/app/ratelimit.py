@@ -112,6 +112,8 @@ ACTION_RULES: dict[str, tuple[int, float]] = {
     "device_start": (20, 600),
     "device_poll": (300, 600),
     "device_code": (20, 600),
+    "push_test": (10, 600),
+    "push_subscribe": (30, 600),
     "room_chat": (40, 60),
     "room_reaction": (60, 60),
 }

@@ -1,6 +1,6 @@
 // The API paths the browser may reach through /api/proxy. Everything else (above all /auth/*,
 // which the web server calls itself so it can manage the cookies) is refused.
-const PREFIXES = ["anime", "manga", "home", "invites", "watch", "me", "friends", "notifications"];
+const PREFIXES = ["anime", "manga", "home", "invites", "watch", "me", "friends", "notifications", "push"];
 
 // Dot segments and anything that could be read as a path separator are never legitimate.
 const unsafeSegment = (segment: string) => segment.startsWith("..") || segment === "." || /[/\\]/.test(segment);

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { AvatarForm } from "@/components/account/AvatarForm";
 import { NotificationsForm } from "@/components/account/NotificationsForm";
 import { MalSection } from "@/components/account/MalSection";
+import { PushForm } from "@/components/account/PushForm";
 import { PlaybackForm } from "@/components/account/PlaybackForm";
 import { PasswordForm } from "@/components/account/PasswordForm";
 import { PreferencesForm } from "@/components/account/PreferencesForm";
@@ -48,16 +49,19 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
   setRequestLocale(locale);
   const t = await getTranslations("account");
   const tNotifications = await getTranslations("notifications.settings");
+  const tPush = await getTranslations("notifications.push");
   const { mal } = await searchParams;
 
   const api = await serverApi();
-  const [me, malStatus, sessions, notifications, twoFactor, playback] = await Promise.all([
+  const [me, malStatus, sessions, notifications, twoFactor, playback, push] = await Promise.all([
     unwrap(api.GET("/me"), locale),
     unwrap(api.GET("/me/mal"), locale),
     unwrap(api.GET("/me/sessions"), locale),
     unwrap(api.GET("/notifications/settings"), locale),
     unwrap(api.GET("/me/2fa"), locale),
     unwrap(api.GET("/watch/preferences"), locale),
+    // A failure here only hides the phone section.
+    api.GET("/push/config").then((r) => r.data, () => undefined),
   ]);
 
   return (
@@ -113,6 +117,12 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
         <Section title={tNotifications("title")}>
           <NotificationsForm muted={notifications.muted} />
         </Section>
+
+        {push?.enabled && push.public_key && (
+          <Section title={tPush("title")}>
+            <PushForm publicKey={push.public_key} />
+          </Section>
+        )}
       </Group>
 
       <Group id="connections" title={t("settings.groups.connections")}>
