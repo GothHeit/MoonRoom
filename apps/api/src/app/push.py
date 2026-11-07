@@ -52,8 +52,14 @@ _TEXT: dict[str, dict[str, tuple[str | None, str]]] = {
     },
 }
 _TEST = {
-    "en": ("Notifications are on", "You'll hear about new episodes and friends here."),
-    "pt": ("Notificações ativadas", "Você vai receber avisos de novos episódios e amigos aqui."),
+    "en": (
+        "Notifications are on",
+        "You'll hear about new episodes, manga chapters and friends here.",
+    ),
+    "pt": (
+        "Notificações ativadas",
+        "Você vai receber avisos de novos episódios, capítulos de mangá e amigos aqui.",
+    ),
 }
 
 
