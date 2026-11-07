@@ -54,15 +54,15 @@ const HIDE_CONTROLS_MS = 5000;
 const NEXT_COUNTDOWN = 10;
 const WARM_NEXT_SECONDS = 180;
 const ARROWS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
-// Room the control card takes at the bottom, so subtitles sit above it while it shows.
-const CONTROLS_HEIGHT = "24rem";
+// Room the control bar takes at the bottom, so subtitles sit above it while it shows.
+const CONTROLS_HEIGHT = "22rem";
 
 const PANEL_BUTTON: Record<Panel, string> = { subtitles: "tvp-subtitles", audio: "tvp-audio", source: "tvp-source" };
 
 /**
  * The TV mode's player: the same play pipeline as the site (sources with fallback, signed links,
  * subtitles, progress, skips, next episode), driven by the remote. While it plays nothing is on
- * screen; any key brings up the control card. Left and right seek, OK plays or pauses, Back
+ * screen; any key brings up the controls. Left and right seek, OK plays or pauses, Back
  * closes a panel or leaves, and the media keys work whenever the TV hands them over.
  */
 export function TvPlayer(props: Props) {
@@ -449,12 +449,12 @@ export function TvPlayer(props: Props) {
       )}
 
       {skip && !error && !ended && !panel && (
-        <div className="absolute right-[var(--tv-x)]" style={{ bottom: shown ? `calc(${CONTROLS_HEIGHT} + 2rem)` : "4rem" }}>
+        <div className="absolute right-[var(--tv-x)]" style={{ bottom: shown ? `calc(${CONTROLS_HEIGHT} + 1rem)` : "4rem" }}>
           {shown ? (
             <TvControl focusKey="tvp-skip" label={t(skipKey(skip.kind))} onPress={skipNow} />
           ) : (
             // Hidden controls: OK skips, so the pill looks pressed-ready.
-            <span className="inline-flex min-h-[4.5rem] items-center rounded-full border-2 border-accent bg-accent px-8 text-[1.625rem] font-bold text-on-accent">
+            <span className="inline-flex min-h-[6rem] items-center rounded-full border-2 border-accent bg-accent px-10 text-[2.25rem] font-bold text-on-accent">
               {t(skipKey(skip.kind))}
             </span>
           )}
@@ -464,27 +464,28 @@ export function TvPlayer(props: Props) {
       {!error && !ended && (
         <div
           aria-hidden={!shown}
-          className={`absolute inset-x-[var(--tv-x)] bottom-12 rounded-ui border border-line bg-bg px-12 pb-12 pt-9 transition-opacity duration-[160ms] ease-out ${
-            shown ? "opacity-100" : "pointer-events-none opacity-0"
-          }`}
+          className={`pointer-events-none absolute inset-0 transition-opacity duration-[160ms] ease-out ${shown ? "opacity-100" : "opacity-0"}`}
         >
-          <div className="flex items-baseline gap-5">
-            <p className="min-w-0 truncate font-display text-[2.75rem] leading-tight">{title}</p>
-            <p className="shrink-0 text-[1.625rem] font-bold text-soft">{t("episode", { episode })}</p>
-            <p className="ml-auto min-w-0 truncate text-[1.375rem] text-muted">{sourceLine}</p>
+          {/* Player-only exception to the flat rule: a soft dark fade keeps text readable on any picture. */}
+          <div className="absolute inset-x-0 top-0 h-[16rem] bg-gradient-to-b from-black/80 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-[30rem] bg-gradient-to-t from-black/90 via-black/60 to-transparent" />
+          <div className="absolute left-[var(--tv-x)] right-[var(--tv-x)] top-12 flex items-baseline gap-6">
+            <p className="min-w-0 truncate font-display text-[4rem] leading-tight">{title}</p>
+            <p className="shrink-0 text-[2.25rem] font-bold text-soft">{t("episode", { episode })}</p>
           </div>
-          <div className="mt-4">
+          <div className={`absolute inset-x-[var(--tv-x)] bottom-20 ${shown ? "pointer-events-auto" : ""}`}>
             <TvSeekBar current={current} duration={duration} target={seek.target} onNudge={seek.nudge} onEnter={togglePlay} />
-          </div>
-          <div className="mt-6 flex items-center gap-6">
-            <TvControl focusKey={PLAY_KEY} round icon={playing ? "pause" : "play"} label={playing ? t("pause") : t("play")} onPress={togglePlay} />
-            <TvControl focusKey="tvp-rewind" round icon="rewind" label={t("rewind")} onPress={() => seek.nudge(-1)} />
-            <TvControl focusKey="tvp-forward" round icon="forward" label={t("forward")} onPress={() => seek.nudge(1)} />
-            {next !== undefined && <TvControl focusKey="tvp-next" icon="next" label={t("nextShort")} onPress={goNext} />}
-            <div className="ml-auto flex items-center gap-6">
-              {tracks.length > 0 && <TvControl focusKey="tvp-subtitles" label={t("subtitles")} onPress={() => setPanel("subtitles")} />}
-              {audioNames.length > 1 && <TvControl focusKey="tvp-audio" label={t("audio")} onPress={() => setPanel("audio")} />}
-              <TvControl focusKey="tvp-source" label={t("source")} onPress={() => setPanel("source")} />
+            <div className="mt-4 flex items-center gap-6">
+              <TvControl focusKey={PLAY_KEY} round icon={playing ? "pause" : "play"} label={playing ? t("pause") : t("play")} onPress={togglePlay} />
+              <TvControl focusKey="tvp-rewind" round icon="rewind" label={t("rewind")} onPress={() => seek.nudge(-1)} />
+              <TvControl focusKey="tvp-forward" round icon="forward" label={t("forward")} onPress={() => seek.nudge(1)} />
+              {next !== undefined && <TvControl focusKey="tvp-next" icon="next" label={t("nextShort")} onPress={goNext} />}
+              <p className="mx-4 min-w-0 flex-1 truncate text-right text-[1.75rem] text-soft">{sourceLine}</p>
+              <div className="flex shrink-0 items-center gap-6">
+                {tracks.length > 0 && <TvControl focusKey="tvp-subtitles" label={t("subtitles")} onPress={() => setPanel("subtitles")} />}
+                {audioNames.length > 1 && <TvControl focusKey="tvp-audio" label={t("audio")} onPress={() => setPanel("audio")} />}
+                <TvControl focusKey="tvp-source" label={t("source")} onPress={() => setPanel("source")} />
+              </div>
             </div>
           </div>
         </div>
