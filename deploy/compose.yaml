@@ -98,6 +98,7 @@ services:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./offline.html:/srv/offline.html:ro
       - caddy-data:/data
     depends_on:
       web: {condition: service_healthy}
