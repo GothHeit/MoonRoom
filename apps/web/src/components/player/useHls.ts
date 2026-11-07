@@ -50,6 +50,19 @@ export const HLS_CONFIG = {
 } as const;
 
 /**
+ * The same on a TV, with far less kept around: a TV gives its web page a small share of memory,
+ * and two minutes of 1080p ahead plus half a minute behind is a large part of it. Half a minute
+ * ahead still rides out a stall, and the size cap keeps a high bitrate from stretching it.
+ */
+export const TV_HLS_CONFIG = {
+  ...HLS_CONFIG,
+  maxBufferLength: 30,
+  maxMaxBufferLength: 45,
+  maxBufferSize: 30 * 1000 * 1000,
+  backBufferLength: 10,
+} as const;
+
+/**
  * Whether this device already failed to decode an HEVC original. Kept for the whole visit, so
  * every later episode starts on the H.264 copy instead of failing and retrying again.
  */
@@ -67,6 +80,8 @@ type Options = {
   /** Called to ask for the stream again, after the original HEVC failed to decode. */
   onRetry: () => void;
   onFail: () => void;
+  /** Buffer less, for a device short on memory (the TV). */
+  lowMemory?: boolean;
 };
 
 /**
@@ -98,7 +113,7 @@ type AirPlayVideo = HTMLVideoElement & {
   webkitCurrentPlaybackTargetIsWireless?: boolean;
 };
 
-export function useHls({ video, url, kind, defaultAudio, maxHeight = null, castUrl = null, onRetry, onFail }: Options) {
+export function useHls({ video, url, kind, defaultAudio, maxHeight = null, castUrl = null, onRetry, onFail, lowMemory = false }: Options) {
   const hlsRef = useRef<import("hls.js").default | null>(null);
   const hevcUsed = useRef(false);
   // While the picture goes to an AirPlay receiver, the browser plays the stream natively: hls.js
@@ -126,7 +141,7 @@ export function useHls({ video, url, kind, defaultAudio, maxHeight = null, castU
       if (cancelled) return;
       if (Hls.isSupported()) {
         let recovered = false;
-        hls = new Hls(HLS_CONFIG);
+        hls = new Hls(lowMemory ? TV_HLS_CONFIG : HLS_CONFIG);
         hlsRef.current = hls;
         hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
           // Play the original HEVC when this device decodes it; if it then fails, retry with H.264.

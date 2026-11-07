@@ -47,7 +47,7 @@ class FakeHls {
 
 vi.mock("hls.js", () => ({ default: FakeHls }));
 
-const { useHls, hevcSupport, HLS_CONFIG } = await import("./useHls");
+const { useHls, hevcSupport, HLS_CONFIG, TV_HLS_CONFIG } = await import("./useHls");
 
 const LEVELS = [
   { height: 1080, videoCodec: "hvc1.2.4.L120" },
@@ -89,6 +89,13 @@ describe("useHls", () => {
     // Every H.264 level is dropped while the device can play the HEVC original.
     expect(hls.removed).toEqual([2, 1]);
     expect(result.current.qualities.map((q) => q.height)).toEqual([1080]);
+  });
+
+  it("buffers less on a device short on memory", async () => {
+    setup({ lowMemory: true });
+    const hls = await started();
+    expect(hls.config).toBe(TV_HLS_CONFIG);
+    expect(TV_HLS_CONFIG.maxMaxBufferLength).toBeLessThan(HLS_CONFIG.maxMaxBufferLength);
   });
 
   it("falls back to H.264 once when the HEVC cannot be decoded", async () => {

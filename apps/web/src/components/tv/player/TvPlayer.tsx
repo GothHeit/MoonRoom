@@ -99,7 +99,7 @@ export function TvPlayer(props: Props) {
   const subtitles = useSubtitles(tracks, subtitleLang, props.subtitleStyle);
   const { selected, styled, style } = subtitles;
   const drawStyled = styled && !plain ? styled : null;
-  const hls = useHls({ video, url, kind, defaultAudio, maxHeight, onRetry: retry, onFail: failPlayback });
+  const hls = useHls({ video, url, kind, defaultAudio, maxHeight, onRetry: retry, onFail: failPlayback, lowMemory: true });
   const seek = useTvSeek(video);
 
   const names: StreamNames = { has: (key) => t.has(key), t: (key, values) => t(key, values) };
@@ -414,7 +414,7 @@ export function TvPlayer(props: Props) {
         ))}
       </video>
 
-      {drawStyled && <AssSubtitles key={drawStyled} video={video} url={`/api/proxy${drawStyled}`} fonts={fonts} onFail={subtitles.onAssFail} />}
+      {drawStyled && <AssSubtitles key={drawStyled} video={video} url={`/api/proxy${drawStyled}`} fonts={fonts} onFail={subtitles.onAssFail} lowMemory />}
 
       <SubtitleOverlay
         video={video}
