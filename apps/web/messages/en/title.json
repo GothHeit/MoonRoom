@@ -53,6 +53,7 @@
     },
     "list": {
       "label": "My list",
+      "remove": "Remove from list",
       "add": "Add to list",
       "saved": "Saved to {status}.",
       "status": {

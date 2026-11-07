@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations, setRequestLocale } from "next-intl/server";
+import { errorCode } from "@app/api-client";
 import { cache, Suspense } from "react";
 
 import { titleArt } from "@/components/title/titleArt";
 import { watchPlan } from "@/components/title/watchPlan";
 import { TvPosterCard } from "@/components/tv/TvCards";
 import { TvEpisodes } from "@/components/tv/TvEpisodes";
+import { TvListControl } from "@/components/tv/TvListControl";
 import { TvPage } from "@/components/tv/TvPage";
 import { TvPillLink } from "@/components/tv/TvPillLink";
 import { TvRow } from "@/components/tv/TvRow";
@@ -15,7 +17,7 @@ import { tvHref } from "@/components/tv/paths";
 import { artImage } from "@/components/ui/artImage";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { APP_NAME } from "@/lib/brand";
-import { animeHref } from "@/lib/catalog";
+import { animeHref, type ListStatus } from "@/lib/catalog";
 import { genreName } from "@/lib/genres";
 import { serverApi, unwrap } from "@/lib/server-api";
 import { cleanSynopsis } from "@/lib/synopsis";
@@ -48,6 +50,20 @@ async function Play({ id }: { id: number }) {
       {plan.next.resume ? t("continue", { episode: plan.next.episode }) : plan.next.rewatch ? t("rewatch") : t("play", { episode: plan.next.episode })}
     </TvPillLink>
   );
+}
+
+/** Beside Play: the title's list status. Left out when it can't be read, so a pick can't overwrite it blind. */
+async function ListControl({ id }: { id: number }) {
+  let status: ListStatus | null | "unavailable" = "unavailable";
+  try {
+    const { data, error } = await (await serverApi()).GET("/me/animelist/{anime_id}", { params: { path: { anime_id: id } } });
+    // Not linked: the pill starts empty and says so when the person tries to save.
+    if (data) status = (data.status as ListStatus | null | undefined) ?? null;
+    else if (errorCode(error) === "mal_not_linked") status = null;
+  } catch {
+    // Left unavailable.
+  }
+  return status === "unavailable" ? null : <TvListControl animeId={id} initial={status} />;
 }
 
 async function WideArt({ id, poster }: { id: number; poster?: string | null }) {
@@ -104,16 +120,19 @@ export default async function TvTitlePage({ params }: PageProps<"/[locale]/tv/an
 
   return (
     <TvPage initial="tv-title-play">
-      {/* One pill at most, so no group: an empty group would catch focus when a title only tracks. */}
+      {/* Pills sit loose, not in a group: an empty group would catch focus when a title has none. */}
       <div data-tv-section="top" className="grid min-h-[37rem] grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className="flex min-w-0 flex-col justify-center py-10 pl-[var(--tv-x)] pr-14">
           <h1 className={`line-clamp-3 break-words leading-[0.95] tracking-[-0.02em] ${long ? "text-[4.25rem]" : "text-[5.5rem]"}`}>{anime.title}</h1>
           {english && english !== anime.title && <p className="mt-3 line-clamp-1 text-[1.75rem] text-muted">{english}</p>}
           {facts.length > 0 && <p className="mt-5 text-[1.5rem] font-medium text-soft">{facts.join(" · ")}</p>}
           <p className="mt-5 line-clamp-4 text-[1.75rem] leading-snug text-soft">{cleanSynopsis(anime.synopsis) || t("noSynopsis")}</p>
-          <div className="mt-9 flex items-center gap-6">
+          <div className="mt-9 flex flex-wrap items-center gap-6">
             <Suspense fallback={<Skeleton className="h-[4.5rem] w-[22rem] rounded-full" />}>
               <Play id={id} />
+            </Suspense>
+            <Suspense fallback={null}>
+              <ListControl id={id} />
             </Suspense>
           </div>
         </div>
