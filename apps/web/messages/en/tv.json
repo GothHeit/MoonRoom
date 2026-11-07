@@ -119,6 +119,12 @@
       "expired": "That sign-in expired. Add the account again with +.",
       "failed": "Couldn’t open that account. Check the TV’s internet connection.",
       "full": "This TV holds {max} accounts. Remove one in Settings to add another."
+    },
+    "offline": {
+      "reconnecting": "Reconnecting",
+      "reconnectingBody": "The moon will be back in a moment",
+      "down": "MoonRoom is offline",
+      "downBody": "Still trying every few seconds. You can leave this open."
     }
   },
   "tvLink": {

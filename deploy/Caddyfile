@@ -15,6 +15,15 @@
 	@compressible not path_regexp ^/api/proxy/watch/rooms/[^/]+/events$
 	encode @compressible zstd gzip
 
+	# "Is the site up?" for the TV wrapper, which asks from another origin. When this server or the
+	# tunnel is down the answer never carries these headers, which is how the wrapper knows.
+	@ping path /api/ping
+	handle @ping {
+		header Access-Control-Allow-Origin *
+		header Cache-Control no-store
+		respond "ok" 200
+	}
+
 	# MyAnimeList sends the browser here after the user approves the link.
 	@mal path /mal/callback
 	handle @mal {

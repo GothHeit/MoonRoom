@@ -119,6 +119,12 @@
       "expired": "Esse login expirou. Adicione a conta de novo com o +.",
       "failed": "Não deu para abrir essa conta. Confira a internet da TV.",
       "full": "Esta TV guarda {max} contas. Remova uma nos Ajustes para adicionar outra."
+    },
+    "offline": {
+      "reconnecting": "Reconectando",
+      "reconnectingBody": "A lua já volta",
+      "down": "O MoonRoom está fora do ar",
+      "downBody": "Ainda tentando a cada poucos segundos. Pode deixar aberto."
     }
   },
   "tvLink": {

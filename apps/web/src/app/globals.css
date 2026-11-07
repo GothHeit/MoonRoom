@@ -239,3 +239,35 @@ main:focus {
     --color-soft: #e2d8f7;
   }
 }
+
+/* The "reconnecting" moon on the TV: a slow sweep through the phases, a glow and twinkling stars. */
+@keyframes moon-phase {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes moon-glow {
+  50% {
+    box-shadow: 0 0 90px 20px rgba(201, 179, 255, 0.35);
+  }
+}
+
+@keyframes star-twinkle {
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moon-anim,
+  .moon-anim * {
+    animation: none !important;
+  }
+}
