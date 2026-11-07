@@ -1337,6 +1337,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tv/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tv Health */
+        post: operations["tv_health_tv_health_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/lookup": {
         parameters: {
             query?: never;
@@ -3278,6 +3295,103 @@ export interface components {
              * @constant
              */
             token_type: "bearer";
+        };
+        /** TvHealthIn */
+        TvHealthIn: {
+            /**
+             * Anime Id
+             * @default 0
+             */
+            anime_id: number;
+            /**
+             * Buffered Ahead S
+             * @default 0
+             */
+            buffered_ahead_s: number;
+            /**
+             * Buffered Behind S
+             * @default 0
+             */
+            buffered_behind_s: number;
+            /**
+             * Buffered Ranges
+             * @default 0
+             */
+            buffered_ranges: number;
+            /**
+             * Dom Nodes
+             * @default 0
+             */
+            dom_nodes: number;
+            /**
+             * Dropped Frames
+             * @default 0
+             */
+            dropped_frames: number;
+            /**
+             * Episode
+             * @default 0
+             */
+            episode: number;
+            /** Errors */
+            errors?: {
+                [key: string]: number;
+            };
+            /**
+             * Js Heap Limit Mb
+             * @default 0
+             */
+            js_heap_limit_mb: number;
+            /**
+             * Js Heap Mb
+             * @default 0
+             */
+            js_heap_mb: number;
+            /**
+             * Level Height
+             * @default 0
+             */
+            level_height: number;
+            /**
+             * Paused
+             * @default false
+             */
+            paused: boolean;
+            /**
+             * Position S
+             * @default 0
+             */
+            position_s: number;
+            /**
+             * Ready State
+             * @default 0
+             */
+            ready_state: number;
+            /**
+             * Reason
+             * @default tick
+             */
+            reason: string;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /**
+             * Styled Subtitles
+             * @default false
+             */
+            styled_subtitles: boolean;
+            /**
+             * Total Frames
+             * @default 0
+             */
+            total_frames: number;
+            /**
+             * Uptime S
+             * @default 0
+             */
+            uptime_s: number;
         };
         /**
          * TwoFactorConfirmIn
@@ -5748,6 +5862,37 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["EndpointIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tv_health_tv_health_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TvHealthIn"];
             };
         };
         responses: {

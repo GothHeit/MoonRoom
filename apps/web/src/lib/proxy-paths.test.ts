@@ -16,6 +16,11 @@ describe("isProxyPathAllowed", () => {
     }
   });
 
+  it("allows the TV health report and nothing else under /tv", () => {
+    expect(isProxyPathAllowed(["tv", "health"])).toBe(true);
+    for (const path of [["tv"], ["tv", "x"], ["tv", "health", "x"]]) expect(isProxyPathAllowed(path)).toBe(false);
+  });
+
   it("allows the TV PIN routes and nothing else under it", () => {
     for (const path of [["auth", "pin"], ["auth", "pin", "unlock"], ["auth", "pin", "lock"], ["auth", "pin", "remove"], ["auth", "pin", "tv"], ["auth", "pin", "tv", "remove"]]) {
       expect(isProxyPathAllowed(path)).toBe(true);

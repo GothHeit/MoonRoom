@@ -27,6 +27,7 @@ from app.routers import (
     auth,
     avatars,
     device_login,
+    diagnostics,
     friends,
     home,
     invites,
@@ -204,6 +205,7 @@ def create_app() -> FastAPI:
         home,
         notifications,
         push,
+        diagnostics,
     ):
         app.include_router(module.router)
     return app

@@ -4493,6 +4493,145 @@
         "title": "TokensOut",
         "type": "object"
       },
+      "TvHealthIn": {
+        "properties": {
+          "anime_id": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Anime Id",
+            "type": "integer"
+          },
+          "buffered_ahead_s": {
+            "default": 0,
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Buffered Ahead S",
+            "type": "number"
+          },
+          "buffered_behind_s": {
+            "default": 0,
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Buffered Behind S",
+            "type": "number"
+          },
+          "buffered_ranges": {
+            "default": 0,
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Buffered Ranges",
+            "type": "integer"
+          },
+          "dom_nodes": {
+            "default": 0,
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "Dom Nodes",
+            "type": "integer"
+          },
+          "dropped_frames": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Dropped Frames",
+            "type": "integer"
+          },
+          "episode": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Episode",
+            "type": "number"
+          },
+          "errors": {
+            "maxProperties": 12,
+            "patternProperties": {
+              "^[\\w.:/ -]*$": {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 40
+            },
+            "title": "Errors",
+            "type": "object"
+          },
+          "js_heap_limit_mb": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Js Heap Limit Mb",
+            "type": "number"
+          },
+          "js_heap_mb": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Js Heap Mb",
+            "type": "number"
+          },
+          "level_height": {
+            "default": 0,
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Level Height",
+            "type": "integer"
+          },
+          "paused": {
+            "default": false,
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "position_s": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Position S",
+            "type": "number"
+          },
+          "ready_state": {
+            "default": 0,
+            "maximum": 4.0,
+            "minimum": 0.0,
+            "title": "Ready State",
+            "type": "integer"
+          },
+          "reason": {
+            "default": "tick",
+            "maxLength": 40,
+            "pattern": "^[\\w.:/ -]*$",
+            "title": "Reason",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "maxLength": 40,
+            "pattern": "^[\\w.:/ -]*$",
+            "title": "Source",
+            "type": "string"
+          },
+          "styled_subtitles": {
+            "default": false,
+            "title": "Styled Subtitles",
+            "type": "boolean"
+          },
+          "total_frames": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Total Frames",
+            "type": "integer"
+          },
+          "uptime_s": {
+            "default": 0,
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "Uptime S",
+            "type": "number"
+          }
+        },
+        "title": "TvHealthIn",
+        "type": "object"
+      },
       "TwoFactorConfirmIn": {
         "description": "Changing two-factor settings needs the password and a current code.",
         "properties": {
@@ -8327,6 +8466,45 @@
         "summary": "Unsubscribe",
         "tags": [
           "push"
+        ]
+      }
+    },
+    "/tv/health": {
+      "post": {
+        "operationId": "tv_health_tv_health_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TvHealthIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Tv Health",
+        "tags": [
+          "tv"
         ]
       }
     },

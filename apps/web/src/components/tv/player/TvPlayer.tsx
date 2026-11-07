@@ -26,6 +26,7 @@ import { isBack, mediaKey, registerMediaKeys } from "../keys";
 import { tvHref } from "../paths";
 import { setFocus } from "../spatial";
 import { useTvSeek } from "./seek";
+import { useTvHealth } from "./useTvHealth";
 import { TvEndCard, TvPlayerError } from "./TvPlayerCards";
 import { PLAY_KEY, SEEK_KEY, TvControl, TvSeekBar } from "./TvPlayerControls";
 import { TvPlayerMenu, type MenuSection } from "./TvPlayerMenu";
@@ -99,7 +100,18 @@ export function TvPlayer(props: Props) {
   const subtitles = useSubtitles(tracks, subtitleLang, props.subtitleStyle);
   const { selected, styled, style } = subtitles;
   const drawStyled = styled && !plain ? styled : null;
-  const hls = useHls({ video, url, kind, defaultAudio, maxHeight, onRetry: retry, onFail: failPlayback, lowMemory: true });
+  const health = useTvHealth(video, { source: answered || source, animeId, episode, styled: drawStyled !== null });
+  const hls = useHls({
+    video,
+    url,
+    kind,
+    defaultAudio,
+    maxHeight,
+    onRetry: retry,
+    onFail: failPlayback,
+    onError: health.onError,
+    lowMemory: true,
+  });
   const seek = useTvSeek(video);
 
   const names: StreamNames = { has: (key) => t.has(key), t: (key, values) => t(key, values) };

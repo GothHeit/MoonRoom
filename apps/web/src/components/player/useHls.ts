@@ -80,6 +80,8 @@ type Options = {
   /** Called to ask for the stream again, after the original HEVC failed to decode. */
   onRetry: () => void;
   onFail: () => void;
+  /** Told about every player error, fatal or not, by its hls.js name (for the TV's health log). */
+  onError?: (details: string, fatal: boolean) => void;
   /** Buffer less, for a device short on memory (the TV). */
   lowMemory?: boolean;
 };
@@ -113,7 +115,7 @@ type AirPlayVideo = HTMLVideoElement & {
   webkitCurrentPlaybackTargetIsWireless?: boolean;
 };
 
-export function useHls({ video, url, kind, defaultAudio, maxHeight = null, castUrl = null, onRetry, onFail, lowMemory = false }: Options) {
+export function useHls({ video, url, kind, defaultAudio, maxHeight = null, castUrl = null, onRetry, onFail, onError, lowMemory = false }: Options) {
   const hlsRef = useRef<import("hls.js").default | null>(null);
   const hevcUsed = useRef(false);
   // While the picture goes to an AirPlay receiver, the browser plays the stream natively: hls.js
@@ -165,6 +167,7 @@ export function useHls({ video, url, kind, defaultAudio, maxHeight = null, castU
           setAudioTrack(id);
         });
         hls.on(Hls.Events.ERROR, (_event, data) => {
+          onError?.(String(data.details), !!data.fatal);
           if (!data.fatal) return;
           // Only a decoding failure means the HEVC can't play here; a network error is the
           // host's fault and must not drop everyone to the H.264 copy.
