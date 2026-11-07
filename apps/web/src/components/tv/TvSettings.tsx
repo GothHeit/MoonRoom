@@ -9,8 +9,9 @@ import { api } from "@/lib/api";
 
 import { TvButton } from "./TvButton";
 import { TvGroup } from "./TvGroup";
+import { TvPinEditor } from "./TvPinEditor";
 
-type Status = "idle" | "saved" | "failed";
+type Status = "idle" | "saved" | "failed" | "pinSaved" | "pinRemoved";
 
 function Setting({ label, hint, top, children }: { label: string; hint?: string; top?: boolean; children: ReactNode }) {
   return (
@@ -24,7 +25,7 @@ function Setting({ label, hint, top, children }: { label: string; hint?: string;
   );
 }
 
-/** Language, the +18 switch, the PIN lock and signing out. Everything else is managed on a phone or computer. */
+/** Language, the +18 switch, the PIN lock and its setting, and signing out. Everything else is managed on a phone or computer. */
 export function TvSettings({ userId, username, showNsfw, pinEnabled }: { userId: string; username: string; showNsfw: boolean; pinEnabled: boolean }) {
   const t = useTranslations("tv.settings");
   const tLocale = useTranslations("locale");
@@ -103,6 +104,9 @@ export function TvSettings({ userId, username, showNsfw, pinEnabled }: { userId:
           </TvButton>
         </Setting>
       )}
+      <Setting label={t("pinEdit")} hint={t("pinEditHint")}>
+        <TvPinEditor pinEnabled={pinEnabled} busy={busy} onDone={(m) => setStatus(m === "saved" ? "pinSaved" : "pinRemoved")} />
+      </Setting>
       <Setting label={t("account")} hint={t("accountHint", { name: username })}>
         <TvButton focusKey="tv-switch-account" disabled={busy} onPress={() => router.push("/tv/accounts?back=1")}>
           {t("switchAccount")}
@@ -112,7 +116,7 @@ export function TvSettings({ userId, username, showNsfw, pinEnabled }: { userId:
         </TvButton>
       </Setting>
       <p role="status" className={`mt-8 min-h-[2.25rem] text-[1.5rem] ${status === "failed" ? "text-danger" : "text-success"}`}>
-        {status === "saved" ? t("saved") : status === "failed" ? t("saveFailed") : ""}
+        {status === "saved" ? t("saved") : status === "failed" ? t("saveFailed") : status === "pinSaved" ? t("pinSaved") : status === "pinRemoved" ? t("pinRemoved") : ""}
       </p>
       <p className="mt-4 max-w-[60rem] text-[1.5rem] text-muted">{t("elsewhere")}</p>
     </div>

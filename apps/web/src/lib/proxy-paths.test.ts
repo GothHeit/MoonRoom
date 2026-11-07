@@ -17,10 +17,10 @@ describe("isProxyPathAllowed", () => {
   });
 
   it("allows the TV PIN routes and nothing else under it", () => {
-    for (const path of [["auth", "pin"], ["auth", "pin", "unlock"], ["auth", "pin", "lock"], ["auth", "pin", "remove"]]) {
+    for (const path of [["auth", "pin"], ["auth", "pin", "unlock"], ["auth", "pin", "lock"], ["auth", "pin", "remove"], ["auth", "pin", "tv"], ["auth", "pin", "tv", "remove"]]) {
       expect(isProxyPathAllowed(path)).toBe(true);
     }
-    for (const path of [["auth", "pin", "x"], ["auth", "pin", "unlock", "x"]]) expect(isProxyPathAllowed(path)).toBe(false);
+    for (const path of [["auth", "pin", "x"], ["auth", "pin", "unlock", "x"], ["auth", "pin", "tv", "x"], ["auth", "pin", "tv", "remove", "x"]]) expect(isProxyPathAllowed(path)).toBe(false);
   });
 
   it("refuses auth routes, the MAL callback, unknown areas and traversal", () => {

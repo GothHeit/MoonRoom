@@ -3007,6 +3007,61 @@
         "title": "PinStatusOut",
         "type": "object"
       },
+      "PinTvRemoveIn": {
+        "properties": {
+          "current_pin": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "Current Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_pin"
+        ],
+        "title": "PinTvRemoveIn",
+        "type": "object"
+      },
+      "PinTvSetIn": {
+        "properties": {
+          "current_pin": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Pin"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "pin": {
+            "pattern": "^\\d{4,6}$",
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin"
+        ],
+        "title": "PinTvSetIn",
+        "type": "object"
+      },
       "PinUnlockIn": {
         "properties": {
           "pin": {
@@ -5492,6 +5547,85 @@
           }
         ],
         "summary": "Remove Pin",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/pin/tv": {
+      "put": {
+        "description": "Add or change the PIN from a TV. A TV with a PIN must give the current one; a TV with\nnone must give the account password, so whoever holds the remote cannot lock the owner out.",
+        "operationId": "set_pin_on_tv_auth_pin_tv_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinTvSetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Pin On Tv",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/pin/tv/remove": {
+      "post": {
+        "operationId": "remove_pin_on_tv_auth_pin_tv_remove_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinTvRemoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Pin On Tv",
         "tags": [
           "auth"
         ]

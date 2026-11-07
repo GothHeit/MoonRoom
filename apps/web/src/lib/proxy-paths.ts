@@ -11,8 +11,12 @@ export function isProxyPathAllowed(path: string[]): boolean {
   // A signed-in phone approving a TV's code. Starting and polling a code go through
   // /api/auth/device, which keeps the TV's secret in a cookie.
   if (first === "auth") {
-    // The TV PIN: its status, entering and locking again on the TV, setting and removing it in Settings.
-    if (second === "pin") return path.length === 2 || (path.length === 3 && ["unlock", "lock", "remove"].includes(path[2]));
+    // The TV PIN: its status, entering and locking again on the TV, setting and removing it in Settings (on a phone, or on the TV itself).
+    if (second === "pin") {
+      if (path.length === 2) return true;
+      if (path.length === 3) return ["unlock", "lock", "remove", "tv"].includes(path[2]);
+      return path.length === 4 && path[2] === "tv" && path[3] === "remove";
+    }
     return path.length === 3 && second === "device" && ["lookup", "approve", "deny"].includes(path[2]);
   }
   if (first === "users") {

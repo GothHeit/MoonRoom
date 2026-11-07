@@ -345,6 +345,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/pin/tv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Pin On Tv
+         * @description Add or change the PIN from a TV. A TV with a PIN must give the current one; a TV with
+         *     none must give the account password, so whoever holds the remote cannot lock the owner out.
+         */
+        put: operations["set_pin_on_tv_auth_pin_tv_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/pin/tv/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Pin On Tv */
+        post: operations["remove_pin_on_tv_auth_pin_tv_remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/pin/unlock": {
         parameters: {
             query?: never;
@@ -2719,6 +2757,20 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** PinTvRemoveIn */
+        PinTvRemoveIn: {
+            /** Current Pin */
+            current_pin: string;
+        };
+        /** PinTvSetIn */
+        PinTvSetIn: {
+            /** Current Pin */
+            current_pin?: string | null;
+            /** Password */
+            password?: string | null;
+            /** Pin */
+            pin: string;
+        };
         /** PinUnlockIn */
         PinUnlockIn: {
             /** Pin */
@@ -3862,6 +3914,68 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PinRemoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_pin_on_tv_auth_pin_tv_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinTvSetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_pin_on_tv_auth_pin_tv_remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinTvRemoveIn"];
             };
         };
         responses: {

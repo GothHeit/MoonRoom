@@ -116,3 +116,60 @@ async def test_normal_sessions_are_never_locked(client, session):
     assert (await client.get("/me", headers=phone)).status_code == 200
     status = (await client.get("/auth/pin", headers=phone)).json()
     assert status["enabled"] is True and status["locked"] is False
+
+
+async def test_tv_adds_a_pin_with_the_password_then_changes_it_with_the_old_pin(client, session):
+    _, phone = await make_user(session)
+    tv, _ = await tv_headers(client, phone)
+    # No PIN yet: the password is required, a PIN alone or a wrong password is refused.
+    r = await client.put("/auth/pin/tv", json={"pin": "1234"}, headers=tv)
+    assert r.status_code == 422 and r.json()["error"]["code"] == "password_required"
+    r = await client.put("/auth/pin/tv", json={"pin": "1234", "password": "nope"}, headers=tv)
+    assert r.status_code == 403 and r.json()["error"]["code"] == "wrong_password"
+    r = await client.put(
+        "/auth/pin/tv", json={"pin": "1234", "password": "password123"}, headers=tv
+    )
+    assert r.status_code == 204
+    # The TV that set it stays unlocked.
+    assert (await client.get("/me", headers=tv)).status_code == 200
+
+    # Changing needs the current PIN, not the password.
+    r = await client.put(
+        "/auth/pin/tv", json={"pin": "5678", "password": "password123"}, headers=tv
+    )
+    assert r.status_code == 422 and r.json()["error"]["code"] == "current_pin_required"
+    r = await client.put("/auth/pin/tv", json={"pin": "5678", "current_pin": "0000"}, headers=tv)
+    assert r.status_code == 403 and r.json()["error"]["code"] == "wrong_pin"
+    r = await client.put("/auth/pin/tv", json={"pin": "5678", "current_pin": "1234"}, headers=tv)
+    assert r.status_code == 204
+    assert (await client.get("/me", headers=tv)).status_code == 200
+    await client.post("/auth/pin/lock", headers=tv)
+    ok = await client.post("/auth/pin/unlock", json={"pin": "5678"}, headers=tv)
+    assert ok.status_code == 204
+
+
+async def test_tv_removes_the_pin_with_the_current_pin(client, session):
+    _, phone = await make_user(session)
+    tv, _ = await tv_headers(client, phone)
+    await set_pin(client, phone)
+    await client.post("/auth/pin/unlock", json={"pin": "1234"}, headers=tv)
+    r = await client.post("/auth/pin/tv/remove", json={"current_pin": "0000"}, headers=tv)
+    assert r.status_code == 403
+    r = await client.post("/auth/pin/tv/remove", json={"current_pin": "1234"}, headers=tv)
+    assert r.status_code == 204
+    assert (await client.get("/me", headers=phone)).json()["pin_enabled"] is False
+
+
+async def test_tv_pin_settings_share_the_wrong_guess_limit_and_are_tv_only(client, session):
+    _, phone = await make_user(session)
+    tv, _ = await tv_headers(client, phone)
+    await set_pin(client, phone)
+    await client.post("/auth/pin/unlock", json={"pin": "1234"}, headers=tv)
+    for _ in range(5):
+        r = await client.post("/auth/pin/tv/remove", json={"current_pin": "0000"}, headers=tv)
+        assert r.status_code == 403
+    r = await client.post("/auth/pin/tv/remove", json={"current_pin": "1234"}, headers=tv)
+    assert r.status_code == 429
+    # The phone uses the normal endpoints.
+    r = await client.put("/auth/pin/tv", json={"pin": "5678", "current_pin": "1234"}, headers=phone)
+    assert r.status_code == 403 and r.json()["error"]["code"] == "pin_only_on_tv"
