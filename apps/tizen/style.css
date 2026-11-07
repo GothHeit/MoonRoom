@@ -1,0 +1,8 @@
+html, body { margin: 0; height: 100%; background: #150d26; color: #f0e8ff; font-family: sans-serif; }
+main { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+h1 { font-size: 96px; font-weight: 400; margin: 0 0 16px; }
+h1 span { color: #c9b3ff; }
+p { font-size: 32px; color: #bcaedb; margin: 0 0 40px; }
+[hidden] { display: none !important; }
+button { margin: 0 16px; font-size: 32px; padding: 16px 48px; border-radius: 999px; border: 3px solid #c9b3ff; background: transparent; color: #f0e8ff; }
+button:focus { background: #c9b3ff; color: #150d26; outline: 4px solid #f0e8ff; outline-offset: 4px; }
