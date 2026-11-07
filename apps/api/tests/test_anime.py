@@ -296,3 +296,16 @@ async def test_concurrent_cold_requests_share_one_mal_call(client, session):
     replies = await asyncio.gather(*(client.get("/anime/top", headers=headers) for _ in range(5)))
     assert all(r.status_code == 200 for r in replies)
     assert route.call_count == 1
+
+
+@respx.mock
+async def test_search_skips_mal_for_queries_too_short_for_it(client, session):
+    _, headers = await make_user(session, "kafka")
+    route = respx.get(f"{API_BASE}/anime").respond(
+        400, json={"error": "bad_request", "message": "invalid q"}
+    )
+    for q in ("f", "fr", " fr "):
+        response = await client.get("/anime/search", params={"q": q}, headers=headers)
+        assert response.status_code == 200
+        assert response.json()["data"] == []
+    assert route.call_count == 0

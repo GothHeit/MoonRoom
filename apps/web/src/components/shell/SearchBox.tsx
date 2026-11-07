@@ -10,7 +10,7 @@ import { coverOf, mangaCaption, mangaHref } from "@/lib/manga";
 
 import { searchHrefFor, type Mode } from "./nav-items";
 
-const MIN_CHARS = 2;
+const MIN_CHARS = 3;
 const DEBOUNCE_MS = 250;
 const MAX_SUGGESTIONS = 6;
 

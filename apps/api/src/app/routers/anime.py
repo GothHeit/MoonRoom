@@ -63,11 +63,17 @@ async def seasonal(request: Request, user: CurrentUser, page: Annotated[int, Que
     )
 
 
+MIN_SEARCH_CHARS = 3
+
+
 @router.get("/search", response_model=AnimeListOut)
 async def search(
     request: Request, user: CurrentUser, q: Annotated[str, Query(min_length=1, max_length=100)]
 ):
-    result = await _mal(request).search(q, user.show_nsfw)
+    # MyAnimeList answers 400 to a query under three characters, so don't ask it.
+    if len(q.strip()) < MIN_SEARCH_CHARS:
+        return AnimeListOut(data=[])
+    result = await _mal(request).search(q.strip(), user.show_nsfw)
     return AnimeListOut(data=_cards([i["node"] for i in result["data"]]))
 
 

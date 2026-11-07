@@ -7,7 +7,10 @@ import { useRouter } from "@/i18n/navigation";
 
 import { useTvFocus } from "./useTvFocus";
 
-const DEBOUNCE_MS = 700;
+/** Typing with a remote is slow, so wait a little longer than on the web before searching. */
+const DEBOUNCE_MS = 1000;
+/** MyAnimeList only searches from three characters on. */
+const MIN_CHARS = 3;
 
 /**
  * The search field. Focusing it with the remote opens the TV's keyboard; results follow the typing
@@ -21,7 +24,7 @@ export function TvSearchField({ initial }: { initial: string }) {
 
   const search = (q: string) => {
     const clean = q.trim().slice(0, 100);
-    if (clean === last.current) return;
+    if (clean === last.current || (clean && clean.length < MIN_CHARS)) return;
     last.current = clean;
     router.replace(clean ? `/tv/search?q=${encodeURIComponent(clean)}` : "/tv/search");
   };
