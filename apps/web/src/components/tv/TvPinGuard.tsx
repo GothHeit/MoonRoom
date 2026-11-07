@@ -20,7 +20,7 @@ function somethingPlaying() {
 /**
  * Renders nothing. On a TV with a PIN it locks the session again when the app goes to the
  * background and after a long idle time, then reloads the server screens, which show the PIN
- * pad. Opening the app locks it too, but that happens on the server (see the TV layout).
+ * pad (coming back from the background goes to the account picker instead). Opening the app locks it too, but that happens on the server (see the TV layout).
  */
 export function TvPinGuard() {
   const router = useRouter();
@@ -43,8 +43,8 @@ export function TvPinGuard() {
     };
     const onVisibility = () => {
       if (document.hidden) void lockNow();
-      // Back in front: the server screens may have changed to the PIN pad.
-      else router.refresh();
+      // Back in front after the app was in the background: it is like opening it, so ask who is watching.
+      else router.replace("/tv/accounts");
     };
     arm();
     window.addEventListener("keydown", arm);

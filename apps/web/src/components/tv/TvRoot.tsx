@@ -38,6 +38,8 @@ export function TvRoot({ children }: { children: ReactNode }) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (!isBack(event)) return;
+      // The PIN screen handles Back itself (it goes to the account picker).
+      if (document.querySelector("[data-tv-pin]")) return;
       event.preventDefault();
       const inNav = !!document.activeElement?.closest("[data-tv-nav]");
       if (pathname === "/tv/login") {
