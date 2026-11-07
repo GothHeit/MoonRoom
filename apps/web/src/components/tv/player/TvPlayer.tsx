@@ -55,7 +55,7 @@ const NEXT_COUNTDOWN = 10;
 const WARM_NEXT_SECONDS = 180;
 const ARROWS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
 // Room the control bar takes at the bottom, so subtitles sit above it while it shows.
-const CONTROLS_HEIGHT = "22rem";
+const CONTROLS_HEIGHT = "16rem";
 
 const PANEL_BUTTON: Record<Panel, string> = { subtitles: "tvp-subtitles", audio: "tvp-audio", source: "tvp-source" };
 
@@ -454,7 +454,7 @@ export function TvPlayer(props: Props) {
             <TvControl focusKey="tvp-skip" label={t(skipKey(skip.kind))} onPress={skipNow} />
           ) : (
             // Hidden controls: OK skips, so the pill looks pressed-ready.
-            <span className="inline-flex min-h-[6rem] items-center rounded-full border-2 border-accent bg-accent px-10 text-[2.25rem] font-bold text-on-accent">
+            <span className="inline-flex min-h-[4.5rem] items-center rounded-full border-2 border-accent bg-accent px-8 text-[1.625rem] font-bold text-on-accent">
               {t(skipKey(skip.kind))}
             </span>
           )}
@@ -468,7 +468,7 @@ export function TvPlayer(props: Props) {
         >
           {/* Player-only exception to the flat rule: a soft dark fade keeps text readable on any picture. */}
           <div className="absolute inset-x-0 top-0 h-[16rem] bg-gradient-to-b from-black/80 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 h-[30rem] bg-gradient-to-t from-black/90 via-black/60 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-[22rem] bg-gradient-to-t from-black/90 via-black/60 to-transparent" />
           <div className="absolute left-[var(--tv-x)] right-[var(--tv-x)] top-12 flex items-baseline gap-6">
             <p className="min-w-0 truncate font-display text-[4rem] leading-tight">{title}</p>
             <p className="shrink-0 text-[2.25rem] font-bold text-soft">{t("episode", { episode })}</p>
@@ -480,7 +480,7 @@ export function TvPlayer(props: Props) {
               <TvControl focusKey="tvp-rewind" round icon="rewind" label={t("rewind")} onPress={() => seek.nudge(-1)} />
               <TvControl focusKey="tvp-forward" round icon="forward" label={t("forward")} onPress={() => seek.nudge(1)} />
               {next !== undefined && <TvControl focusKey="tvp-next" icon="next" label={t("nextShort")} onPress={goNext} />}
-              <p className="mx-4 min-w-0 flex-1 truncate text-right text-[1.75rem] text-soft">{sourceLine}</p>
+              <p className="mx-4 min-w-0 flex-1 truncate text-right text-[1.375rem] text-soft">{sourceLine}</p>
               <div className="flex shrink-0 items-center gap-6">
                 {tracks.length > 0 && <TvControl focusKey="tvp-subtitles" label={t("subtitles")} onPress={() => setPanel("subtitles")} />}
                 {audioNames.length > 1 && <TvControl focusKey="tvp-audio" label={t("audio")} onPress={() => setPanel("audio")} />}
