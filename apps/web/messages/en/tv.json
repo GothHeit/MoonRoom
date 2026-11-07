@@ -44,7 +44,10 @@
       "signOut": "Sign out of this TV",
       "saved": "Saved.",
       "saveFailed": "Couldn't save. Try again.",
-      "elsewhere": "Your profile, MyAnimeList, password and signed-in devices are managed on your phone or computer."
+      "elsewhere": "Your profile, MyAnimeList, password and signed-in devices are managed on your phone or computer.",
+      "pin": "PIN lock",
+      "pinHint": "Ask for your PIN again on this TV, as if it had just been opened.",
+      "lockNow": "Lock now"
     },
     "login": {
       "title": "Sign in on your TV",
@@ -75,6 +78,16 @@
       "styled": "As released (styled)",
       "plain": "Simple (lighter for the TV)",
       "nothingElse": "Nothing else to pick for this episode."
+    },
+    "pin": {
+      "title": "Enter your PIN",
+      "locked": "{name}’s MoonRoom is locked on this TV",
+      "entered": "{count, plural, one {# digit entered} other {# digits entered}}",
+      "delete": "Delete",
+      "unlock": "Unlock",
+      "wrong": "Wrong PIN. Try again.",
+      "rateLimited": "Too many tries. Wait a few minutes.",
+      "failed": "Couldn't check the PIN. Check the TV's internet connection."
     }
   },
   "tvLink": {

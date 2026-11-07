@@ -6,6 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import pin
 from app.config import get_settings
 from app.db import get_session, utcnow
 from app.errors import ApiError
@@ -41,15 +42,37 @@ async def bearer_identity(
     return decoded
 
 
+async def _load_user(
+    request: Request, session: AsyncSession, credentials: HTTPAuthorizationCredentials | None
+) -> tuple[User, uuid.UUID]:
+    user_id, sid = await bearer_identity(request, session, credentials)
+    user = await session.get(User, user_id)
+    if user is None:
+        raise ApiError(401, "invalid_token", "User no longer exists")
+    return user, sid
+
+
+async def current_user_even_if_locked(
+    request: Request,
+    session: Session,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> User:
+    """Like `current_user`, but also for a TV session that has not entered its PIN. Only the
+    PIN endpoints use it."""
+    user, _ = await _load_user(request, session, credentials)
+    await session.commit()
+    return user
+
+
 async def current_user(
     request: Request,
     session: Session,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> User:
-    user_id, _ = await bearer_identity(request, session, credentials)
-    user = await session.get(User, user_id)
-    if user is None:
-        raise ApiError(401, "invalid_token", "User no longer exists")
+    user, sid = await _load_user(request, session, credentials)
+    # A TV session whose PIN wasn't entered gets nothing from the account.
+    if await pin.is_locked(session, user, sid):
+        raise ApiError(403, "pin_required", "Enter the PIN to use this TV")
     # End the read transaction now: it would otherwise hold a pooled connection until the
     # response is sent, through any scraper or MAL call the endpoint waits on. The user stays
     # usable (expire_on_commit is off) and later queries check a connection out again.
@@ -58,6 +81,7 @@ async def current_user(
 
 
 CurrentUser = Annotated[User, Depends(current_user)]
+LockedOkUser = Annotated[User, Depends(current_user_even_if_locked)]
 
 
 async def current_session_id(
@@ -71,6 +95,15 @@ async def current_session_id(
 
 
 CurrentSessionId = Annotated[uuid.UUID, Depends(current_session_id)]
+
+
+async def session_id_of(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> uuid.UUID:
+    """The session id in a bearer token that `current_user_even_if_locked` already accepted."""
+    decoded = decode_access_token(credentials.credentials) if credentials else None
+    assert decoded is not None
+    return decoded[1]
 
 
 async def current_admin(user: CurrentUser) -> User:

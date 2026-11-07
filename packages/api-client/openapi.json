@@ -2487,6 +2487,10 @@
             ],
             "title": "Manga Lang"
           },
+          "pin_enabled": {
+            "title": "Pin Enabled",
+            "type": "boolean"
+          },
           "share_activity": {
             "title": "Share Activity",
             "type": "boolean"
@@ -2520,7 +2524,8 @@
           "manga_lang",
           "is_admin",
           "avatar",
-          "share_activity"
+          "share_activity",
+          "pin_enabled"
         ],
         "title": "MeOut",
         "type": "object"
@@ -2932,6 +2937,89 @@
           }
         },
         "title": "Picture",
+        "type": "object"
+      },
+      "PinRemoveIn": {
+        "properties": {
+          "password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "PinRemoveIn",
+        "type": "object"
+      },
+      "PinSetIn": {
+        "properties": {
+          "password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "pin": {
+            "pattern": "^\\d{4,6}$",
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin",
+          "password"
+        ],
+        "title": "PinSetIn",
+        "type": "object"
+      },
+      "PinStatusOut": {
+        "properties": {
+          "avatar": {
+            "$ref": "#/components/schemas/AvatarOut"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "id",
+          "username",
+          "avatar",
+          "locked"
+        ],
+        "title": "PinStatusOut",
+        "type": "object"
+      },
+      "PinUnlockIn": {
+        "properties": {
+          "pin": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin"
+        ],
+        "title": "PinUnlockIn",
         "type": "object"
       },
       "PlaybackOut": {
@@ -5281,6 +5369,168 @@
           }
         },
         "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/pin": {
+      "get": {
+        "description": "Open to a locked TV: it asks this to know whether to show the PIN screen.",
+        "operationId": "pin_status_auth_pin_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Pin Status",
+        "tags": [
+          "auth"
+        ]
+      },
+      "put": {
+        "operationId": "set_pin_auth_pin_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinSetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Pin",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/pin/lock": {
+      "post": {
+        "description": "The TV page locks itself when it opens, goes to the background or sits idle.",
+        "operationId": "lock_auth_pin_lock_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lock",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/pin/remove": {
+      "post": {
+        "operationId": "remove_pin_auth_pin_remove_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinRemoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Pin",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/pin/unlock": {
+      "post": {
+        "operationId": "unlock_auth_pin_unlock_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinUnlockIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unlock",
         "tags": [
           "auth"
         ]

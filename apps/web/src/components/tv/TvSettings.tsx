@@ -24,8 +24,8 @@ function Setting({ label, hint, top, children }: { label: string; hint?: string;
   );
 }
 
-/** Language, the +18 switch and signing out. Everything else is managed on a phone or computer. */
-export function TvSettings({ username, showNsfw }: { username: string; showNsfw: boolean }) {
+/** Language, the +18 switch, the PIN lock and signing out. Everything else is managed on a phone or computer. */
+export function TvSettings({ username, showNsfw, pinEnabled }: { username: string; showNsfw: boolean; pinEnabled: boolean }) {
   const t = useTranslations("tv.settings");
   const tLocale = useTranslations("locale");
   const locale = useLocale();
@@ -63,6 +63,13 @@ export function TvSettings({ username, showNsfw }: { username: string; showNsfw:
     router.refresh();
   }
 
+  async function lockNow() {
+    setBusy(true);
+    await api.POST("/auth/pin/lock").catch(() => undefined);
+    // The layout now builds the PIN pad instead of this screen.
+    router.refresh();
+  }
+
   return (
     <div className="px-[var(--tv-x)]">
       <Setting label={t("language")} top>
@@ -80,6 +87,13 @@ export function TvSettings({ username, showNsfw }: { username: string; showNsfw:
           {t("hide")}
         </TvButton>
       </Setting>
+      {pinEnabled && (
+        <Setting label={t("pin")} hint={t("pinHint")}>
+          <TvButton focusKey="tv-lock-now" disabled={busy} onPress={lockNow}>
+            {t("lockNow")}
+          </TvButton>
+        </Setting>
+      )}
       <Setting label={t("account")} hint={t("signedInAs", { name: username })}>
         <TvButton focusKey="tv-sign-out" disabled={busy} onPress={signOut}>
           {t("signOut")}

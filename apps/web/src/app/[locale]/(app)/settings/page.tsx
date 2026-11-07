@@ -7,6 +7,7 @@ import { NotificationsForm } from "@/components/account/NotificationsForm";
 import { MalSection } from "@/components/account/MalSection";
 import { PushForm } from "@/components/account/PushForm";
 import { PlaybackForm } from "@/components/account/PlaybackForm";
+import { PinPanel } from "@/components/account/PinPanel";
 import { PasswordForm } from "@/components/account/PasswordForm";
 import { PreferencesForm } from "@/components/account/PreferencesForm";
 import { SessionsPanel } from "@/components/account/SessionsPanel";
@@ -138,6 +139,10 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
 
         <Section title={t("twoFactor.title")}>
           <TwoFactorPanel status={twoFactor} />
+        </Section>
+
+        <Section title={t("pin.title")}>
+          <PinPanel enabled={me.pin_enabled} />
         </Section>
 
         <Section title={t("sessions.title")}>

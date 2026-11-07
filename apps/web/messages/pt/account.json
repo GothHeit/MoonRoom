@@ -164,6 +164,25 @@
       "disableIntro": "Digite sua senha e um código atual (ou um código de backup) para desativar.",
       "codeOrBackup": "Código ou código de backup",
       "disabled": "Login em dois fatores desativado."
+    },
+    "pin": {
+      "title": "PIN da TV",
+      "intro": "Um PIN de 4 a 6 dígitos que toda TV conectada à sua conta pede ao abrir o MoonRoom, depois de ficar em segundo plano e depois de muito tempo parada. Sem ele, ninguém na frente da TV vê sua conta nem suas listas.",
+      "on": "O PIN está ativado.",
+      "off": "O PIN está desativado.",
+      "set": "Definir um PIN",
+      "change": "Trocar PIN",
+      "remove": "Remover PIN",
+      "pinLabel": "Novo PIN",
+      "pinHint": "De 4 a 6 dígitos.",
+      "password": "Sua senha",
+      "invalid": "Use de 4 a 6 dígitos.",
+      "save": "Salvar PIN",
+      "confirmRemove": "Remover PIN",
+      "saving": "Salvando…",
+      "cancel": "Cancelar",
+      "saved": "PIN salvo. Suas TVs vão pedir.",
+      "removed": "PIN removido."
     }
   }
 }

@@ -164,6 +164,25 @@
       "disableIntro": "Enter your password and a current code (or a backup code) to turn this off.",
       "codeOrBackup": "Code or backup code",
       "disabled": "Two-factor login is off."
+    },
+    "pin": {
+      "title": "TV PIN",
+      "intro": "A 4 to 6 digit PIN that every TV signed in to your account asks for when MoonRoom opens, after it has been in the background, and after a long idle time. Without it, nobody at the TV can see your account or lists.",
+      "on": "The PIN is on.",
+      "off": "The PIN is off.",
+      "set": "Set a PIN",
+      "change": "Change PIN",
+      "remove": "Remove PIN",
+      "pinLabel": "New PIN",
+      "pinHint": "4 to 6 digits.",
+      "password": "Your password",
+      "invalid": "Use 4 to 6 digits.",
+      "save": "Save PIN",
+      "confirmRemove": "Remove PIN",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "saved": "PIN saved. Your TVs will ask for it.",
+      "removed": "PIN removed."
     }
   }
 }

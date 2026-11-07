@@ -60,7 +60,10 @@
     "two_factor_disabled": "Two-factor login is off.",
     "two_factor_not_started": "Start the setup first.",
     "manga_not_found": "Manga not found.",
-    "upstream_failed": "The source didn't answer. Try again."
+    "upstream_failed": "The source didn't answer. Try again.",
+    "wrong_pin": "Wrong PIN.",
+    "pin_required": "Enter the PIN to use this TV.",
+    "pin_not_on_tv": "Set the PIN from your phone or computer."
   },
   "row": {
     "previous": "Scroll left",

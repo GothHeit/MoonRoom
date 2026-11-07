@@ -125,7 +125,9 @@ async def poll_device_login(body: DevicePollIn, session: Session, request: Reque
     login.used_at = utcnow()
     audit.info("device login user=%s ip=%s", user.id, ip)
     # The session carries the TV's details, so the sessions list names the TV, not the phone.
-    tokens = await _issue_tokens(session, user, {"user_agent": login.user_agent, "ip": login.ip})
+    tokens = await _issue_tokens(
+        session, user, {"user_agent": login.user_agent, "ip": login.ip}, tv=True
+    )
     return DevicePollOut(status="approved", tokens=tokens)
 
 

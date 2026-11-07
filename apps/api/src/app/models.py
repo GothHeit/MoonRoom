@@ -38,6 +38,10 @@ class User(TimestampMixin, Base):
     two_factor_at: Mapped[datetime | None] = mapped_column(default=None)
     # The last accepted 30 s step, so a code can't be used twice.
     totp_last_step: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    # Optional PIN that TV sessions must enter before they show anything (hashed like a
+    # password). Kept on the user for now; a later per-profile PIN would move it.
+    pin_hash: Mapped[str | None] = mapped_column(String(255), default=None)
+    pin_set_at: Mapped[datetime | None] = mapped_column(default=None)
 
 
 class Invite(TimestampMixin, Base):
@@ -69,6 +73,20 @@ class RefreshToken(TimestampMixin, Base):
     started_at: Mapped[datetime]
     user_agent: Mapped[str | None] = mapped_column(String(255))
     ip: Mapped[str | None] = mapped_column(String(64))
+    # Signed in through the TV code flow. Such a session needs the owner's PIN (when set).
+    is_tv: Mapped[bool] = mapped_column(default=False, server_default="false")
+
+
+class SessionUnlock(Base):
+    """A TV session that entered the PIN, until `unlocked_until`. No row means locked."""
+
+    __tablename__ = "session_unlocks"
+
+    family_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    unlocked_until: Mapped[datetime]
 
 
 class MalLink(TimestampMixin, Base):

@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
-from app import db
+from app import db, pin
 from app.deps import CurrentUser, Session, bearer_identity, throttle
 from app.errors import ApiError
 from app.models import User
@@ -211,8 +211,10 @@ async def _stream_user(
     # Not CurrentUser: that holds a database connection until the response ends, and this
     # response lasts as long as the viewer stays in the room.
     async with db.new_session() as session:
-        user_id, _ = await bearer_identity(request, session, credentials)
+        user_id, sid = await bearer_identity(request, session, credentials)
         user = await session.get(User, user_id)
+        if user is not None and await pin.is_locked(session, user, sid):
+            raise ApiError(403, "pin_required", "Enter the PIN to use this TV")
     if user is None:
         raise ApiError(401, "invalid_token", "User no longer exists")
     return user

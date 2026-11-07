@@ -91,6 +91,7 @@ class MeOut(BaseModel):
     is_admin: bool
     avatar: AvatarOut
     share_activity: bool
+    pin_enabled: bool
 
 
 class MeUpdate(BaseModel):
@@ -125,6 +126,8 @@ async def _issue_tokens(
     user: User,
     device: dict,
     family: tuple[uuid.UUID, datetime] | None = None,
+    *,
+    tv: bool = False,
 ) -> TokensOut:
     """Starts a session, or with `family` (id, started_at) continues one after a rotation."""
     settings = get_settings()
@@ -137,6 +140,7 @@ async def _issue_tokens(
             expires_at=utcnow() + timedelta(days=settings.refresh_token_days),
             family_id=family_id,
             started_at=started_at,
+            is_tv=tv,
             **device,
         )
     )
@@ -160,6 +164,7 @@ async def build_me(user: User, session: Session) -> MeOut:
         is_admin=user.is_admin,
         avatar=avatar_out(user, link.mal_picture if link else None),
         share_activity=user.share_activity,
+        pin_enabled=user.pin_hash is not None,
     )
 
 
@@ -296,7 +301,7 @@ async def refresh(body: RefreshIn, session: Session, request: Request, ip: Clien
         if user is None:
             raise ApiError(401, "invalid_refresh_token", "User no longer exists")
         return await _issue_tokens(
-            session, user, _device(request, ip), (token.family_id, token.started_at)
+            session, user, _device(request, ip), (token.family_id, token.started_at), tv=token.is_tv
         )
 
     if token.revoked_at is not None:
@@ -317,7 +322,7 @@ async def refresh(body: RefreshIn, session: Session, request: Request, ip: Clien
     if user is None:
         raise ApiError(401, "invalid_refresh_token", "User no longer exists")
     return await _issue_tokens(
-        session, user, _device(request, ip), (token.family_id, token.started_at)
+        session, user, _device(request, ip), (token.family_id, token.started_at), tv=token.is_tv
     )
 
 

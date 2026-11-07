@@ -20,7 +20,7 @@ export default async function TvSettingsPage({ params }: PageProps<"/[locale]/tv
   return (
     <TvPage initial={`tv-locale-${locale}`}>
       <h1 className="px-[var(--tv-x)] pb-4 pt-10 text-[4rem]">{t("title")}</h1>
-      <TvSettings username={me.username} showNsfw={me.show_nsfw} />
+      <TvSettings username={me.username} showNsfw={me.show_nsfw} pinEnabled={me.pin_enabled} />
     </TvPage>
   );
 }

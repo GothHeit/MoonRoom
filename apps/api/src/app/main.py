@@ -33,6 +33,7 @@ from app.routers import (
     mal,
     manga,
     notifications,
+    pin,
     progress,
     push,
     rooms,
@@ -190,6 +191,7 @@ def create_app() -> FastAPI:
     for module in (
         auth,
         device_login,
+        pin,
         avatars,
         friends,
         invites,

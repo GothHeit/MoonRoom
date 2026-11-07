@@ -60,7 +60,10 @@
     "two_factor_disabled": "O login em dois fatores está desativado.",
     "two_factor_not_started": "Comece pela configuração.",
     "manga_not_found": "Mangá não encontrado.",
-    "upstream_failed": "A fonte não respondeu. Tente de novo."
+    "upstream_failed": "A fonte não respondeu. Tente de novo.",
+    "wrong_pin": "PIN errado.",
+    "pin_required": "Digite o PIN para usar esta TV.",
+    "pin_not_on_tv": "Defina o PIN pelo celular ou computador."
   },
   "row": {
     "previous": "Rolar para a esquerda",

@@ -287,6 +287,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pin Status
+         * @description Open to a locked TV: it asks this to know whether to show the PIN screen.
+         */
+        get: operations["pin_status_auth_pin_get"];
+        /** Set Pin */
+        put: operations["set_pin_auth_pin_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/pin/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock
+         * @description The TV page locks itself when it opens, goes to the background or sits idle.
+         */
+        post: operations["lock_auth_pin_lock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/pin/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Pin */
+        post: operations["remove_pin_auth_pin_remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/pin/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unlock */
+        post: operations["unlock_auth_pin_unlock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/refresh": {
         parameters: {
             query?: never;
@@ -2487,6 +2562,8 @@ export interface components {
             locale: "pt" | "en";
             /** Manga Lang */
             manga_lang: string | null;
+            /** Pin Enabled */
+            pin_enabled: boolean;
             /** Share Activity */
             share_activity: boolean;
             /** Show Nsfw */
@@ -2617,6 +2694,35 @@ export interface components {
             large?: string | null;
             /** Medium */
             medium?: string | null;
+        };
+        /** PinRemoveIn */
+        PinRemoveIn: {
+            /** Password */
+            password: string;
+        };
+        /** PinSetIn */
+        PinSetIn: {
+            /** Password */
+            password: string;
+            /** Pin */
+            pin: string;
+        };
+        /** PinStatusOut */
+        PinStatusOut: {
+            avatar: components["schemas"]["AvatarOut"];
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: string;
+            /** Locked */
+            locked: boolean;
+            /** Username */
+            username: string;
+        };
+        /** PinUnlockIn */
+        PinUnlockIn: {
+            /** Pin */
+            pin: string;
         };
         /** PlaybackOut */
         PlaybackOut: {
@@ -3656,6 +3762,137 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RefreshIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pin_status_auth_pin_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinStatusOut"];
+                };
+            };
+        };
+    };
+    set_pin_auth_pin_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinSetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lock_auth_pin_lock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_pin_auth_pin_remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinRemoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlock_auth_pin_unlock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinUnlockIn"];
             };
         };
         responses: {
