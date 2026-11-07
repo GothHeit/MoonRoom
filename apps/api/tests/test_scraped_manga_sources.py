@@ -223,6 +223,12 @@ LM_PAGE = (
     r"{\"url\":\"monster/capitulo-1/page-2-1.webp\"},{\"url\":\"monster/cover-md.webp\"},"
     r"{\"url\":\"other/capitulo-1/page-1-1.webp\"}]}"
 )
+# Newer chapters list their pages without a file extension.
+LM_PAGE_BARE = (
+    r"{\"images\":[{\"url\":\"monster/capitulo-2/page-1\",\"width\":1080},"
+    r"{\"url\":\"monster/capitulo-2/page-2\"},{\"url\":\"monster/cover-md.webp\"},"
+    r"{\"url\":\"credits-page.webp?chapter=abc\"}]}"
+)
 
 
 @pytest.fixture
@@ -273,6 +279,9 @@ async def test_leituramanga_lists_chapters_and_resolves_pages(lm):
     respx.get(f"{LM_SITE}/manga/monster/chapter/1").mock(
         return_value=httpx.Response(200, text=LM_PAGE)
     )
+    respx.get(f"{LM_SITE}/manga/monster/chapter/2").mock(
+        return_value=httpx.Response(200, text=LM_PAGE_BARE)
+    )
     listed = await lm.chapters(MONSTER, None)
     assert listed is not None and listed.source_id == "monster"
     assert [(c.id, c.number) for c in listed.chapters] == [
@@ -287,6 +296,12 @@ async def test_leituramanga_lists_chapters_and_resolves_pages(lm):
         "https://cdn.lm.test/monster/capitulo-1/page-2-1.webp",
     ]
     assert found.upstream_headers == {"Referer": "https://lm.test/"}
+    bare = await lm.pages(MONSTER, "monster~2")
+    assert bare is not None
+    assert bare.urls == [
+        "https://cdn.lm.test/monster/capitulo-2/page-1",
+        "https://cdn.lm.test/monster/capitulo-2/page-2",
+    ]
     # Other titles, unknown chapters and odd ids are refused.
     assert await lm.pages(MONSTER, "other~1") is None
     assert await lm.pages(MONSTER, "monster~9") is None

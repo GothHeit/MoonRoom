@@ -28,7 +28,10 @@ _MISSING = {"missing": True}
 _SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _MANGA_ID = re.compile(r"^[0-9a-f]{24}$")
 _NUMBER = re.compile(r"^\d+(?:\.\d+)?$")
-_IMAGE = re.compile(r'"url":"([A-Za-z0-9][A-Za-z0-9/_.-]*\.(?:webp|jpe?g|png|avif))"')
+# Older chapters name their pages with an extension; newer ones leave it off (the host still
+# serves them as images), so a path is also a page when it is a numbered one.
+_IMAGE = re.compile(r'"url":"([A-Za-z0-9][A-Za-z0-9/_.-]*)"')
+_IMAGE_FILE = re.compile(r"\.(?:webp|jpe?g|png|avif)$|/page-\d+(?:-\d+)?$")
 
 
 class LeituramangaSource:
@@ -161,7 +164,7 @@ class LeituramangaSource:
         urls: list[str] = []
         for path in _IMAGE.findall(body):
             # Only this title's own pages; covers and other titles' art share the markup.
-            if path.startswith(f"{slug}/") and "/cover" not in path:
+            if path.startswith(f"{slug}/") and "/cover" not in path and _IMAGE_FILE.search(path):
                 url = f"{self._images}/{path}"
                 if url not in urls:
                     urls.append(url)
