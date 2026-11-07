@@ -1,8 +1,15 @@
-html, body { margin: 0; height: 100%; background: #150d26; color: #f0e8ff; font-family: sans-serif; }
+html, body { margin: 0; height: 100%; background: #150d26; color: #f0e8ff; font-family: sans-serif; overflow: hidden; }
+body { background: radial-gradient(ellipse at 50% 45%, #2a1b4d 0, #150d26 70%); }
 main { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-h1 { font-size: 96px; font-weight: 400; margin: 0 0 16px; }
-h1 span { color: #c9b3ff; }
-p { font-size: 32px; color: #bcaedb; margin: 0 0 40px; }
+#logo { position: absolute; top: 76px; width: 480px; }
+#moon { width: 240px; height: 240px; border-radius: 50%; position: relative; overflow: hidden; background: #c9b3ff; box-shadow: 0 0 60px 10px rgba(201, 179, 255, 0.25); animation: glow 6s ease-in-out infinite; margin-top: 40px; }
+#moon i { position: absolute; top: -2%; left: -2%; width: 104%; height: 104%; border-radius: 50%; background: #150d26; animation: phase 6s ease-in-out infinite; }
+body.off #moon { background: #8f7fc0; animation-duration: 12s; }
+body.off #moon i { animation-duration: 12s; }
+@keyframes phase { 0% { transform: translateX(-100%); } 50% { transform: translateX(0); } 100% { transform: translateX(100%); } }
+@keyframes glow { 50% { box-shadow: 0 0 90px 20px rgba(201, 179, 255, 0.35); } }
+h1 { font-size: 56px; font-weight: 400; margin: 56px 0 12px; }
+p { font-size: 30px; color: #bcaedb; margin: 0 0 40px; min-height: 36px; }
 [hidden] { display: none !important; }
 button { margin: 0 16px; font-size: 32px; padding: 16px 48px; border-radius: 999px; border: 3px solid #c9b3ff; background: transparent; color: #f0e8ff; }
 button:focus { background: #c9b3ff; color: #150d26; outline: 4px solid #f0e8ff; outline-offset: 4px; }

@@ -15,6 +15,15 @@
 	@compressible not path_regexp ^/api/proxy/watch/rooms/[^/]+/events$
 	encode @compressible zstd gzip
 
+	# "Is the site up?" for the TV wrapper, which asks from another origin. When this server or the
+	# tunnel is down the answer never carries these headers, which is how the wrapper knows.
+	@ping path /api/ping
+	handle @ping {
+		header Access-Control-Allow-Origin *
+		header Cache-Control no-store
+		respond "ok" 200
+	}
+
 	# MyAnimeList sends the browser here after the user approves the link.
 	@mal path /mal/callback
 	handle @mal {
@@ -27,6 +36,20 @@
 	handle {
 		reverse_proxy web:3000 {
 			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	# While the app restarts (a deploy) or is down, show the moon page, which retries by itself.
+	handle_errors {
+		@down expression {err.status_code} in [502, 503, 504]
+		handle @down {
+			header Retry-After 5
+			header Cache-Control "no-store"
+			rewrite * /offline.html
+			root * /srv
+			file_server {
+				status 503
+			}
 		}
 	}
 }
