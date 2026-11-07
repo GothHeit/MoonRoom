@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { routing } from "./i18n/routing";
 import {
   ACCESS_COOKIE,
+  ACCOUNTS_COOKIE,
   applyCookies,
   clearedCookies,
   REFRESH_COOKIE,
@@ -18,6 +19,9 @@ const PUBLIC_PATHS = ["/login", "/register", "/tv/login"];
 
 /** The TV mode (/tv) has its own sign-in screen: a code approved on a phone. */
 const isTv = (path: string) => path === "/tv" || path.startsWith("/tv/");
+
+/** The account picker and the "add an account" screen: open to a TV with any account on it. */
+const isPicker = (path: string) => path === "/tv/accounts" || path.startsWith("/tv/accounts/");
 
 function splitLocale(pathname: string) {
   const [, first, ...rest] = pathname.split("/");
@@ -66,8 +70,19 @@ export default async function proxy(request: NextRequest) {
     }
   }
 
-  if (!signedIn && !isPublic && isTv(path)) return redirect(request, `/${locale}/tv/login`, cookies);
-  if (!signedIn && !isPublic) {
+  const hasParked = request.cookies.has(ACCOUNTS_COOKIE);
+  const pickerOk = isPicker(path) && hasParked;
+  if (isTv(path)) {
+    // Opening the TV app (a full page load of its start address) always asks who is watching.
+    if ((signedIn || hasParked) && path === "/tv" && request.headers.get("sec-fetch-mode") === "navigate") {
+      return redirect(request, `/${locale}/tv/accounts`, cookies);
+    }
+    // No active account: a TV with others parked on it asks who is watching, else it signs in.
+    if (!signedIn && !isPublic && !pickerOk) {
+      return redirect(request, `/${locale}/${hasParked ? "tv/accounts" : "tv/login"}`, cookies);
+    }
+  }
+  if (!signedIn && !isPublic && !pickerOk) {
     const { search } = request.nextUrl;
     return redirect(request, `/${locale}/login`, cookies, path === "/" ? undefined : `${path}${search}`);
   }

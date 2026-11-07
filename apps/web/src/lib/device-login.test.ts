@@ -61,3 +61,50 @@ describe("TV sign-in routes", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+describe("TV sign-in in add-account mode", () => {
+  const tokens = { access_token: "new-a", refresh_token: "new-r", token_type: "bearer", expires_in: 900 };
+  const parkedCookie = Buffer.from(JSON.stringify([1, 2, 3, 4].map((i) => ({ id: `u${i}`, name: `n${i}`, avatar: { kind: "none", version: 0 }, refresh: `r${i}` })))).toString("base64url");
+
+  it("refuses to start when the TV already holds five accounts", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const res = await startDeviceLogin(post("/api/auth/device/start?add=1", `mr_refresh=active; mr_accounts=${parkedCookie}`));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.code).toBe("too_many_accounts");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not keep a session that arrives after the TV filled up", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        calls.push(new URL(url).pathname);
+        return Response.json({ status: "approved", tokens });
+      }),
+    );
+    const res = await pollDeviceLogin(post("/api/auth/device/poll?add=1", `mr_device=secret; mr_refresh=active; mr_accounts=${parkedCookie}`));
+    expect(res.status).toBe(409);
+    expect(calls).toContain("/auth/logout");
+    expect(res.headers.getSetCookie().join("\n")).not.toMatch(/mr_refresh=new-r/);
+  });
+
+  it("parks the active account and signs the new one in", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const path = new URL(url).pathname;
+        if (path === "/auth/device/token") return Response.json({ status: "approved", tokens });
+        if (path === "/auth/refresh") return Response.json({ access_token: "old-a", refresh_token: "old-r", token_type: "bearer", expires_in: 900 });
+        if (path === "/auth/pin") return Response.json({ id: "u1", username: "Ana", avatar: { kind: "none", version: 0 } });
+        return new Response(null, { status: 204 });
+      }),
+    );
+    const res = await pollDeviceLogin(post("/api/auth/device/poll?add=1", "mr_device=secret; mr_refresh=active"));
+    expect(res.status).toBe(204);
+    const cookies = res.headers.getSetCookie().join("\n");
+    expect(cookies).toMatch(/mr_refresh=new-r/);
+    expect(cookies).toMatch(/mr_accounts=/);
+  });
+});

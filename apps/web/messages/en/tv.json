@@ -40,14 +40,15 @@
       "show": "Show",
       "hide": "Hide",
       "account": "Account",
-      "signedInAs": "Signed in as {name}",
-      "signOut": "Sign out of this TV",
       "saved": "Saved.",
       "saveFailed": "Couldn't save. Try again.",
       "elsewhere": "Your profile, MyAnimeList, password and signed-in devices are managed on your phone or computer.",
       "pin": "PIN lock",
       "pinHint": "Ask for your PIN again on this TV, as if it had just been opened.",
-      "lockNow": "Lock now"
+      "lockNow": "Lock now",
+      "switchAccount": "Switch account",
+      "removeAccount": "Remove from this TV",
+      "accountHint": "Signed in as {name}. Removing signs this account out of the TV; your other accounts stay."
     },
     "login": {
       "title": "Sign in on your TV",
@@ -88,6 +89,16 @@
       "wrong": "Wrong PIN. Try again.",
       "rateLimited": "Too many tries. Wait a few minutes.",
       "failed": "Couldn't check the PIN. Check the TV's internet connection."
+    },
+    "accounts": {
+      "title": "Who’s watching?",
+      "add": "Add account",
+      "addTitle": "Add an account",
+      "cancel": "Cancel",
+      "opening": "Opening…",
+      "expired": "That sign-in expired. Add the account again with +.",
+      "failed": "Couldn’t open that account. Check the TV’s internet connection.",
+      "full": "This TV holds {max} accounts. Remove one in Settings to add another."
     }
   },
   "tvLink": {

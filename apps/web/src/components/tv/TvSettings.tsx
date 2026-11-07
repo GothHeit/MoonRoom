@@ -25,7 +25,7 @@ function Setting({ label, hint, top, children }: { label: string; hint?: string;
 }
 
 /** Language, the +18 switch, the PIN lock and signing out. Everything else is managed on a phone or computer. */
-export function TvSettings({ username, showNsfw, pinEnabled }: { username: string; showNsfw: boolean; pinEnabled: boolean }) {
+export function TvSettings({ userId, username, showNsfw, pinEnabled }: { userId: string; username: string; showNsfw: boolean; pinEnabled: boolean }) {
   const t = useTranslations("tv.settings");
   const tLocale = useTranslations("locale");
   const locale = useLocale();
@@ -55,11 +55,20 @@ export function TvSettings({ username, showNsfw, pinEnabled }: { username: strin
     else setNsfw(!next);
   }
 
-  async function signOut() {
+  async function removeAccount() {
     setBusy(true);
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
-    // Fresh from the server, so nothing of the signed-in screens is reused.
-    router.replace("/tv/login");
+    const res = await fetch("/api/tv/accounts/remove", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: userId }),
+    }).catch(() => null);
+    if (!res?.ok) {
+      setBusy(false);
+      setStatus("failed");
+      return;
+    }
+    // Fresh from the server: other accounts on the TV get the picker, else the sign-in screen.
+    router.replace("/tv/accounts");
     router.refresh();
   }
 
@@ -94,9 +103,12 @@ export function TvSettings({ username, showNsfw, pinEnabled }: { username: strin
           </TvButton>
         </Setting>
       )}
-      <Setting label={t("account")} hint={t("signedInAs", { name: username })}>
-        <TvButton focusKey="tv-sign-out" disabled={busy} onPress={signOut}>
-          {t("signOut")}
+      <Setting label={t("account")} hint={t("accountHint", { name: username })}>
+        <TvButton focusKey="tv-switch-account" disabled={busy} onPress={() => router.push("/tv/accounts?back=1")}>
+          {t("switchAccount")}
+        </TvButton>
+        <TvButton focusKey="tv-sign-out" disabled={busy} onPress={removeAccount}>
+          {t("removeAccount")}
         </TvButton>
       </Setting>
       <p role="status" className={`mt-8 min-h-[2.25rem] text-[1.5rem] ${status === "failed" ? "text-danger" : "text-success"}`}>

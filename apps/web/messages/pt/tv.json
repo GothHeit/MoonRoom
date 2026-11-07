@@ -40,14 +40,15 @@
       "show": "Mostrar",
       "hide": "Ocultar",
       "account": "Conta",
-      "signedInAs": "Conectado como {name}",
-      "signOut": "Sair desta TV",
       "saved": "Salvo.",
       "saveFailed": "Não deu para salvar. Tente de novo.",
       "elsewhere": "Perfil, MyAnimeList, senha e aparelhos conectados são gerenciados no celular ou no computador.",
       "pin": "Bloqueio por PIN",
       "pinHint": "Pede o PIN de novo nesta TV, como se ela tivesse acabado de abrir.",
-      "lockNow": "Bloquear agora"
+      "lockNow": "Bloquear agora",
+      "switchAccount": "Trocar de conta",
+      "removeAccount": "Remover desta TV",
+      "accountHint": "Conectado como {name}. Remover desconecta esta conta da TV; as outras contas continuam."
     },
     "login": {
       "title": "Entre na sua TV",
@@ -88,6 +89,16 @@
       "wrong": "PIN errado. Tente de novo.",
       "rateLimited": "Muitas tentativas. Espere alguns minutos.",
       "failed": "Não deu para conferir o PIN. Veja a internet da TV."
+    },
+    "accounts": {
+      "title": "Quem está assistindo?",
+      "add": "Adicionar conta",
+      "addTitle": "Adicionar uma conta",
+      "cancel": "Cancelar",
+      "opening": "Abrindo…",
+      "expired": "Esse login expirou. Adicione a conta de novo com o +.",
+      "failed": "Não deu para abrir essa conta. Confira a internet da TV.",
+      "full": "Esta TV guarda {max} contas. Remova uma nos Ajustes para adicionar outra."
     }
   },
   "tvLink": {

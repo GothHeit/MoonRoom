@@ -5,6 +5,7 @@ import { AuthCard } from "@/components/auth/AuthCard";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { Link } from "@/i18n/navigation";
 import { titled } from "@/lib/page-title";
+import { safeNext } from "@/lib/redirect";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/register">): Promise<Metadata> {
   const { locale } = await params;
@@ -16,7 +17,8 @@ export default async function RegisterPage({ params, searchParams }: PageProps<"
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("register");
-  const { invite } = await searchParams;
+  const { invite, next } = await searchParams;
+  const back = safeNext(typeof next === "string" ? next : null);
 
   return (
     <AuthCard
@@ -24,7 +26,7 @@ export default async function RegisterPage({ params, searchParams }: PageProps<"
       footer={
         <>
           {t("haveAccount")}{" "}
-          <Link href="/login" className="font-bold text-accent hover:underline">
+          <Link href={back === "/" ? "/login" : { pathname: "/login", query: { next: back } }} className="font-bold text-accent hover:underline">
             {t("loginLink")}
           </Link>
         </>

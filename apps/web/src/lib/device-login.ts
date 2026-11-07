@@ -4,6 +4,7 @@ import { API_URL } from "./config";
 import { applyCookies, clearedDeviceCookie, DEVICE_COOKIE, deviceCookie, sessionCookies } from "./cookies";
 import { FORBIDDEN_ORIGIN, isSameOrigin } from "./origin";
 import { deviceHeaders } from "./session";
+import { addApproved, isFull } from "./tv-accounts";
 
 // The TV side of signing in with a code. The secret the TV polls with stays in an httpOnly
 // cookie, so the page only ever sees the short code it shows; an approved poll turns into the
@@ -24,8 +25,14 @@ function passThrough(upstream: Response, text: string) {
   return new NextResponse(text, { status: upstream.status, headers: { "Content-Type": "application/json" } });
 }
 
+/** "Add an account" mode: the TV is already signed in, and the new session joins it. */
+const adding = (request: Request) => new URL(request.url).searchParams.get("add") === "1";
+
+const FULL = { error: { code: "too_many_accounts", message: "This TV holds as many accounts as it can" } };
+
 export async function startDeviceLogin(request: Request) {
   if (!isSameOrigin(request)) return NextResponse.json(FORBIDDEN_ORIGIN, { status: 403 });
+  if (adding(request) && isFull(request)) return NextResponse.json(FULL, { status: 409 });
   let upstream: Response;
   try {
     upstream = await call("/auth/device", request);
@@ -64,6 +71,17 @@ export async function pollDeviceLogin(request: Request) {
   const data = JSON.parse(text) as { status: "pending" | "approved"; tokens?: Parameters<typeof sessionCookies>[0] | null };
   if (data.status !== "approved" || !data.tokens) return NextResponse.json({ status: "pending" });
   const response = new NextResponse(null, { status: 204 });
+  if (adding(request)) {
+    if (isFull(request)) {
+      // Filled up while the code was out: the new session is not kept.
+      await call("/auth/logout", request, { refresh_token: data.tokens.refresh_token }).catch(() => undefined);
+      const full = NextResponse.json(FULL, { status: 409 });
+      applyCookies(full.cookies, [clearedDeviceCookie()]);
+      return full;
+    }
+    applyCookies(response.cookies, [...(await addApproved(request, data.tokens)), clearedDeviceCookie()]);
+    return response;
+  }
   applyCookies(response.cookies, [...sessionCookies(data.tokens), clearedDeviceCookie()]);
   return response;
 }

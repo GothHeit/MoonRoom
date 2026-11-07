@@ -46,6 +46,37 @@ describe("auth middleware", () => {
     expect(where(await proxy(req("/pt/tv/login", "mr_access=a")))).toBe("/pt/tv");
   });
 
+  describe("TV account picker", () => {
+    const start = (path: string, cookie?: string) =>
+      new NextRequest(`http://localhost:3000${path}`, { headers: { "sec-fetch-mode": "navigate", ...(cookie ? { cookie } : {}) } });
+
+    it("asks who is watching when the app opens, even with one account", async () => {
+      expect(where(await proxy(start("/pt/tv", "mr_access=a")))).toBe("/pt/tv/accounts");
+    });
+
+    it("does not ask again for moves inside the app or deep links", async () => {
+      expect(where(await proxy(req("/pt/tv", "mr_access=a")))).toBeNull();
+      expect(where(await proxy(start("/pt/tv/anime/1", "mr_access=a")))).toBeNull();
+    });
+
+    it("shows the picker to a TV that has only parked accounts", async () => {
+      expect(where(await proxy(start("/pt/tv", "mr_accounts=x")))).toBe("/pt/tv/accounts");
+      expect(where(await proxy(req("/pt/tv/accounts", "mr_accounts=x")))).toBeNull();
+      expect(where(await proxy(req("/pt/tv/accounts/add", "mr_accounts=x")))).toBeNull();
+      expect(where(await proxy(req("/pt/tv/anime/1", "mr_accounts=x")))).toBe("/pt/tv/accounts");
+    });
+
+    it("sends a TV with no account at all to sign in", async () => {
+      expect(where(await proxy(req("/pt/tv/accounts")))).toBe("/pt/tv/login");
+      expect(where(await proxy(start("/pt/tv")))).toBe("/pt/tv/login");
+    });
+
+    it("lets a signed-in TV reach the picker and the add screen", async () => {
+      expect(where(await proxy(req("/pt/tv/accounts", "mr_access=a")))).toBeNull();
+      expect(where(await proxy(req("/pt/tv/accounts/add", "mr_access=a")))).toBeNull();
+    });
+  });
+
   it("renews an expired access cookie from the refresh cookie", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json(tokens)));
     const res = await proxy(req("/pt", "mr_refresh=r"));

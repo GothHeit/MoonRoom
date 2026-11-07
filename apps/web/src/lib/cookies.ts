@@ -12,6 +12,20 @@ const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
 /** The secret a TV polls its sign-in code with. Lives as long as the code (10 minutes). */
 export const DEVICE_COOKIE = "mr_device";
 
+/**
+ * The other accounts signed in on this TV (see lib/tv-accounts.ts). httpOnly, so the page never
+ * sees the refresh tokens inside it.
+ */
+export const ACCOUNTS_COOKIE = "mr_accounts";
+
+export function accountsCookie(value: string): CookieSpec {
+  return { name: ACCOUNTS_COOKIE, value, options: base(REFRESH_MAX_AGE) };
+}
+
+export function clearedAccountsCookie(): CookieSpec {
+  return { name: ACCOUNTS_COOKIE, value: "", options: base(0) };
+}
+
 export function deviceCookie(token: string, maxAge: number): CookieSpec {
   return { name: DEVICE_COOKIE, value: token, options: base(maxAge) };
 }

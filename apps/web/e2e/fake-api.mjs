@@ -15,6 +15,14 @@ const spentRefresh = new Set();
 const liveRefresh = new Set();
 let counter = 0;
 let refreshCalls = 0;
+// Which account a refresh token belongs to (its tag), so a renewed session stays the same account.
+const refreshTag = new Map();
+const USER_OF_TAG = { "": "kafka", "linked-": "linked", "expired-": "expired" };
+const idOf = (username) => (username === "kafka" ? "1" : `id-${username}`);
+const userOf = (token) => USER_OF_TAG[/^access-((?:linked-|expired-)?)/.exec(token ?? "")?.[1] ?? ""] ?? "kafka";
+// The TV sign-in code flow: a test approves the pending code for an account.
+let deviceApproved = null;
+let devicePending = false;
 
 function issue(tag = "") {
   counter += 1;
@@ -26,6 +34,7 @@ function issue(tag = "") {
   };
   accessTokens.add(tokens.access_token);
   liveRefresh.add(tokens.refresh_token);
+  refreshTag.set(tokens.refresh_token, tag);
   return tokens;
 }
 
@@ -117,7 +126,23 @@ createServer(async (req, res) => {
       return send(401, error("invalid_refresh_token"));
     }
     spentRefresh.add(refresh_token);
-    return send(200, issue());
+    return send(200, issue(refreshTag.get(refresh_token) ?? ""));
+  }
+  if (url.pathname === "/auth/device" && req.method === "POST") {
+    devicePending = true;
+    deviceApproved = null;
+    return send(201, { device_token: "device-secret", user_code: "BCDF-GHJK", expires_in: 600, interval: 1 });
+  }
+  if (url.pathname === "/auth/device/token") {
+    if (!devicePending) return send(410, error("device_login_expired"));
+    if (!deviceApproved) return send(200, { status: "pending", tokens: null });
+    devicePending = false;
+    const tag = { expired: "expired-", linked: "linked-" }[deviceApproved] ?? "";
+    return send(200, { status: "approved", tokens: issue(tag) });
+  }
+  if (url.pathname === "/__approve_device") {
+    deviceApproved = url.searchParams.get("user") ?? "kafka";
+    return send(204);
   }
   if (url.pathname === "/auth/logout") {
     const { refresh_token } = await body(req);
@@ -168,15 +193,22 @@ createServer(async (req, res) => {
       manga_genres: [{ id: 2, name: "Adventure" }, { id: 10, name: "Fantasy" }],
     });
   }
+  if (url.pathname === "/auth/pin") {
+    if (!authed) return send(401, error("not_authenticated"));
+    const username = userOf(token);
+    return send(200, { enabled: false, id: idOf(username), username, avatar: { kind: "none", version: 0 }, locked: false });
+  }
+  if (url.pathname === "/auth/pin/lock") return send(authed ? 204 : 401);
   if (url.pathname === "/me") {
     if (!authed) return send(401, error("not_authenticated"));
     if (req.method === "PATCH") {
       const patch = await body(req);
       if ("subtitle_lang" in patch) subtitleLang = patch.subtitle_lang;
     }
+    const username = userOf(token);
     return send(200, {
-      id: "1",
-      username: "kafka",
+      id: idOf(username),
+      username,
       locale: "en",
       show_nsfw: false,
       subtitle_lang: subtitleLang,

@@ -42,6 +42,10 @@ export function TvRoot({ children }: { children: ReactNode }) {
       const inNav = !!document.activeElement?.closest("[data-tv-nav]");
       if (pathname === "/tv/login") {
         exitApp();
+      } else if (pathname === "/tv/accounts") {
+        // The first screen leaves the app; reached from Settings, Back returns there.
+        if (new URLSearchParams(window.location.search).has("back")) router.back();
+        else exitApp();
       } else if (!TOP_LEVEL.includes(pathname)) {
         if (window.history.length > 1) router.back();
         else router.replace("/tv");

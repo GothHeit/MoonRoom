@@ -66,15 +66,16 @@ function Countdown({ until }: { until: number }) {
  * Signing a TV in: it shows a short code and a QR, a signed-in phone approves it at /link, and
  * this screen, polling every few seconds, lands on Home as soon as it is approved.
  */
-export function TvLogin() {
+export function TvLogin({ adding = false }: { adding?: boolean }) {
   const t = useTranslations("tv.login");
+  const tAccounts = useTranslations("tv.accounts");
   const router = useRouter();
   const [state, setState] = useState<State>({ kind: "loading" });
 
   const start = useCallback(async () => {
     setState({ kind: "loading" });
     try {
-      const res = await fetch("/api/auth/device/start", { method: "POST" });
+      const res = await fetch(`/api/auth/device/start${adding ? "?add=1" : ""}`, { method: "POST" });
       const data = await res.json().catch(() => undefined);
       if (!res.ok) {
         setState({ kind: "error", code: (data as { error?: { code?: string } } | undefined)?.error?.code ?? "unknown" });
@@ -85,7 +86,7 @@ export function TvLogin() {
     } catch {
       setState({ kind: "error", code: "network" });
     }
-  }, []);
+  }, [adding]);
 
   useEffect(() => {
     // Fetching the first code on arrival is the point of this screen.
@@ -106,7 +107,7 @@ export function TvLogin() {
         return;
       }
       try {
-        const res = await fetch("/api/auth/device/poll", { method: "POST" });
+        const res = await fetch(`/api/auth/device/poll${adding ? "?add=1" : ""}`, { method: "POST" });
         if (!live) return;
         if (res.status === 204) {
           // Fresh from the server, so Home is built with the new session.
@@ -116,6 +117,7 @@ export function TvLogin() {
         }
         if (res.status === 410) return setState({ kind: "expired" });
         if (res.status === 403) return setState({ kind: "declined" });
+        if (res.status === 409) return setState({ kind: "error", code: "too_many_accounts" });
         // Too fast for the server (several TVs behind one address): back off.
         if (res.status === 429) wait = Math.min(wait * 2, 30_000);
       } catch {
@@ -128,7 +130,7 @@ export function TvLogin() {
       live = false;
       window.clearTimeout(timer);
     };
-  }, [login, router]);
+  }, [login, router, adding]);
 
   const qr = useQr(login ? linkUrl(login.code).toString() : null);
   const stopped = state.kind !== "showing" && state.kind !== "loading";
@@ -142,7 +144,7 @@ export function TvLogin() {
     <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)_auto] items-center gap-24 px-[calc(var(--tv-x)*2)] py-20">
       <TvGroup top className="min-w-0">
         <Image src="/logo-lockup.svg" alt={APP_NAME} width={250} height={60} unoptimized priority className="h-[3.75rem] w-auto" />
-        <h1 className="mt-14 text-[5.5rem] leading-[0.95] tracking-[-0.02em]">{t("title")}</h1>
+        <h1 className="mt-14 text-[5.5rem] leading-[0.95] tracking-[-0.02em]">{adding ? tAccounts("addTitle") : t("title")}</h1>
         {state.kind === "showing" || state.kind === "loading" ? (
           <>
             <ol className="mt-10 space-y-4 text-[1.75rem] text-soft">
@@ -172,7 +174,7 @@ export function TvLogin() {
         ) : (
           <div className="mt-10">
             <p className="text-[2rem] text-soft">
-              {state.kind === "expired" ? t("expired") : state.kind === "declined" ? t("declined") : state.code === "rate_limited" ? t("rateLimited") : t("failed")}
+              {state.kind === "expired" ? t("expired") : state.kind === "declined" ? t("declined") : state.code === "rate_limited" ? t("rateLimited") : state.code === "too_many_accounts" ? tAccounts("full", { max: 5 }) : t("failed")}
             </p>
             <div className="mt-8">
               <TvButton variant="primary" focusKey="tv-login-retry" onPress={() => void start()}>
@@ -182,9 +184,19 @@ export function TvLogin() {
           </div>
         )}
         <div className="mt-12">
-          <TvPillLink href="/login?next=/tv" variant="secondary" focusKey="tv-login-password">
-            {t("password")}
-          </TvPillLink>
+          {adding ? (
+            <TvButton
+              variant="secondary"
+              focusKey="tv-login-cancel"
+              onPress={() => (window.history.length > 1 ? router.back() : router.replace("/tv/accounts"))}
+            >
+              {tAccounts("cancel")}
+            </TvButton>
+          ) : (
+            <TvPillLink href="/login?next=/tv" variant="secondary" focusKey="tv-login-password">
+              {t("password")}
+            </TvPillLink>
+          )}
         </div>
       </TvGroup>
       <figure className={`flex flex-col items-center ${stopped ? "invisible" : ""}`}>
