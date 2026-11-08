@@ -51,10 +51,15 @@ export function TvPinGuard() {
     };
     arm();
     window.addEventListener("keydown", arm);
+    // A video starting counts as the viewer being there: the next episode starting on its own must
+    // not lock the TV in the few seconds between episodes, when nothing is playing. Media events
+    // don't bubble, so they are caught on the way down.
+    document.addEventListener("playing", arm, true);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.clearTimeout(idle);
       window.removeEventListener("keydown", arm);
+      document.removeEventListener("playing", arm, true);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [router]);
