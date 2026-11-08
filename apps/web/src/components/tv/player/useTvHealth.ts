@@ -3,6 +3,8 @@
 import type { components } from "@app/api-client";
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 
+import { drain } from "@/lib/drain";
+
 type TvHealth = components["schemas"]["TvHealthIn"];
 
 export const HEALTH_INTERVAL_MS = 30_000;
@@ -62,7 +64,9 @@ function send(body: TvHealth) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     keepalive: true,
-  }).catch(() => undefined);
+  })
+    .then(drain)
+    .catch(() => undefined);
 }
 
 /**

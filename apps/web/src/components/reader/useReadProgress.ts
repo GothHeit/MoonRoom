@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { api } from "@/lib/api";
+import { drain } from "@/lib/drain";
 
 const SAVE_DELAY_MS = 800;
 
@@ -35,7 +36,9 @@ export function useReadProgress(mangaId: number, chapterKey: string, page: numbe
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ page: last, pages: count, completed: last >= count - 1 }),
         keepalive: true,
-      }).catch(() => undefined);
+      })
+        .then(drain)
+        .catch(() => undefined);
     };
   }, [mangaId, chapterKey]);
 }

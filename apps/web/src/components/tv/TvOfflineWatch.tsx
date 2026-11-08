@@ -3,6 +3,8 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
+import { drain } from "@/lib/drain";
+
 import { isBack } from "./keys";
 
 const CHECK_MS = 4000;
@@ -29,6 +31,8 @@ async function reachable() {
       cache: "no-store",
       signal: abort.signal,
     });
+    // Read the answer to the end, inside the time limit, so the request really finishes.
+    await drain(response);
     return response.ok;
   } catch {
     return false;

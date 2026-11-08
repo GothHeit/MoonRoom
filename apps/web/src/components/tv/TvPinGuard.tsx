@@ -3,13 +3,16 @@
 import { useEffect } from "react";
 
 import { useRouter } from "@/i18n/navigation";
+import { drain } from "@/lib/drain";
 
 // A TV left alone this long asks for the PIN again. Never while something is playing.
 const IDLE_MS = 20 * 60 * 1000;
 
 function lockNow() {
   // keepalive: the page may be going to the background while this is sent.
-  return fetch("/api/proxy/auth/pin/lock", { method: "POST", keepalive: true }).catch(() => undefined);
+  return fetch("/api/proxy/auth/pin/lock", { method: "POST", keepalive: true })
+    .then(drain)
+    .catch(() => undefined);
 }
 
 function somethingPlaying() {

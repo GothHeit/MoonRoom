@@ -27,6 +27,22 @@ describe("TvOfflineWatch", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("reads every check's answer to the end, so no request is left open", async () => {
+    const answers: Response[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const response = new Response("ok");
+        answers.push(response);
+        return response;
+      }),
+    );
+    show();
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    expect(answers.length).toBeGreaterThan(2);
+    expect(answers.every((r) => r.bodyUsed)).toBe(true);
+  });
+
   it("covers the screen once the site stops answering, then the long text after a minute", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
     show();

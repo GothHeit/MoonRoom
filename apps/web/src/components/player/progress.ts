@@ -1,5 +1,7 @@
 import type { components } from "@app/api-client";
 
+import { drain } from "@/lib/drain";
+
 type Progress = components["schemas"]["ProgressOut"];
 type ProgressIn = components["schemas"]["ProgressIn"];
 
@@ -41,5 +43,7 @@ export function saveProgress(animeId: number, episode: number, body: ProgressIn,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     keepalive,
-  }).catch(() => undefined);
+  })
+    .then(drain)
+    .catch(() => undefined);
 }
