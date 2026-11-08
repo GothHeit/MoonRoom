@@ -63,6 +63,24 @@ export function TvRoot({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [pathname, router]);
 
+  useEffect(() => {
+    // The TV keyboard shrinks the viewport while typing; keep the scale of the largest size seen so
+    // the whole UI doesn't shrink with it.
+    let width = 0;
+    let height = 0;
+    const apply = () => {
+      width = Math.max(width, window.innerWidth);
+      height = Math.max(height, window.innerHeight);
+      document.documentElement.style.fontSize = `${Math.min(width / 120, height / 67.5)}px`;
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => {
+      window.removeEventListener("resize", apply);
+      document.documentElement.style.fontSize = "";
+    };
+  }, []);
+
   return (
     <div data-tv className="min-h-dvh [--tv-x:5rem]">
       {/* 16px at 1920x1080; the page never shows a scrollbar, the remote does the scrolling. */}

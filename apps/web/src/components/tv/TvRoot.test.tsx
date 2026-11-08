@@ -54,3 +54,18 @@ describe("TvRoot Back key", () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 });
+
+describe("TvRoot scale", () => {
+  it("keeps the scale of the largest viewport when the TV keyboard shrinks it", () => {
+    const set = (w: number, h: number) => {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: w });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: h });
+    };
+    set(1920, 1080);
+    render(<TvRoot>x</TvRoot>);
+    expect(document.documentElement.style.fontSize).toBe("16px");
+    set(1920, 600);
+    fireEvent(window, new Event("resize"));
+    expect(document.documentElement.style.fontSize).toBe("16px");
+  });
+});
