@@ -207,7 +207,7 @@ class AnimesOnlineCCSource:
         if page and (player := parse_player(await self._get(page))):
             for video in parse_videos(await self._get(player)):
                 if await hls.is_public_target(video.url):
-                    result = Stream(video.url, "mp4", video.height, {})
+                    result = Stream(video.url, "mp4", video.height, {"User-Agent": USER_AGENT})
                     if video.expires:
                         self._expiry[key] = video.expires - EXPIRY_MARGIN
                     break

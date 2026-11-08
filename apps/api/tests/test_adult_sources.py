@@ -154,6 +154,7 @@ async def test_animesbiz_stream():
     assert listed and listed.episodes == [1, 2]
     stream = await source.stream(ANIME, 1, "sub")
     assert stream and stream.kind == "mp4" and stream.resolution == 720
+    assert "Chrome" in stream.upstream_headers["User-Agent"]  # the link is bound to that agent
     assert await source.episodes(ANIME, "dub") is None
 
 
