@@ -169,6 +169,7 @@ async def test_genre_rows_show_only_genres_with_enough_titles(client, session, m
     _, headers = await make_user(session, "kafka")
     mock_season(node(1))
     mock_ranking(
+        *(node(300 + i, genres=(2,)) for i in range(20)),  # the top row
         *(node(100 + i, genres=(1,)) for i in range(9)),
         *(node(200 + i, genres=(4,)) for i in range(3)),
     )
@@ -177,6 +178,29 @@ async def test_genre_rows_show_only_genres_with_enough_titles(client, session, m
     genre_rows = [r for r in body["rows"] if r["id"] == "genre"]
     assert [r["genre"]["name"] for r in genre_rows] == ["Action"]
     assert len(genre_rows[0]["items"]) == 9
+
+
+@respx.mock
+async def test_genre_rows_skip_titles_shown_in_a_row_above(client, session, monkeypatch):
+    from app.routers import home
+
+    monkeypatch.setattr(home, "todays_genres", lambda today, count=4: [1, 4, 2])
+    _, headers = await make_user(session, "kafka")
+    mock_season(node(1))
+    mock_ranking(
+        *(node(300 + i, genres=(1,)) for i in range(20)),  # the top row, all Action
+        *(node(100 + i, genres=(1, 4)) for i in range(10)),
+        *(node(200 + i, genres=(4,)) for i in range(8)),
+        *(node(400 + i, genres=(1, 2)) for i in range(12)),  # too far down the Action row to show
+    )
+    mock_details(1)
+    rows = (await client.get("/home", headers=headers)).json()["rows"]
+    ids = {r["genre"]["name"]: [i["anime"]["id"] for i in r["items"]] for r in rows if r["genre"]}
+    # Action leaves out what the top row shows; Comedy leaves out what Action shows.
+    assert ids["Action"] == [*range(100, 110), *range(400, 410)]
+    assert ids["Comedy"] == list(range(200, 208))
+    # Adventure has too few titles left to make a row.
+    assert list(ids) == ["Action", "Comedy"]
 
 
 @respx.mock
