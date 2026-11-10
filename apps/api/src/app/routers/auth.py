@@ -15,6 +15,7 @@ from app.db import utcnow
 from app.deps import ClientIp, CurrentSessionId, CurrentUser, Session, session_check
 from app.errors import ApiError
 from app.models import Invite, MalLink, RefreshToken, User
+from app.ratelimit import hit
 from app.security import (
     DUMMY_PASSWORD_HASH,
     create_access_token,
@@ -172,10 +173,7 @@ async def build_me(user: User, session: Session) -> MeOut:
 async def register(body: RegisterIn, session: Session, request: Request, ip: ClientIp):
     limits = request.app.state.auth_limits
     username = body.username.lower()
-    limits.register_ip.check(ip)
-    limits.register_user.check(username)
-    limits.register_ip.record(ip)
-    limits.register_user.record(username)
+    await hit((limits.register_ip, ip), (limits.register_user, username))
     invite = await session.scalar(
         select(Invite).where(Invite.code == body.invite_code).with_for_update()
     )
@@ -207,22 +205,19 @@ async def register(body: RegisterIn, session: Session, request: Request, ip: Cli
 async def login(body: LoginIn, session: Session, request: Request, ip: ClientIp):
     limits = request.app.state.auth_limits
     username = body.username.lower()
-    limits.login_ip.check(ip)
     # Keyed on (ip, username), so a stranger's bad guesses can't lock a friend out of their own
     # account from another address.
     attempt = f"{ip}|{username}"
-    limits.login_user.check(attempt)
-    # Recorded before the slow checks so a burst of concurrent guesses is counted; a
+    # Counted before the slow checks so a burst of concurrent guesses is counted; a
     # successful login takes its hit back, so friends who log in normally are never throttled.
-    limits.login_ip.record(ip)
-    limits.login_user.record(attempt)
+    await hit((limits.login_ip, ip), (limits.login_user, attempt))
     user = await session.scalar(select(User).where(User.username == body.username.lower()))
     password_hash = user.password_hash if user else DUMMY_PASSWORD_HASH
     if not await verify_password_async(body.password, password_hash) or user is None:
         audit.info("login failed username=%r ip=%s", username, ip)
         raise ApiError(401, "invalid_credentials", "Wrong username or password")
-    limits.login_ip.forgive(ip)
-    limits.login_user.reset(attempt)
+    await limits.login_ip.forgive(ip)
+    await limits.login_user.reset(attempt)
     if two_factor.is_enabled(user) and not await two_factor.is_trusted(
         session, user, body.trusted_device
     ):
@@ -239,10 +234,7 @@ async def login_second_step(body: MfaLoginIn, session: Session, request: Request
     if user_id is None:
         raise ApiError(401, "invalid_mfa_token", "Sign in again")
     key = str(user_id)
-    limits.mfa_ip.check(ip)
-    limits.mfa_user.check(key)
-    limits.mfa_ip.record(ip)
-    limits.mfa_user.record(key)
+    await hit((limits.mfa_ip, ip), (limits.mfa_user, key))
     # Locked so two requests can't spend the same code.
     user = await session.scalar(select(User).where(User.id == user_id).with_for_update())
     if user is None or not two_factor.is_enabled(user):
@@ -252,8 +244,8 @@ async def login_second_step(body: MfaLoginIn, session: Session, request: Request
         await session.rollback()
         audit.info("second step failed user=%s ip=%s", user_id, ip)
         raise ApiError(401, "invalid_code", "That code is wrong or already used")
-    limits.mfa_ip.forgive(ip)
-    limits.mfa_user.reset(key)
+    await limits.mfa_ip.forgive(ip)
+    await limits.mfa_user.reset(key)
     trusted = await two_factor.trust_device(session, user) if body.trust_device else None
     # Committed with the tokens below.
     audit.info("login user=%s ip=%s second_step=%s trusted=%s", user.id, ip, kind, bool(trusted))
@@ -423,12 +415,11 @@ async def change_password(
 ):
     limiter = request.app.state.auth_limits.password_user
     key = str(user.id)
-    limiter.check(key)
-    limiter.record(key)
+    await hit((limiter, key))
     if not await verify_password_async(body.current_password, user.password_hash):
         audit.info("password change refused user=%s", user.id)
         raise ApiError(403, "wrong_password", "Current password is wrong")
-    limiter.reset(key)
+    await limiter.reset(key)
     user.password_hash = await hash_password_async(body.new_password)
     # Every other device must sign in again; this one keeps its session.
     await session.execute(_revoke(user, keep=current))
@@ -470,26 +461,24 @@ class BackupCodesOut(BaseModel):
 async def _check_password(user: User, password: str, request: Request) -> None:
     limiter = request.app.state.auth_limits.password_user
     key = str(user.id)
-    limiter.check(key)
-    limiter.record(key)
+    await hit((limiter, key))
     if not await verify_password_async(password, user.password_hash):
         audit.info("two-factor change refused, wrong password user=%s", user.id)
         raise ApiError(403, "wrong_password", "Password is wrong")
-    limiter.reset(key)
+    await limiter.reset(key)
 
 
 async def _check_second_step(user: User, code: str, session: Session, request: Request) -> str:
     limiter = request.app.state.auth_limits.mfa_user
     key = str(user.id)
-    limiter.check(key)
-    limiter.record(key)
+    await hit((limiter, key))
     user_id = user.id
     kind = await two_factor.check_code(session, user, code)
     if kind is None:
         await session.rollback()
         audit.info("two-factor change refused, wrong code user=%s", user_id)
         raise ApiError(403, "invalid_code", "That code is wrong or already used")
-    limiter.reset(key)
+    await limiter.reset(key)
     return kind
 
 
@@ -527,12 +516,11 @@ async def two_factor_enable(
         raise ApiError(409, "two_factor_not_started", "Start the setup first")
     limiter = request.app.state.auth_limits.mfa_user
     key = str(user.id)
-    limiter.check(key)
-    limiter.record(key)
+    await hit((limiter, key))
     step = two_factor.matching_step(user.totp_secret, body.code, None)
     if step is None:
         raise ApiError(400, "invalid_code", "That code is wrong, check your authenticator app")
-    limiter.reset(key)
+    await limiter.reset(key)
     user.totp_last_step = step
     user.two_factor_at = utcnow()
     codes = await two_factor.replace_backup_codes(session, user)

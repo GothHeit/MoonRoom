@@ -160,6 +160,7 @@ async def lifespan(app: FastAPI):
                     await source.aclose()
             await app.state.shared_cache.aclose()
             await app.state.room_store.aclose()
+            await app.state.auth_limits.store.aclose()
     await db.dispose_engine()
 
 

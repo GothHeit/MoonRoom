@@ -14,6 +14,7 @@ from app.db import utcnow
 from app.deps import CurrentSessionId, CurrentUser, LockedOkUser, Session, session_id_of
 from app.errors import ApiError
 from app.models import MalLink
+from app.ratelimit import hit
 from app.routers.auth import _check_password
 from app.security import hash_password_async, verify_password_async
 
@@ -103,15 +104,12 @@ async def _check_current_pin(user, pin_value: str, request: Request, sid: uuid.U
     """Same guesses budget as the lock screen: a wrong PIN here counts like a wrong unlock."""
     limits = request.app.state.auth_limits
     session_key, user_key = str(sid), str(user.id)
-    limits.pin_session.check(session_key)
-    limits.pin_user.check(user_key)
-    limits.pin_session.record(session_key)
-    limits.pin_user.record(user_key)
+    await hit((limits.pin_session, session_key), (limits.pin_user, user_key))
     if user.pin_hash is None or not await verify_password_async(pin_value, user.pin_hash):
         audit.info("tv pin wrong (settings) user=%s session=%s", user.id, sid)
         raise ApiError(403, "wrong_pin", "That PIN is wrong")
-    limits.pin_session.reset(str(sid))
-    limits.pin_user.forgive(user_key)
+    await limits.pin_session.reset(str(sid))
+    await limits.pin_user.forgive(user_key)
 
 
 @router.put("/auth/pin/tv", status_code=204)
@@ -166,18 +164,15 @@ async def unlock(
 ):
     limits = request.app.state.auth_limits
     session_key, user_key = str(sid), str(user.id)
-    limits.pin_session.check(session_key)
-    limits.pin_user.check(user_key)
-    limits.pin_session.record(session_key)
-    limits.pin_user.record(user_key)
+    await hit((limits.pin_session, session_key), (limits.pin_user, user_key))
     if user.pin_hash is None:
         # Nothing to enter: not an error, and not a free guess either.
         return
     if not await verify_password_async(body.pin, user.pin_hash):
         audit.info("tv pin wrong user=%s session=%s", user.id, sid)
         raise ApiError(403, "wrong_pin", "That PIN is wrong")
-    limits.pin_session.reset(session_key)
-    limits.pin_user.forgive(user_key)
+    await limits.pin_session.reset(session_key)
+    await limits.pin_user.forgive(user_key)
     await pin.unlock(session, user.id, sid)
     audit.info("tv pin unlocked user=%s session=%s", user.id, sid)
 

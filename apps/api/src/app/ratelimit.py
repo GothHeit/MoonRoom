@@ -1,14 +1,24 @@
-"""A small in-process sliding-window limiter.
+"""Sliding-window limiters.
 
-State lives in this process only, which is fine for a single API instance. Running several
-instances would need a shared store (e.g. Redis) instead.
+`RateLimiter` lives in this process only: fine for cheap action caps. `SharedLimiter` guards the
+guessable things (passwords, 2FA codes, TV PINs): its counts live in Redis, so an API restart
+(every deploy) or a second worker does not hand out fresh guesses. If Redis is not configured or
+cannot be reached, it counts in this process instead: stricter than shared counting never is, and
+never open.
 """
 
+import hashlib
+import logging
 import time
+import uuid
 from collections import deque
 from collections.abc import Callable
 
+from redis.asyncio import Redis
+
 from app.errors import ApiError
+
+log = logging.getLogger(__name__)
 
 
 class RateLimiter:
@@ -67,36 +77,188 @@ class RateLimiter:
         self._hits.pop(key, None)
 
 
+# Longest wait for Redis before the call counts as a failure.
+REDIS_TIMEOUT = 0.5
+# After a failure Redis is skipped for this long, so a dead server costs one timeout.
+BREAKER_SECONDS = 30.0
+
+# KEYS are windows (sorted sets of hit times); ARGV is [member, limit1, window1, limit2, ...].
+# Either every window has room and each gets one hit, or none does and nothing is counted.
+# Returns 0 on success, otherwise the longest wait in seconds. Time comes from Redis itself.
+_HIT_SCRIPT = """
+local t = redis.call('TIME')
+local now = tonumber(t[1]) + tonumber(t[2]) / 1000000
+local wait = 0
+for i, key in ipairs(KEYS) do
+  local limit = tonumber(ARGV[2 * i])
+  local window = tonumber(ARGV[2 * i + 1])
+  redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+  if redis.call('ZCARD', key) >= limit then
+    local first = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+    local w = math.floor(tonumber(first[2]) + window - now) + 1
+    if w < 1 then w = 1 end
+    if w > wait then wait = w end
+  end
+end
+if wait > 0 then return wait end
+for i, key in ipairs(KEYS) do
+  redis.call('ZADD', key, now, ARGV[1])
+  redis.call('EXPIRE', key, math.ceil(tonumber(ARGV[2 * i + 1])))
+end
+return 0
+"""
+
+
+class AttemptStore:
+    """The Redis connection behind the shared limiters, with a breaker."""
+
+    def __init__(self, redis_url: str = "", prefix: str = "moonroom"):
+        self.prefix = prefix
+        self.redis: Redis | None = (
+            Redis.from_url(
+                redis_url, socket_timeout=REDIS_TIMEOUT, socket_connect_timeout=REDIS_TIMEOUT
+            )
+            if redis_url
+            else None
+        )
+        self._script = self.redis.register_script(_HIT_SCRIPT) if self.redis else None
+        self._down_until = 0.0
+
+    @property
+    def usable(self) -> bool:
+        return self.redis is not None and time.monotonic() >= self._down_until
+
+    def failed(self, exc: Exception) -> None:
+        if time.monotonic() >= self._down_until:
+            log.warning("Redis unavailable, counting login attempts in-process: %s", exc)
+        self._down_until = time.monotonic() + BREAKER_SECONDS
+
+    def redis_key(self, name: str, key: str) -> str:
+        return f"{self.prefix}:rl:{name}:{hashlib.sha256(key.encode()).hexdigest()[:32]}"
+
+    async def hit(self, entries: list[tuple["SharedLimiter", str]]) -> int | None:
+        """All-or-nothing count. Returns the wait in seconds when over a limit, else None;
+        raises when Redis fails."""
+        assert self._script is not None
+        keys = [self.redis_key(lim.name, key) for lim, key in entries]
+        args: list[str | int | float] = [uuid.uuid4().hex]
+        for lim, _ in entries:
+            args += [lim.limit, lim.window]
+        wait = int(await self._script(keys=keys, args=args))
+        return wait or None
+
+    async def aclose(self) -> None:
+        if self.redis is not None:
+            await self.redis.aclose()
+
+
+class SharedLimiter:
+    """A sliding window whose counts live in Redis, with an in-process copy as the fallback."""
+
+    def __init__(self, name: str, limit: int, window_seconds: float, store: AttemptStore):
+        self.name = name
+        self.limit = limit
+        self.window = window_seconds
+        self._store = store
+        self._local = RateLimiter(limit, window_seconds)
+
+    async def forgive(self, key: str) -> None:
+        """Drop the most recent hit, e.g. when an attempt turned out to be fine."""
+        self._local.forgive(key)
+        if self._store.usable:
+            try:
+                assert self._store.redis is not None
+                await self._store.redis.zpopmax(self._store.redis_key(self.name, key))
+            except Exception as exc:
+                self._store.failed(exc)
+
+    async def reset(self, key: str) -> None:
+        self._local.reset(key)
+        if self._store.usable:
+            try:
+                assert self._store.redis is not None
+                await self._store.redis.delete(self._store.redis_key(self.name, key))
+            except Exception as exc:
+                self._store.failed(exc)
+
+    def sweep(self) -> None:
+        self._local.sweep()
+
+
+def _too_many(wait: int) -> ApiError:
+    return ApiError(
+        429,
+        "rate_limited",
+        "Too many attempts, try again later",
+        headers={"Retry-After": str(wait)},
+    )
+
+
+async def hit(*entries: tuple[SharedLimiter, str]) -> None:
+    """Counts one attempt on every (limiter, key) pair, or raises 429 and counts none.
+
+    The check and the count are one step, so a burst of concurrent guesses cannot all pass the
+    check before any is counted.
+    """
+    store = entries[0][0]._store
+    if store.usable:
+        try:
+            wait = await store.hit(list(entries))
+        except Exception as exc:
+            store.failed(exc)
+        else:
+            if wait is not None:
+                raise _too_many(wait)
+            return
+    # No Redis: count here. The check covers every pair first, so a blocked attempt is free.
+    for limiter, key in entries:
+        limiter._local.check(key)
+    for limiter, key in entries:
+        limiter._local.record(key)
+
+
 class AuthLimits:
-    """The limiters guarding /auth/login and /auth/register."""
+    """The limiters guarding sign-in, registration, passwords, 2FA codes and TV PINs."""
 
     def __init__(self, settings):
         window = settings.login_window_seconds
-        self.login_ip = RateLimiter(settings.login_ip_limit, window)
-        self.login_user = RateLimiter(settings.login_user_limit, window)
-        self.register_ip = RateLimiter(settings.register_ip_limit, settings.register_window_seconds)
-        self.register_user = RateLimiter(
-            settings.register_user_limit, settings.register_window_seconds
+        self.store = AttemptStore(settings.redis_url)
+        new = lambda name, limit, secs: SharedLimiter(name, limit, secs, self.store)  # noqa: E731
+        self.login_ip = new("login_ip", settings.login_ip_limit, window)
+        self.login_user = new("login_user", settings.login_user_limit, window)
+        self.register_ip = new(
+            "register_ip", settings.register_ip_limit, settings.register_window_seconds
+        )
+        self.register_user = new(
+            "register_user", settings.register_user_limit, settings.register_window_seconds
         )
         # Wrong current passwords on /me/password, per user.
-        self.password_user = RateLimiter(settings.login_user_limit, window)
+        self.password_user = new("password_user", settings.login_user_limit, window)
         # Wrong second-step codes, per user and per address. A 6-digit code has only a million
         # values, so these stay tight.
-        self.mfa_user = RateLimiter(settings.login_user_limit, window)
-        self.mfa_ip = RateLimiter(settings.login_ip_limit, window)
+        self.mfa_user = new("mfa_user", settings.login_user_limit, window)
+        self.mfa_ip = new("mfa_ip", settings.login_ip_limit, window)
         # Wrong TV PINs. A PIN has only 10^4 to 10^6 values, so a TV session gets a few tries
         # and the account a few more across every TV; successes take their hit back.
-        self.pin_session = RateLimiter(5, 300)
-        self.pin_user = RateLimiter(20, 3600)
+        self.pin_session = new("pin_session", 5, 300)
+        self.pin_user = new("pin_user", 20, 3600)
+
+    def _all(self) -> tuple[SharedLimiter, ...]:
+        return (
+            self.login_ip,
+            self.login_user,
+            self.register_ip,
+            self.register_user,
+            self.password_user,
+            self.mfa_user,
+            self.mfa_ip,
+            self.pin_session,
+            self.pin_user,
+        )
 
     def sweep(self) -> None:
-        for limiter in (self.login_ip, self.login_user, self.register_ip, self.register_user):
+        for limiter in self._all():
             limiter.sweep()
-        self.password_user.sweep()
-        self.mfa_user.sweep()
-        self.mfa_ip.sweep()
-        self.pin_session.sweep()
-        self.pin_user.sweep()
 
 
 # Caps on actions that cost other people (notifications), outside services (MAL) or the server
