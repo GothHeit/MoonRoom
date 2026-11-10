@@ -10,7 +10,8 @@ import type { AvatarInfo } from "@/lib/avatar";
 
 import { UserMenu } from "./UserMenu";
 
-const item = "press flex min-h-14 short:min-h-11 flex-1 flex-col short:flex-row items-center justify-center gap-1 short:gap-2 text-xs font-medium active:opacity-70";
+// Under 360 px the five labels would touch ("Minha lista" next to "Buscar"), so they go one size down.
+const item = "press flex min-h-14 short:min-h-11 flex-1 flex-col short:flex-row items-center justify-center gap-1 short:gap-2 whitespace-nowrap text-xs max-[359px]:text-[0.6875rem] font-medium active:opacity-70";
 
 /** Phone navigation: Home, Browse, My list, Search, You. */
 export function TabBar({ userId, username, avatar, isAdmin, pending = 0 }: { userId: string; username: string; avatar: AvatarInfo; isAdmin: boolean; pending?: number }) {
@@ -38,7 +39,7 @@ export function TabBar({ userId, username, avatar, isAdmin, pending = 0 }: { use
           </Link>
         );
       })}
-      <div className="flex flex-1 justify-center">
+      <div className="flex flex-1">
         <UserMenu
           userId={userId}
           username={username}
