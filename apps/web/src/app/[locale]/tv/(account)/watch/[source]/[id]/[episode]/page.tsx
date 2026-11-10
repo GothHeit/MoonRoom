@@ -65,6 +65,8 @@ export default async function TvWatchPage({ params, searchParams }: Params) {
       episode={ep}
       title={anime.title}
       episodes={episodes}
+      thumbnails={episodesResult?.data?.thumbnails ?? {}}
+      poster={anime.main_picture?.large ?? anime.main_picture?.medium ?? null}
       lang={lang}
       startAt={startAt}
       subtitleLang={me.subtitle_lang}

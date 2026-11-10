@@ -1,5 +1,6 @@
 "use client";
 
+import type { components } from "@app/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -39,6 +40,10 @@ type Props = {
   title: string;
   /** Sorted episode numbers the source has, used for the next episode. May be empty. */
   episodes: number[];
+  /** Episode stills the source has, by episode number. */
+  thumbnails: Record<string, string>;
+  /** The title's poster, behind the end screen when there's no wide art. */
+  poster: string | null;
   lang: Lang;
   /** Seconds to start from: the saved position, or where a source switch left off. */
   startAt: number;
@@ -49,6 +54,7 @@ type Props = {
 };
 
 type Panel = "subtitles" | "audio" | "source";
+type TitleArt = components["schemas"]["TitleArtOut"];
 
 // Longer than the site's 3 s: the person is across the room and the remote is slower.
 const HIDE_CONTROLS_MS = 5000;
@@ -67,7 +73,7 @@ const PANEL_BUTTON: Record<Panel, string> = { subtitles: "tvp-subtitles", audio:
  * closes a panel or leaves, and the media keys work whenever the TV hands them over.
  */
 export function TvPlayer(props: Props) {
-  const { source, animeId, episode, title, episodes, lang, startAt, subtitleLang, showSkips } = props;
+  const { source, animeId, episode, title, episodes, thumbnails, poster, lang, startAt, subtitleLang, showSkips } = props;
   const t = useTranslations("player");
   const tv = useTranslations("tv.player");
   const locale = useLocale();
@@ -128,6 +134,24 @@ export function TvPlayer(props: Props) {
     if (nearEnd && next !== undefined) warmPlayback(source, animeId, next, lang);
   }, [nearEnd, source, animeId, next, lang]);
   const { save, onTime } = useProgressSaver(video, animeId, episode);
+
+  // Wide art and the next episode's still and title for the end screen, asked for near the end.
+  const [art, setArt] = useState<TitleArt | null>(null);
+  const artAsked = useRef(false);
+  useEffect(() => {
+    if (!(nearEnd || ended) || artAsked.current) return;
+    artAsked.current = true;
+    let cancelled = false;
+    api
+      .GET("/anime/{anime_id}/art", { params: { path: { anime_id: animeId }, query: { lang: locale === "pt" ? "pt" : "en" } } })
+      .then(({ data }) => {
+        if (!cancelled && data) setArt(data);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [nearEnd, ended, animeId, locale]);
 
   useEffect(() => registerMediaKeys(), []);
 
@@ -451,7 +475,14 @@ export function TvPlayer(props: Props) {
 
       {ended && !error && (
         <TvEndCard
+          title={title}
           next={next}
+          nextTitle={next !== undefined ? (art?.episodes?.[next]?.title ?? null) : null}
+          still={next !== undefined ? (thumbnails[next] ? `/api/proxy${thumbnails[next]}` : (art?.episodes?.[next]?.image ?? null)) : null}
+          stillFromSource={next !== undefined && !!thumbnails[next]}
+          backdrop={art?.backdrop ?? null}
+          poster={poster}
+          total={NEXT_COUNTDOWN}
           countdown={countdown}
           autoNext={autoNext}
           onPlayNext={goNext}
