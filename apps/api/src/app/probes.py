@@ -129,7 +129,11 @@ class StreamProbes:
     async def _file_alive(self, stream: Stream, key: Key) -> bool:
         if key in self._files:
             return True
-        response = await self._http.head(stream.url, headers=stream.upstream_headers)
+        # Through open_upstream, like the proxy: a redirect to our own network counts as dead.
+        response, _ = await open_upstream(
+            self._http, stream.url, dict(stream.upstream_headers), method="HEAD"
+        )
+        await response.aclose()
         # Some hosts refuse HEAD; only a missing file counts as dead.
         if response.status_code in GONE:
             self._dead[key] = None

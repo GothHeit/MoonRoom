@@ -108,5 +108,15 @@ async def test_stream_reads_the_mp4_at_play_time():
     assert await source.episodes(ANIME, "dub") is None
 
 
+@respx.mock
+async def test_titles_ending_in_a_dot_are_searched_without_it():
+    anime = {"id": 1, "title": "Natsuyasumi.", "alternative_titles": {}}
+    respx.get(f"{BASE}/search/Natsuyasumi").respond(text=article("natsuyasumi", "Natsuyasumi"))
+    respx.get(f"{BASE}/anime/natsuyasumi/").respond(text=group(1, "natsuyasumi", 2))
+    respx.get(url__startswith=f"{BASE}/search/").respond(404)  # any other query finds nothing
+    listed = await AnimesOnlineCCSource().episodes(anime, "sub")
+    assert listed and listed.episodes == [1, 2]
+
+
 def test_registry():
     assert isinstance(load_sources(["animesonlinecc"])["animesonlinecc"], AnimesOnlineCCSource)

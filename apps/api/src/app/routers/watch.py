@@ -20,12 +20,12 @@ from app.models import PlayerPreferences, SourceChoice
 from app.probes import Gone, HostError, Master, StreamProbes
 from app.ranking import ORIGINAL, ORIGINAL_AUDIO, Prefs, base_lang
 from app.schemas import EpisodesOut, StreamOption
-from app.security import create_playback_token, decode_playback_token
+from app.security import PlaybackKind, create_playback_token, decode_playback_token
 from app.singleflight import SingleFlight
 from app.source_hints import lacks_subbed
 from app.sources.base import EpisodeList, Lang, SkipKind, Stream, VideoSource
 from app.subtitles import ass_to_vtt
-from app.upstream import open_upstream, read_playlist
+from app.upstream import open_upstream, passthrough_headers, read_capped, read_playlist
 
 logger = logging.getLogger(__name__)
 
@@ -478,8 +478,19 @@ async def link(
     link is opened. Used to hand the stream to a device that fetches it itself, such as an
     AirPlay receiver, long after the first link has expired."""
     _source(request, source)
-    token = create_playback_token(user.id, sid, source, anime_id, episode, lang)
-    return LinkOut(url=f"/watch/{'video' if kind == 'mp4' else 'hls'}?token={token}")
+    return LinkOut(url=_start_link(user.id, sid, source, anime_id, episode, lang, kind))
+
+
+def _start_link(
+    user: uuid.UUID, sid: uuid.UUID, source: str, anime_id: int, episode: int, lang: str, kind: str
+) -> str:
+    """The link that plays an episode. An HLS one opens the master playlist, which signs every
+    later link, so it lives minutes. An MP4 one is the stream itself, asked again on every seek
+    and after every pause, so it lives hours, like the links an HLS playlist hands out."""
+    if kind == "mp4":
+        token = create_playback_token(user, sid, source, anime_id, episode, lang, kind="mp4")
+        return f"/watch/video?token={token}"
+    return f"/watch/hls?token={create_playback_token(user, sid, source, anime_id, episode, lang)}"
 
 
 @router.post("/{source}/{anime_id}/episodes/{episode}/play", response_model=PlaybackOut)
@@ -515,8 +526,6 @@ async def play(
         if resolved is None:
             raise ApiError(404, "not_available", "This episode isn't available from this source")
         used, stream = resolved
-    token = create_playback_token(user.id, sid, used, anime_id, episode, lang)
-    path = "video" if stream.kind == "mp4" else "hls"
     referer = stream.upstream_headers.get("Referer", "")
     viewer = hls.Viewer(str(user.id), str(sid))
     resolution = stream.resolution
@@ -532,7 +541,7 @@ async def play(
         lang=lang,
         kind=stream.kind,
         resolution=resolution,
-        url=f"/watch/{path}?token={token}",
+        url=_start_link(user.id, sid, used, anime_id, episode, lang, stream.kind),
         subtitles=[
             SubtitleOut(
                 lang=s.lang,
@@ -556,11 +565,16 @@ async def play(
     )
 
 
-async def _playback_claims(request: Request, session: AsyncSession, token: str | None) -> dict:
+async def _playback_claims(
+    request: Request,
+    session: AsyncSession,
+    token: str | None,
+    kinds: tuple[PlaybackKind, ...] = ("playback",),
+) -> dict:
     """The claims of a playback token. The token stands on its own, since the devices that play
     it can't send a login, but it only works while the login session it was made in is open, so
     signing out stops it."""
-    claims = decode_playback_token(token) if token else None
+    claims = decode_playback_token(token, kinds) if token else None
     if claims is None or not await session_open(request, session, claims["sub"], claims["sid"]):
         raise ApiError(403, "invalid_link", "Invalid or expired playback token")
     return claims
@@ -576,7 +590,8 @@ async def session_open(request: Request, session: AsyncSession, user: str, sid: 
 
 @router.get("/video")
 async def video(request: Request, session: Session, token: Annotated[str, Query()]):
-    claims = await _playback_claims(request, session, token)
+    # A short "playback" token still opens it: links handed out before MP4 ones lived hours.
+    claims = await _playback_claims(request, session, token, ("mp4", "playback"))
     await session.commit()  # the stream below can run for hours: don't hold a connection
 
     src = _source(request, claims["src"])
@@ -590,14 +605,7 @@ async def video(request: Request, session: Session, token: Annotated[str, Query(
         headers["Range"] = request.headers["range"]  # lets the player seek
 
     http: httpx.AsyncClient = request.app.state.http
-    upstream = await _upstream(
-        http.send(
-            http.build_request(
-                "GET", stream.url, headers=headers, timeout=httpx.Timeout(30.0, read=None)
-            ),
-            stream=True,
-        )
-    )
+    upstream, _ = await _upstream(open_upstream(http, stream.url, headers))
     if upstream.status_code == 416:
         # A seek past the end: players expect the real 416 and the size in Content-Range.
         await upstream.aclose()
@@ -609,10 +617,7 @@ async def video(request: Request, session: Session, token: Annotated[str, Query(
         await upstream.aclose()
         raise ApiError(502, "upstream_failed", f"Video host answered {upstream.status_code}")
 
-    passthrough = {
-        h: upstream.headers[h] for h in ("content-length", "content-range") if h in upstream.headers
-    }
-    passthrough["accept-ranges"] = "bytes"
+    passthrough = passthrough_headers(upstream)
 
     async def body():
         try:
@@ -769,10 +774,7 @@ async def hls_proxy(
         )
 
     media_type = hls.media_type(url, k, content_type)
-    passthrough = {
-        h: upstream.headers[h] for h in ("content-length", "content-range") if h in upstream.headers
-    }
-    passthrough["accept-ranges"] = "bytes"
+    passthrough = passthrough_headers(upstream)
     # Upstream bytes are untrusted: never let a browser guess them into HTML or script.
     passthrough["x-content-type-options"] = "nosniff"
 
@@ -819,23 +821,44 @@ async def _video_start(request: Request, master: Master, referer: str) -> int | 
         playlists = [master.url]
 
     async def first_pts(url: str) -> int | None:
+        # Through open_upstream, like the proxy: every hop must be a public address.
         try:
-            if not hls.looks_public(url):
-                return None
-            text = master.text if url == master.url else (await http.get(url, headers=headers)).text
+            if url == master.url:
+                text = master.text
+            else:
+                playlist, _ = await open_upstream(http, url, headers)
+                if playlist.status_code >= 300:
+                    await playlist.aclose()
+                    return None
+                text = await read_capped(playlist)
             entry = next(x.strip() for x in text.splitlines() if x.strip() and x[0] != "#")
-            seg = urljoin(url, entry)
-            if not hls.looks_public(seg):
-                return None
-            got = await http.get(seg, headers={**headers, "Range": "bytes=0-65535"})
-            return hls.ts_start(got.content[:65536]) if got.status_code < 300 else None
-        except (httpx.HTTPError, StopIteration, TimeoutError):
+            seg, _ = await open_upstream(
+                http, urljoin(url, entry), {**headers, "Range": "bytes=0-65535"}
+            )
+            return await _ts_start(seg)
+        except (ApiError, httpx.HTTPError, StopIteration, TimeoutError):
             return None
 
     found = [x for x in await asyncio.gather(*(first_pts(u) for u in playlists)) if x is not None]
     start = min(found) if found else None
     _STARTS[master.url] = start
     return start
+
+
+async def _ts_start(segment: httpx.Response) -> int | None:
+    """The first timestamp of a segment, from at most its first 64 KB (a host may ignore the
+    Range header and send it all). The response is always closed."""
+    head = b""
+    try:
+        if segment.status_code >= 300:
+            return None
+        async for chunk in segment.aiter_bytes():
+            head += chunk
+            if len(head) >= 65536:
+                break
+    finally:
+        await segment.aclose()
+    return hls.ts_start(head[:65536])
 
 
 async def _master(probes: StreamProbes, url: str, referer: str) -> Master:

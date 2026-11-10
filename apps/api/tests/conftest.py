@@ -13,13 +13,25 @@ from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
-from app import db  # noqa: E402
+from app import db, hls  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
 from app.models import User  # noqa: E402
 from app.routers.invites import new_invite  # noqa: E402
 from app.security import create_access_token  # noqa: E402
 
 API_DIR = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def public_hosts(monkeypatch):
+    """Tests never reach real DNS: every host a test names resolves to a public address.
+    A test about private addresses patches `hls.resolve_host` itself."""
+
+    async def resolve(host):
+        return ["93.184.216.34"]
+
+    monkeypatch.setattr(hls, "resolve_host", resolve)
+    hls._public_hosts.clear()
 
 
 @pytest.fixture(scope="session", autouse=True)

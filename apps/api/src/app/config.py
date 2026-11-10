@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # How long the link that starts a playback lives. It works without a login (a TV or AirPlay
     # receiver can't send one), so it is short; every later link is re-signed as the player goes.
     playback_token_minutes: int = 10
+    # How long the link of an MP4 episode lives. It is the stream itself, asked again on every
+    # seek and after every pause, so it lives as long as an HLS segment link (four hours).
+    mp4_link_minutes: int = 240
     # A refresh token that was just rotated is still accepted for this long, so a device whose
     # answer got lost can retry without it reading as a stolen token.
     refresh_grace_seconds: int = 60

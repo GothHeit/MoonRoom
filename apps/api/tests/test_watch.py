@@ -1,11 +1,19 @@
+import gzip
+import time
+import uuid
+from urllib.parse import parse_qs, urlsplit
+
 import httpx
 import pytest
 import respx
 
 from app import hls
+from app.config import get_settings
 from app.main import app as fastapi_app
 from app.mal.client import API_BASE
+from app.probes import StreamProbes
 from app.routers import watch
+from app.security import create_playback_token, decode_playback_token
 from app.source_hints import SOURCE_FAILURE_TTL, SOURCE_HINT_TTL
 from app.sources.base import EpisodeList, Skip, Stream
 from tests.conftest import make_user
@@ -124,6 +132,82 @@ async def test_video_proxy_passes_range_not_satisfiable_through(client, session)
 
     respx.get(VIDEO_URL).mock(return_value=httpx.Response(403))
     assert (await client.get(url, headers=headers)).status_code == 502
+
+
+@respx.mock
+async def test_an_mp4_link_outlives_the_short_playback_token(client, session, monkeypatch):
+    # The browser asks the MP4 link again on every seek and after a pause, long after a
+    # ten-minute token would be gone: the link lives as long as an HLS segment link.
+    fastapi_app.state.sources = {"fake": FakeSource()}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    respx.get(VIDEO_URL).mock(return_value=httpx.Response(206, content=b"x"))
+    monkeypatch.setattr(get_settings(), "playback_token_minutes", -1)  # every short token expired
+
+    play = (await client.post("/watch/fake/21/episodes/1/play", headers=headers)).json()
+    link = (await client.post("/watch/fake/21/episodes/1/link?kind=mp4", headers=headers)).json()[
+        "url"
+    ]
+    for url in (play["url"], link):
+        claims = decode_playback_token(parse_qs(urlsplit(url).query)["token"][0], ("mp4",))
+        assert claims is not None and claims["exp"] - time.time() > 3.9 * 3600
+        assert (await client.get(url, headers={"Range": "bytes=700000000-"})).status_code == 206
+
+    # A short token still opens the video while it lives, and only while it lives.
+    short = create_playback_token(uuid.uuid4(), uuid.uuid4(), "fake", 21, 1, "sub")
+    assert (await client.get("/watch/video", params={"token": short})).status_code == 403
+    # An MP4 link can't start an HLS stream.
+    token = parse_qs(urlsplit(play["url"]).query)["token"][0]
+    assert (await client.get("/watch/hls", params={"token": token})).status_code == 403
+
+
+@respx.mock
+async def test_compressed_answers_are_passed_on_without_the_compressed_length(client, session):
+    fastapi_app.state.sources = {"fake": FakeSource()}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    body = b"0123456789" * 300
+    packed = gzip.compress(body)
+    upstream = respx.get(VIDEO_URL).mock(
+        return_value=httpx.Response(
+            200,
+            content=packed,
+            headers={"content-encoding": "gzip", "content-length": str(len(packed))},
+        )
+    )
+    url = (await client.post("/watch/fake/21/episodes/1/play", headers=headers)).json()["url"]
+    video = await client.get(url)
+    assert video.status_code == 200 and video.content == body
+    assert video.headers.get("content-length") != str(len(packed))
+    assert upstream.calls.last.request.headers["accept-encoding"] == "identity"
+
+
+@respx.mock
+async def test_the_video_proxy_never_follows_a_redirect_into_our_network(
+    client, session, monkeypatch
+):
+    async def resolve(host):
+        return ["192.168.2.1"] if host == "router.example" else ["93.184.216.34"]
+
+    monkeypatch.setattr(hls, "resolve_host", resolve)
+    fastapi_app.state.sources = {"fake": FakeSource()}
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    respx.get(VIDEO_URL).mock(
+        return_value=httpx.Response(302, headers={"location": "https://router.example/admin"})
+    )
+    inside = respx.get("https://router.example/admin").mock(return_value=httpx.Response(200))
+    url = (await client.post("/watch/fake/21/episodes/1/play", headers=headers)).json()["url"]
+    assert (await client.get(url)).status_code == 502
+    assert not inside.called
+
+    # The liveness check treats such a file as gone, without asking the address either.
+    respx.head(VIDEO_URL).mock(
+        return_value=httpx.Response(302, headers={"location": "https://router.example/admin"})
+    )
+    probes = StreamProbes(fastapi_app.state.http)
+    assert await probes.check(await FakeSource().stream({}, 1, "sub")) is False
+    assert not inside.called
 
 
 @respx.mock

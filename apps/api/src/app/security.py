@@ -3,6 +3,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import timedelta
+from typing import Literal
 
 import jwt
 from argon2 import PasswordHasher
@@ -85,29 +86,50 @@ def decode_mfa_token(token: str) -> uuid.UUID | None:
     return uuid.UUID(claims["sub"]) if claims else None
 
 
+# What a playback token opens: "playback" starts an HLS stream and lives minutes, since the
+# playlist it opens signs its own links. "mp4" is the whole stream of an MP4 episode: the player
+# asks it again for every seek and after every pause, so it lives as long as an HLS segment link.
+PlaybackKind = Literal["playback", "mp4"]
+
+
 def create_playback_token(
-    user_id: uuid.UUID, session_id: uuid.UUID, source: str, anime_id: int, episode: int, lang: str
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+    source: str,
+    anime_id: int,
+    episode: int,
+    lang: str,
+    kind: PlaybackKind = "playback",
 ) -> str:
     """Names the episode a /play answer picked and starts its playback. A TV or an AirPlay
     receiver can't send a login, so the token stands on its own: it is signed with the stream
-    link key, lives minutes, and only works while the session it names is open."""
+    link key, and only works while the session it names is open."""
     now = utcnow()
+    settings = get_settings()
+    lifetime = (
+        timedelta(minutes=settings.mp4_link_minutes)
+        if kind == "mp4"
+        else timedelta(minutes=settings.playback_token_minutes)
+    )
     claims = {
         "sub": str(user_id),
         "sid": str(session_id),
-        "typ": "playback",
+        "typ": kind,
         "src": source,
         "aid": anime_id,
         "ep": episode,
         "lang": lang,
         "iat": now,
-        "exp": now + timedelta(minutes=get_settings().playback_token_minutes),
+        "exp": now + lifetime,
     }
-    return jwt.encode(claims, get_settings().stream_link_keys[0], algorithm=ALGORITHM)
+    return jwt.encode(claims, settings.stream_link_keys[0], algorithm=ALGORITHM)
 
 
-def decode_playback_token(token: str) -> dict | None:
-    """The claims of a playback token, or None. Always carries `sub` and `sid`."""
+def decode_playback_token(
+    token: str, kinds: tuple[PlaybackKind, ...] = ("playback",)
+) -> dict | None:
+    """The claims of a playback token of one of `kinds`, or None. Always carries `sub` and
+    `sid`."""
     for key in get_settings().stream_link_keys:
         try:
             claims = jwt.decode(
@@ -117,7 +139,7 @@ def decode_playback_token(token: str) -> dict | None:
             continue  # maybe signed before the last rotation
         except jwt.PyJWTError:
             return None
-        if claims.get("typ") != "playback" or not claims.get("sid") or not claims.get("sub"):
+        if claims.get("typ") not in kinds or not claims.get("sid") or not claims.get("sub"):
             return None
         return claims
     return None

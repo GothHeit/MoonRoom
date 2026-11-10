@@ -154,9 +154,19 @@ class AnimesOnlineCCSource:
         response.raise_for_status()
         return response.text
 
+    async def _search(self, query: str) -> str:
+        # A path ending in a dot is a 404 on this theme ("Natsuyasumi."), and so is a search
+        # that finds nothing on some of its sites.
+        try:
+            return await self._get(f"{BASE}/search/{quote(query.rstrip('. '))}")
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code == 404:
+                return ""
+            raise
+
     async def _find(self, anime: dict, lang: Lang) -> Candidate | None:
         queries = search_queries(anime)
-        pages = await asyncio.gather(*(self._get(f"{BASE}/search/{quote(q)}") for q in queries))
+        pages = await asyncio.gather(*(self._search(q) for q in queries))
         dub = lang == "dub"
         candidates = [
             Candidate(c.identifier, DUB_SUFFIX.sub("", c.name))
