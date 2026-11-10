@@ -9,7 +9,7 @@ import { Field } from "@/components/ui/Field";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api";
 
-export const MIN_PASSWORD = 8;
+const MIN_PASSWORD = 8;
 
 export function PasswordForm() {
   const t = useTranslations("account.password");

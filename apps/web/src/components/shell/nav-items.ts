@@ -25,7 +25,7 @@ export const navItemsFor = (mode: Mode) => (mode === "manga" ? MANGA_ITEMS : ANI
 
 export const searchHrefFor = (mode: Mode) => (mode === "manga" ? "/manga/search" : "/search");
 
-export const modeHome = (mode: Mode) => (mode === "manga" ? "/manga" : "/");
+const modeHome = (mode: Mode) => (mode === "manga" ? "/manga" : "/");
 
 // Pages that exist in both catalogs, by their anime address.
 const COUNTERPARTS: Record<string, string> = { "/": "/manga", "/browse": "/manga/browse", "/list": "/manga/list", "/search": "/manga/search" };

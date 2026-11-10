@@ -12,7 +12,6 @@ export type ListEntry = components["schemas"]["ListItemOut"];
 
 /** The two lists a MyAnimeList account keeps. Each has its own page, statuses and progress unit. */
 export type ListKind = "anime" | "manga";
-export const listHref = (kind: ListKind) => (kind === "manga" ? "/manga/list" : "/list");
 
 export const animeHref = (id: number) => `/anime/${id}`;
 

@@ -97,7 +97,7 @@ function readCookie(request: Request, name: string): string | undefined {
   return match ? decodeURIComponent(match[1]) : undefined;
 }
 
-export function parkedFrom(request: Request): ParkedAccount[] {
+function parkedFrom(request: Request): ParkedAccount[] {
   return parseParked(readCookie(request, "mr_accounts"));
 }
 

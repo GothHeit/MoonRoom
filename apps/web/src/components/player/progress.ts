@@ -7,7 +7,7 @@ type ProgressIn = components["schemas"]["ProgressIn"];
 
 export const SAVE_INTERVAL_MS = 10_000;
 // Matches the API: past this share of the episode it counts as watched.
-export const COMPLETED_RATIO = 0.9;
+const COMPLETED_RATIO = 0.9;
 // Resuming this close to either end isn't worth it.
 const RESUME_MIN_SECONDS = 5;
 const RESUME_END_MARGIN_SECONDS = 15;

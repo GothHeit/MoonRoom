@@ -8,7 +8,7 @@ import { isBack } from "./keys";
 import { setFocus } from "./spatial";
 import { useTvFocus } from "./useTvFocus";
 
-export const SYNOPSIS_KEY = "tv-title-synopsis";
+const SYNOPSIS_KEY = "tv-title-synopsis";
 
 /** The pill-shaped "Read more" under a cut synopsis. Small on purpose: Play stays the main action. */
 function More({ label, expanded, onOpen }: { label: string; expanded: boolean; onOpen: () => void }) {

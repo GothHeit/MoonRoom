@@ -222,11 +222,6 @@ def local_file(url: str) -> tuple[Path, os.stat_result] | None:
     return (path, info) if stat.S_ISREG(info.st_mode) else None
 
 
-def local_path(url: str) -> Path | None:
-    found = local_file(url)
-    return found[0] if found else None
-
-
 def in_library(url: str) -> bool:
     """Whether a file: URL names a path inside a library folder, judged from the text alone.
     Used for the links inside library playlists, which can list hundreds of segments: they are

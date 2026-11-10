@@ -1,5 +1,5 @@
 // The largest request body the proxy accepts: the avatar upload (2 MB) plus multipart overhead.
-export const MAX_BODY_BYTES = 3 * 1024 * 1024;
+const MAX_BODY_BYTES = 3 * 1024 * 1024;
 
 /** Reads a request body, giving up (null) as soon as it passes the limit instead of buffering it all. */
 export async function readLimitedBody(request: Request, limit = MAX_BODY_BYTES): Promise<ArrayBuffer | null> {

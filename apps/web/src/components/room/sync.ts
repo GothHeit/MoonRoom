@@ -10,16 +10,16 @@ export type Playback = {
 };
 
 /** A local seek further than this from the room is the viewer's own; closer is the player settling. */
-export const SEEK_INTENT_SECONDS = 1;
+const SEEK_INTENT_SECONDS = 1;
 /** How long after applying the room's state the player's own events are not the viewer's doing. */
 export const APPLY_WINDOW_MS = 800;
 /** Further apart than this and the player jumps to the room; closer, it catches up by speed. */
 export const HARD_SEEK_SECONDS = 0.5;
 /** AirPlay can't change speed and its seeks land late, so it only jumps, and only further out. */
-export const WIRELESS_SEEK_SECONDS = 1;
+const WIRELESS_SEEK_SECONDS = 1;
 /** A nudge starts past this drift and stops under the second number, so it doesn't flicker. */
-export const NUDGE_START_SECONDS = 0.025;
-export const NUDGE_STOP_SECONDS = 0.005;
+const NUDGE_START_SECONDS = 0.025;
+const NUDGE_STOP_SECONDS = 0.005;
 /** At most this much faster or slower: about 3 s per minute, unnoticeable with pitch kept. */
 export const MAX_NUDGE = 0.06;
 /** Speed change per second of drift, so half a second is made up in about 10 s... */
@@ -27,7 +27,7 @@ const NUDGE_GAIN = 0.5;
 /** ...but never less than this, so the last few frames close in seconds, not a minute. */
 const MIN_NUDGE = 0.01;
 /** After a jump the player gets this long to settle before it may jump again. */
-export const SEEK_COOLDOWN_MS = 1500;
+const SEEK_COOLDOWN_MS = 1500;
 /** Paused players match the room to within about a frame. */
 const PAUSED_TOLERANCE = 0.05;
 

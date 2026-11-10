@@ -9,7 +9,7 @@ import { setFocus } from "../spatial";
 export type MenuOption = { key: string; label: string; selected: boolean; onPick: () => void };
 export type MenuSection = { title: string; options: MenuOption[] };
 
-export const MENU_KEY = "tvp-menu";
+const MENU_KEY = "tvp-menu";
 const optionKey = (key: string) => `tvp-menu-${key}`;
 
 function Option({ option }: { option: MenuOption }) {

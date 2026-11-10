@@ -1,12 +1,12 @@
 "use client";
 
-import { getCurrentFocusKey, init, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { init, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 
 // Remote navigation for the TV mode: arrows move to the nearest item in that direction, Enter
 // activates it. Started once, on the first import in the browser.
 let started = false;
 
-export function startSpatialNavigation() {
+function startSpatialNavigation() {
   if (started || typeof window === "undefined") return;
   started = true;
   init({
@@ -32,12 +32,6 @@ export function rememberFocus(screen: string, focusKey: string) {
 export function recallFocus(screen: string): string | undefined {
   const key = remembered.get(screen);
   return key && doesFocusableExist(key) ? key : undefined;
-}
-
-/** True when the focused item is still on screen (it unmounts when a page changes). */
-export function hasLiveFocus(): boolean {
-  const key = getCurrentFocusKey();
-  return !!key && doesFocusableExist(key);
 }
 
 export { setFocus };

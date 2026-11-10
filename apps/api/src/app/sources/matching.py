@@ -85,10 +85,6 @@ def fuzzy_key(s: str, join_hyphens: bool = False) -> str:
     return DECORATIVE_SUFFIX.sub("", " ".join(SPELLINGS.get(w, w) for w in words))
 
 
-def fuzzy_keys(s: str) -> set[str]:
-    return {fuzzy_key(s), fuzzy_key(s, join_hyphens=True)}
-
-
 def fill_censored(target: str, name: str) -> str:
     """The target with each censored token replaced by the word of `name` it can stand for."""
     if not CENSORED.search(target):

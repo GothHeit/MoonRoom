@@ -13,7 +13,7 @@ export const MAX_ZOOM = 4;
 export const centered: Crop = { zoom: 1, cx: 0.5, cy: 0.5 };
 
 /** Pixels per image pixel at zoom 1: the smaller side exactly fills the frame. */
-export function coverScale(width: number, height: number, frame: number): number {
+function coverScale(width: number, height: number, frame: number): number {
   return frame / Math.min(width, height);
 }
 

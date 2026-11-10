@@ -13,7 +13,7 @@ import { TvPlayerMenu, type MenuOption } from "./player/TvPlayerMenu";
 import { setFocus } from "./spatial";
 import { useTvFocus } from "./useTvFocus";
 
-export const LIST_KEY = "tv-title-list";
+const LIST_KEY = "tv-title-list";
 
 /**
  * The title's place on the person's MyAnimeList list, as a pill beside Play. OK opens the same

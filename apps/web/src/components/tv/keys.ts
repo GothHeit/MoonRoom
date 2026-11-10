@@ -32,7 +32,7 @@ export type MediaKey = "playPause" | "play" | "pause" | "stop" | "forward" | "re
  */
 export const TIZEN_MEDIA_KEYS = ["MediaPlayPause", "MediaPlay", "MediaPause", "MediaStop", "MediaFastForward", "MediaRewind"];
 
-export function isTyping(target: EventTarget | null) {
+function isTyping(target: EventTarget | null) {
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 }
 

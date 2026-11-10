@@ -27,7 +27,6 @@ import { isBack, mediaKey, registerMediaKeys } from "../keys";
 import { tvHref } from "../paths";
 import { setFocus } from "../spatial";
 import { useTvSeek } from "./seek";
-import { useTvHealth } from "./useTvHealth";
 import { TvEndCard, TvPlayerError } from "./TvPlayerCards";
 import { PLAY_KEY, SEEK_KEY, TvControl, TvSeekBar } from "./TvPlayerControls";
 import { TvPlayerMenu, type MenuSection } from "./TvPlayerMenu";
@@ -109,7 +108,6 @@ export function TvPlayer(props: Props) {
   const subtitles = useSubtitles(tracks, subtitleLang, props.subtitleStyle);
   const { selected, styled, style } = subtitles;
   const drawStyled = styled && !plain ? styled : null;
-  const health = useTvHealth(video, { source: answered || source, animeId, episode, styled: drawStyled !== null });
   const hls = useHls({
     video,
     url,
@@ -118,7 +116,6 @@ export function TvPlayer(props: Props) {
     maxHeight,
     onRetry: retry,
     onFail: failPlayback,
-    onError: health.onError,
     lowMemory: true,
   });
   const seek = useTvSeek(video);
@@ -143,12 +140,14 @@ export function TvPlayer(props: Props) {
   const artAsked = useRef(false);
   useEffect(() => {
     if (!(nearEnd || ended) || artAsked.current) return;
-    artAsked.current = true;
     let cancelled = false;
     api
       .GET("/anime/{anime_id}/art", { params: { path: { anime_id: animeId }, query: { lang: locale === "pt" ? "pt" : "en" } } })
       .then(({ data }) => {
-        if (!cancelled && data) setArt(data);
+        // Only a delivered answer counts as asked: if the episode ends while the request is in flight, the effect runs again and asks once more.
+        if (cancelled || !data) return;
+        artAsked.current = true;
+        setArt(data);
       })
       .catch(() => undefined);
     return () => {

@@ -7,7 +7,7 @@ import type { StreamChoice } from "@/lib/watch-target";
 
 import { streamLabel, type StreamNames } from "./streams";
 
-export const ERRORS = [
+const ERRORS = [
   "not_available",
   "source_not_found",
   "upstream_failed",

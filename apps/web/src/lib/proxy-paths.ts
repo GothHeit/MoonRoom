@@ -7,8 +7,6 @@ const unsafeSegment = (segment: string) => segment.startsWith("..") || segment =
 
 export function isProxyPathAllowed(path: string[]): boolean {
   const [first, second] = path;
-  // The TV player's health reports (see useTvHealth).
-  if (first === "tv") return path.length === 2 && second === "health";
   if (first === "mal") return path.length === 2 && second === "link";
   // A signed-in phone approving a TV's code. Starting and polling a code go through
   // /api/auth/device, which keeps the TV's secret in a cookie.

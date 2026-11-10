@@ -353,10 +353,10 @@ async def test_library_links_never_leave_the_library(client, session, tmp_path, 
     (tmp_path / "secret.txt").write_text("secret")
     monkeypatch.setattr(get_settings(), "local_library_dirs", str(root))
 
-    assert hls.local_path((root / "1" / "seg.m4s").as_uri()) is not None
-    assert hls.local_path((tmp_path / "secret.txt").as_uri()) is None
-    assert hls.local_path(f"{(root / '1').as_uri()}/../../secret.txt") is None
-    assert hls.local_path("https://cdn.example/x") is None
+    assert hls.local_file((root / "1" / "seg.m4s").as_uri()) is not None
+    assert hls.local_file((tmp_path / "secret.txt").as_uri()) is None
+    assert hls.local_file(f"{(root / '1').as_uri()}/../../secret.txt") is None
+    assert hls.local_file("https://cdn.example/x") is None
 
     links = hls.rewrite_playlist(
         (root / "1" / "a.m3u8").read_text(), (root / "1" / "a.m3u8").as_uri(), "", "v"
@@ -442,9 +442,10 @@ def test_library_links_may_point_into_any_library_folder(tmp_path: Path, monkeyp
     link = (disk / "7" / "sub" / "1" / "seg.m4s").as_uri()
     monkeypatch.setattr(get_settings(), "local_library_dir", "")
     monkeypatch.setattr(get_settings(), "local_library_dirs", str(disk))
-    assert hls.local_path(link) is None
+    assert hls.local_file(link) is None
     monkeypatch.setattr(get_settings(), "local_library_dirs", f"{disk}, {nas}")
-    assert hls.local_path(link) == (nas / "7" / "sub" / "1" / "seg.m4s").resolve()
+    found = hls.local_file(link)
+    assert found is not None and found[0] == (nas / "7" / "sub" / "1" / "seg.m4s").resolve()
     assert hls.local_file((nas / "7" / "sub" / "1").as_uri()) is None  # a folder
 
     # Playlist links are judged by their path alone, without touching each file.

@@ -10,7 +10,7 @@ function behavior(): ScrollBehavior {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 }
 
-export function revealHorizontally(node: HTMLElement) {
+function revealHorizontally(node: HTMLElement) {
   const scroller = node.closest<HTMLElement>("[data-tv-scroller]");
   if (!scroller) return;
   const box = node.getBoundingClientRect();
@@ -22,7 +22,7 @@ export function revealHorizontally(node: HTMLElement) {
   if (delta !== 0) scroller.scrollBy({ left: delta, behavior: behavior() });
 }
 
-export function revealVertically(node: HTMLElement) {
+function revealVertically(node: HTMLElement) {
   // The block to keep whole on screen: a row with its title, the episodes with their heading.
   const section = node.closest<HTMLElement>("[data-tv-section]");
   // The first block (the hero, a title's header) keeps the page at the very top.

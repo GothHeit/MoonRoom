@@ -4,7 +4,7 @@ import { animate, LazyMotion, m, useDragControls, useMotionValue, type PanInfo }
 import { useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 /** Where a flick would come to rest, the way scrolling decelerates (Apple's projection). */
-export function project(velocity: number, rate = 0.998) {
+function project(velocity: number, rate = 0.998) {
   return ((velocity / 1000) * rate) / (1 - rate);
 }
 

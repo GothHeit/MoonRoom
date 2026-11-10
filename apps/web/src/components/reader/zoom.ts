@@ -4,9 +4,9 @@ export type Size = { w: number; h: number };
 export type Point = { x: number; y: number };
 
 export const NO_ZOOM: Zoom = { scale: 1, x: 0, y: 0 };
-export const MAX_SCALE = 4;
+const MAX_SCALE = 4;
 // What a double tap zooms to: enough to read small lettering.
-export const DOUBLE_TAP_SCALE = 2.5;
+const DOUBLE_TAP_SCALE = 2.5;
 // A scale this close to 1 is treated as no zoom, so the page snaps back whole.
 const SNAP_BELOW = 1.04;
 

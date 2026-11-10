@@ -11,7 +11,7 @@ import type { ChatLine, RoomState } from "./useRoom";
 import { InviteFriends } from "./InviteFriends";
 import { votesNeeded } from "./sync";
 
-export const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 export type PanelTab = "chat" | "people" | "episode";
 const TABS: PanelTab[] = ["chat", "people", "episode"];

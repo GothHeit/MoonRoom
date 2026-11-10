@@ -13,7 +13,7 @@ const variants: Record<Variant, string> = {
   ghost: "text-muted hover:bg-surface hover:text-fg",
 };
 
-export function buttonClass(variant: Variant = "primary", className = "") {
+function buttonClass(variant: Variant = "primary", className = "") {
   return `${base} ${variants[variant]} ${className}`.trim();
 }
 

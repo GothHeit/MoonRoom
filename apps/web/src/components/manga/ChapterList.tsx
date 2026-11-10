@@ -22,7 +22,7 @@ type Props = {
 };
 
 /** "Ch. 12", "Vol. 2 · Ch. 12" or "One-shot". */
-export function chapterLabel(t: (key: string, values?: Record<string, string>) => string, chapter: Chapter) {
+function chapterLabel(t: (key: string, values?: Record<string, string>) => string, chapter: Chapter) {
   if (!chapter.number) return t("oneShot");
   return t("chapter", { n: chapter.number });
 }

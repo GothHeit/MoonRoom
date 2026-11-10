@@ -92,7 +92,7 @@ export function readAction(listing: ChaptersOut, mangaId: number) {
 }
 
 /** The language names shown in the chapter language menu; others show their code. */
-export const LANGUAGE_NAMES: Record<string, string> = {
+const LANGUAGE_NAMES: Record<string, string> = {
   "pt-br": "Português (BR)",
   pt: "Português",
   en: "English",
