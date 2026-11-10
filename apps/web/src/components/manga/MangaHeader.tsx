@@ -1,4 +1,4 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 
 import { HeroSplit } from "@/components/ui/HeroSplit";
@@ -17,6 +17,7 @@ type Props = {
 /** The title page header: cover, serif title, facts, synopsis. The same layout as the anime one. */
 export async function MangaHeader({ manga, badge, action }: Props) {
   const t = await getTranslations("manga.page");
+  const locale = await getLocale();
   const tGenres = await getTranslations("genres");
   const label = (group: string, key: string | null | undefined) => (key && t.has(`${group}.${key}`) ? t(`${group}.${key}`) : key);
 
@@ -49,6 +50,7 @@ export async function MangaHeader({ manga, badge, action }: Props) {
         <h2 className="sr-only">{t("synopsis")}</h2>
         <div className="mt-6">
           <Synopsis text={cleanSynopsis(manga.synopsis) || t("noSynopsis")} />
+          {locale === "pt" && !!manga.synopsis && <p className="mt-1 text-xs text-muted">{t("synopsisEnglish")}</p>}
         </div>
         <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
           {authors.length > 0 && (
