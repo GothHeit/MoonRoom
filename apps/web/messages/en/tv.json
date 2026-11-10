@@ -8,7 +8,7 @@
       "settings": "Settings"
     },
     "title": {
-      "unavailable": "This title isn't available to watch here yet."
+      "unavailable": "This title isn’t available to watch here yet."
     },
     "home": {
       "featured": "Featured",
@@ -41,7 +41,7 @@
       "hide": "Hide",
       "account": "Account",
       "saved": "Saved.",
-      "saveFailed": "Couldn't save. Try again.",
+      "saveFailed": "Couldn’t save. Try again.",
       "elsewhere": "Your profile, MyAnimeList, password and signed-in devices are managed on your phone or computer.",
       "pin": "PIN lock",
       "pinHint": "Ask for your PIN again on this TV, as if it had just been opened.",
@@ -64,7 +64,7 @@
       "pinWrong": "That PIN is wrong.",
       "pinWrongPassword": "That password is wrong.",
       "pinTooMany": "Too many tries. Wait a few minutes.",
-      "pinFailed": "Couldn't save the PIN. Try again.",
+      "pinFailed": "Couldn’t save the PIN. Try again.",
       "switchAccount": "Switch account",
       "removeAccount": "Remove from this TV",
       "accountHint": "Signed in as {name}. Removing signs this account out of the TV; your other accounts stay."
@@ -76,11 +76,11 @@
       "codeLabel": "Sign-in code",
       "expiresIn": "The code expires in {time}",
       "waiting": "Waiting for your phone…",
-      "scan": "Or scan this with your phone's camera",
+      "scan": "Or scan this with your phone’s camera",
       "expired": "This code expired.",
       "declined": "The sign-in was declined on the phone.",
       "rateLimited": "Too many codes in a short time. Wait a few minutes and try again.",
-      "failed": "Couldn't get a code. Check the TV's internet connection.",
+      "failed": "Couldn’t get a code. Check the TV’s internet connection.",
       "newCode": "Show a new code",
       "password": "Use my password instead"
     },
@@ -108,7 +108,7 @@
       "unlock": "Unlock",
       "wrong": "Wrong PIN. Try again.",
       "rateLimited": "Too many tries. Wait a few minutes.",
-      "failed": "Couldn't check the PIN. Check the TV's internet connection."
+      "failed": "Couldn’t check the PIN. Check the TV’s internet connection."
     },
     "accounts": {
       "title": "Who’s watching?",

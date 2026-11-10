@@ -9,6 +9,8 @@ import { NAV_KEY, PAGE_KEY, recallFocus, setFocus } from "./spatial";
 
 // How long the screen waits for its `initial` item to stream in before settling for the first one.
 const INITIAL_WAIT_TRIES = 15;
+// The longest it waits while a `data-tv-pending` placeholder says the item is still loading.
+const PENDING_WAIT_TRIES = 80;
 // How long a screen with nothing to focus waits before handing focus to the top bar.
 const EMPTY_WAIT_TRIES = 5;
 
@@ -24,7 +26,8 @@ type Props = {
 /**
  * A TV screen's content. On arrival focus goes to the item the person left from (after Back),
  * else to `initial`, else to the first item, as soon as the content has streamed in, unless the
- * person already moved it. A screen with nothing to focus (an empty list) hands focus to the top
+ * person already moved it. While a `data-tv-pending` placeholder stands in for `initial` (the Play
+ * pill waiting on the sources) the screen keeps waiting for it instead of settling for another item. A screen with nothing to focus (an empty list) hands focus to the top
  * bar, so the remote never goes dead; if items stream in later, focus still moves down to them.
  */
 export function TvPage({ initial, className = "", bare = false, children }: Props) {
@@ -49,9 +52,15 @@ export function TvPage({ initial, className = "", bare = false, children }: Prop
         void setFocus(initial);
         return true;
       }
-      if (initial && tries < INITIAL_WAIT_TRIES) return false;
-      // The first item in page order (registration order can differ when parts stream in).
-      const first = ref.current?.querySelector<HTMLElement>("[data-tv-key]")?.dataset.tvKey;
+      // Still on its way: for a short while in any case, and for as long as its placeholder shows.
+      const pending = !!ref.current?.querySelector("[data-tv-pending]");
+      if (initial && (tries < INITIAL_WAIT_TRIES || (pending && tries < PENDING_WAIT_TRIES))) return false;
+      // The first item in page order (registration order can differ when parts stream in), ahead
+      // of the side items a screen marks as such (a "read more").
+      const first = (
+        ref.current?.querySelector<HTMLElement>("[data-tv-key]:not([data-tv-aside])") ??
+        ref.current?.querySelector<HTMLElement>("[data-tv-key]")
+      )?.dataset.tvKey;
       if (!first) {
         if (!parked && !bare && tries >= EMPTY_WAIT_TRIES && doesFocusableExist(NAV_KEY)) {
           void setFocus(NAV_KEY);

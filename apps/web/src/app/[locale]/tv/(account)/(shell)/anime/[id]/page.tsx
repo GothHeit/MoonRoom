@@ -13,6 +13,7 @@ import { TvPage } from "@/components/tv/TvPage";
 import { TvPillLink } from "@/components/tv/TvPillLink";
 import { TvRow } from "@/components/tv/TvRow";
 import { TvRowSkeleton } from "@/components/tv/TvSkeleton";
+import { TvSynopsis } from "@/components/tv/TvSynopsis";
 import { tvHref } from "@/components/tv/paths";
 import { artImage } from "@/components/ui/artImage";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -126,9 +127,16 @@ export default async function TvTitlePage({ params }: PageProps<"/[locale]/tv/an
           <h1 className={`line-clamp-3 break-words leading-[0.95] tracking-[-0.02em] ${long ? "text-[4.25rem]" : "text-[5.5rem]"}`}>{anime.title}</h1>
           {english && english !== anime.title && <p className="mt-3 line-clamp-1 text-[1.75rem] text-muted">{english}</p>}
           {facts.length > 0 && <p className="mt-5 text-[1.5rem] font-medium text-soft">{facts.join(" · ")}</p>}
-          <p className="mt-5 line-clamp-4 text-[1.75rem] leading-snug text-soft">{cleanSynopsis(anime.synopsis) || t("noSynopsis")}</p>
-          <div className="mt-9 flex flex-wrap items-center gap-6">
-            <Suspense fallback={<Skeleton className="h-[4.5rem] w-[22rem] rounded-full" />}>
+          <TvSynopsis title={anime.title} text={cleanSynopsis(anime.synopsis) || t("noSynopsis")} />
+          <div className="mt-7 flex flex-wrap items-center gap-6">
+            {/* The marker keeps the screen waiting for Play, so OK right after opening a title plays. */}
+            <Suspense
+              fallback={
+                <div data-tv-pending>
+                  <Skeleton className="h-[4.5rem] w-[22rem] rounded-full" />
+                </div>
+              }
+            >
               <Play id={id} />
             </Suspense>
             <Suspense fallback={null}>

@@ -17,7 +17,8 @@
   "states": {
     "notFoundTitle": "Page not found",
     "notFoundBody": "That page doesn't exist or was moved.",
-    "errorTitle": "Something went wrong"
+    "errorTitle": "Something went wrong",
+    "errorBody": "We couldn’t load this. Try again."
   },
   "placeholder": {
     "comingSoon": "This page is coming soon."

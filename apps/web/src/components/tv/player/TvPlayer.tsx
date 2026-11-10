@@ -89,6 +89,8 @@ export function TvPlayer(props: Props) {
   const [askStreams, setAskStreams] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [waiting, setWaiting] = useState(true);
+  // The picture has shown at least once since the stream was asked for.
+  const [begun, setBegun] = useState(false);
   const [current, setCurrent] = useState(startAt);
   const [duration, setDuration] = useState(0);
   const [active, setActive] = useState(true);
@@ -100,6 +102,7 @@ export function TvPlayer(props: Props) {
   const playbackRetry = playback.retry;
   const retry = useCallback(() => {
     started.current = false;
+    setBegun(false);
     playbackRetry();
   }, [playbackRetry]);
   const failPlayback = useCallback(() => setError("playback_failed"), [setError]);
@@ -175,7 +178,8 @@ export function TvPlayer(props: Props) {
 
   const length = url && Number.isFinite(duration) && duration > 0 ? Math.round(duration) : 0;
   const skips = useSkips(ownSkips, animeId, episode, showSkips ? length : 0);
-  const skip = showSkips ? activeSkip(skips, current) : undefined;
+  // Not before the picture first shows: there is nothing to skip yet, and the pill would sit by the spinner.
+  const skip = showSkips && begun ? activeSkip(skips, current) : undefined;
   const skipNow = useCallback(() => {
     const v = video.current;
     const target = showSkips ? activeSkip(skips, v?.currentTime ?? 0) : undefined;
@@ -441,7 +445,10 @@ export function TvPlayer(props: Props) {
         onEnded={onEnded}
         onWaiting={() => setWaiting(true)}
         onCanPlay={() => setWaiting(false)}
-        onPlaying={() => setWaiting(false)}
+        onPlaying={() => {
+          setWaiting(false);
+          setBegun(true);
+        }}
         onError={() => url && setError("playback_failed")}
         className="absolute inset-0 h-full w-full"
       >

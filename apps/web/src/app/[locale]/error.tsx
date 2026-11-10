@@ -13,7 +13,7 @@ export default function ErrorPage({ error, reset }: { error: Error; reset: () =>
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-4 text-center">
       <h1 className="text-4xl sm:text-5xl">{t("states.errorTitle")}</h1>
       <p role="alert" className="text-muted">
-        {t.has(key) ? t(key) : t("errors.unknown")}
+        {t.has(key) && error.message !== "unknown" ? t(key) : t("states.errorBody")}
       </p>
       <Button onClick={reset}>{t("actions.retry")}</Button>
     </div>

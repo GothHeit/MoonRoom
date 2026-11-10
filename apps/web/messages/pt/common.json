@@ -17,7 +17,8 @@
   "states": {
     "notFoundTitle": "Página não encontrada",
     "notFoundBody": "Essa página não existe ou foi movida.",
-    "errorTitle": "Algo deu errado"
+    "errorTitle": "Algo deu errado",
+    "errorBody": "Não conseguimos carregar isto. Tente de novo."
   },
   "placeholder": {
     "comingSoon": "Esta página chega em breve."
