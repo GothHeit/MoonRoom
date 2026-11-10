@@ -21,7 +21,7 @@ from app.deps import CurrentSessionId, CurrentUser, Session
 from app.errors import ApiError
 from app.mal.client import MANGA_RANKINGS, MalClient, is_safe
 from app.mal.genres import GENRE_IDS, GENRES
-from app.manga.base import Chapter, ChapterList, MangaSource
+from app.manga.base import Chapter, ChapterList, MangaSource, trust_numbers
 from app.manga.pagecache import MAX_PAGE_BYTES, PageCache
 from app.models import MalLink, MangaContinueHidden, MangaProgress, User
 from app.routers.anime import only_safe
@@ -386,7 +386,8 @@ async def details(request: Request, manga_id: int, user: CurrentUser):
 async def _ask(request: Request, name: str, manga: dict, lang: str | None) -> ChapterList | None:
     source = _sources(request)[name]
     try:
-        return await asyncio.wait_for(source.chapters(manga, lang), SOURCE_TIMEOUT)
+        listed = await asyncio.wait_for(source.chapters(manga, lang), SOURCE_TIMEOUT)
+        return trust_numbers(listed) if listed is not None else None
     except Exception as exc:  # a broken source is skipped, the others still answer
         log.warning("manga: source %s failed for %s: %s", name, manga.get("id"), exc)
         return None

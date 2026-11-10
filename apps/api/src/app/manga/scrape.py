@@ -59,8 +59,18 @@ def best_match(manga: dict, candidates: list[tuple[str, list[str]]]) -> str | No
     return best if best_ratio >= MIN_RATIO else None
 
 
+_NUMBER = r"\d+(?:\.\d+)?"
+
+
 def chapter_number(label: str) -> str:
-    found = re.search(r"\d+(?:\.\d+)?", label)
+    """The chapter a label names. "Group 2 Chapter 386" and "Vol.3 Ch.20" are chapter 386 and
+    20: the number that follows the word chapter wins, else the first number in the label."""
+    after = re.search(
+        rf"\b(?:chapter|chap|ch|cap[ií]tulo|cap)\b\.?\s*#?\s*({_NUMBER})", label, re.I
+    )
+    if after:
+        return after.group(1)
+    found = re.search(_NUMBER, label)
     return found.group(0) if found else ""
 
 

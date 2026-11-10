@@ -104,18 +104,18 @@ class MangapillSource:
                 if page is None:
                     return None
                 chapters: dict[str, Chapter] = {}
+                taken: set[str] = set()
                 for cid, label in _CHAPTER.findall(page):
                     if cid.split("-")[0] != found["id"]:
                         continue
-                    chapters.setdefault(
-                        cid,
-                        Chapter(
-                            id=cid,
-                            number=chapter_number(label),
-                            volume=None,
-                            title=None,
-                            lang="en",
-                        ),
+                    number = chapter_number(label)
+                    # Some titles list a chapter once per scan group ("Group 2 Chapter 386");
+                    # the first listed (the newest group) stays, so a number is never twice.
+                    if cid in chapters or (number and number in taken):
+                        continue
+                    taken.add(number)
+                    chapters[cid] = Chapter(
+                        id=cid, number=number, volume=None, title=None, lang="en"
                     )
                 ordered = sorted(chapters.values(), key=lambda c: (sort_key(c.number), c.id))
                 listed = ChapterList(found["id"], found["title"], ["en"], ordered)
