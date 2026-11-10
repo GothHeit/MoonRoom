@@ -1551,8 +1551,7 @@
             "title": "Trusted Device"
           },
           "username": {
-            "maxLength": 32,
-            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_]{1,32}$",
             "title": "Username",
             "type": "string"
           }
@@ -3870,8 +3869,8 @@
       "RequestIn": {
         "properties": {
           "username": {
-            "maxLength": 32,
-            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^\\s*[A-Za-z0-9_]{1,32}\\s*$",
             "title": "Username",
             "type": "string"
           }
@@ -5095,6 +5094,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -5157,6 +5158,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -5219,6 +5222,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -6648,6 +6653,8 @@
             "name": "manga_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Manga Id",
               "type": "integer"
             }
@@ -6696,6 +6703,8 @@
             "name": "manga_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Manga Id",
               "type": "integer"
             }
@@ -6778,6 +6787,7 @@
             "name": "manga_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Manga Id",
               "type": "integer"
@@ -6819,6 +6829,8 @@
             "name": "manga_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Manga Id",
               "type": "integer"
             }
@@ -6830,6 +6842,7 @@
             "schema": {
               "maxLength": 16,
               "minLength": 1,
+              "pattern": "^[^\\x00]+$",
               "title": "Chapter",
               "type": "string"
             }
@@ -6888,6 +6901,8 @@
             "name": "manga_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Manga Id",
               "type": "integer"
             }
@@ -7306,6 +7321,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -7344,6 +7361,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -7389,6 +7408,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -7648,6 +7669,8 @@
             "name": "manga_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Manga Id",
               "type": "integer"
             }
@@ -7686,6 +7709,8 @@
             "name": "manga_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Manga Id",
               "type": "integer"
             }
@@ -7731,6 +7756,8 @@
             "name": "manga_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Manga Id",
               "type": "integer"
             }
@@ -7881,6 +7908,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -7933,6 +7962,7 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
@@ -7974,6 +8004,7 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
@@ -7984,6 +8015,7 @@
             "name": "episode",
             "required": true,
             "schema": {
+              "maximum": 10000,
               "minimum": 0,
               "title": "Episode",
               "type": "integer"
@@ -8518,8 +8550,8 @@
             "name": "username",
             "required": true,
             "schema": {
-              "maxLength": 32,
-              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^\\s*[A-Za-z0-9_]{1,32}\\s*$",
               "title": "Username",
               "type": "string"
             }
@@ -8663,6 +8695,7 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
@@ -8867,6 +8900,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -8876,6 +8911,8 @@
             "name": "episode",
             "required": true,
             "schema": {
+              "maximum": 10000,
+              "minimum": 1,
               "title": "Episode",
               "type": "integer"
             }
@@ -9594,6 +9631,7 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
@@ -9604,6 +9642,7 @@
             "name": "episode",
             "required": true,
             "schema": {
+              "maximum": 10000,
               "minimum": 1,
               "title": "Episode",
               "type": "integer"
@@ -9746,6 +9785,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -9817,6 +9858,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -9826,6 +9869,8 @@
             "name": "episode",
             "required": true,
             "schema": {
+              "maximum": 10000,
+              "minimum": 1,
               "title": "Episode",
               "type": "integer"
             }
@@ -9910,6 +9955,8 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
             }
@@ -9919,6 +9966,8 @@
             "name": "episode",
             "required": true,
             "schema": {
+              "maximum": 10000,
+              "minimum": 1,
               "title": "Episode",
               "type": "integer"
             }
@@ -10002,6 +10051,7 @@
             "name": "anime_id",
             "required": true,
             "schema": {
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Anime Id",
               "type": "integer"
@@ -10012,6 +10062,7 @@
             "name": "episode",
             "required": true,
             "schema": {
+              "maximum": 10000,
               "minimum": 1,
               "title": "Episode",
               "type": "integer"

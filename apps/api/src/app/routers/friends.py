@@ -59,8 +59,12 @@ class RequestsOut(BaseModel):
     outgoing: list[RequestOut]
 
 
+# Looked up with the surrounding spaces trimmed; the characters are the registration alphabet.
+LOOKUP_NAME = r"^\s*[A-Za-z0-9_]{1,32}\s*$"
+
+
 class RequestIn(BaseModel):
-    username: str = Field(min_length=1, max_length=32)
+    username: str = Field(pattern=LOOKUP_NAME, max_length=64)
 
 
 class ActivityOut(BaseModel):
@@ -225,7 +229,7 @@ async def _activity(
 
 @router.get("/users/lookup", response_model=LookupOut, dependencies=[throttle("user_lookup")])
 async def lookup(
-    username: Annotated[str, Query(min_length=1, max_length=32)],
+    username: Annotated[str, Query(pattern=LOOKUP_NAME, max_length=64)],
     user: CurrentUser,
     session: Session,
 ):

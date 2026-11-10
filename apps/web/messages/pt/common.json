@@ -30,6 +30,8 @@
     "invalid_token": "Sua sessão expirou. Entre de novo.",
     "validation_failed": "Confira os campos e tente de novo.",
     "rate_limited": "Muitas tentativas. Espere um pouco e tente de novo.",
+    "internal_error": "Algo deu errado do nosso lado. Tente de novo em instantes.",
+    "progress_limit": "Você atingiu o limite de títulos salvos.",
     "mal_unavailable": "O MyAnimeList não respondeu. Tente de novo em instantes.",
     "anime_not_found": "Anime não encontrado.",
     "not_available": "Não disponível nesta fonte.",

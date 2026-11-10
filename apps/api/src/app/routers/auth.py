@@ -46,7 +46,9 @@ class RegisterIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    username: str = Field(min_length=1, max_length=32)
+    # Same alphabet as registration: anything else can't be an account, and a NUL character
+    # would only be refused by the database as a 500.
+    username: str = Field(pattern=r"^[A-Za-z0-9_]{1,32}$")
     password: str = Field(min_length=1, max_length=128)
     # The token a browser got when it was trusted; it skips the second step.
     trusted_device: str | None = Field(default=None, max_length=128)

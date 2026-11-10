@@ -7,7 +7,7 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 from cachetools import TTLCache
-from fastapi import APIRouter, Path, Query, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ from app import hls
 from app.choose import Picked, audio_to_start, resolve_auto, union_episodes
 from app.deps import CurrentSessionId, CurrentUser, Session, session_check, throttle
 from app.errors import ApiError
+from app.ids import AnimeId, PlayableEpisode
 from app.models import PlayerPreferences, SourceChoice
 from app.probes import Gone, HostError, Master, StreamProbes
 from app.ranking import ORIGINAL, ORIGINAL_AUDIO, Prefs, base_lang
@@ -274,7 +275,7 @@ def episodes_out(source: str, result: EpisodeList, viewer: hls.Viewer) -> Episod
 async def episodes(
     request: Request,
     source: str,
-    anime_id: int,
+    anime_id: AnimeId,
     user: CurrentUser,
     sid: CurrentSessionId,
     lang: Lang = "sub",
@@ -290,7 +291,7 @@ async def episodes(
 
 
 @router.get("/options/{anime_id}/{episode}", response_model=list[StreamOption])
-async def options(request: Request, anime_id: int, episode: int, user: CurrentUser):
+async def options(request: Request, anime_id: AnimeId, episode: PlayableEpisode, user: CurrentUser):
     """Every source and sub/dub that lists this episode, in fallback order, for the player's
     source menu. A source that is slow or failing is left out. Kept for a few minutes per
     episode, so reopening the menu or the player doesn't ask every source again."""
@@ -344,12 +345,13 @@ async def _probe_options(request: Request, anime: dict, episode: int) -> list[St
     "/{source}/{anime_id}/episodes/{episode}/prepare",
     status_code=202,
     responses={202: {"description": "Warming started, or not needed"}},
+    dependencies=[throttle("prepare")],
 )
 async def prepare(
     request: Request,
     source: str,
-    anime_id: Annotated[int, Path(ge=1)],
-    episode: Annotated[int, Path(ge=1)],
+    anime_id: AnimeId,
+    episode: PlayableEpisode,
     user: CurrentUser,
     session: Session,
     lang: Lang = "sub",
@@ -394,8 +396,8 @@ async def _warm(request: Request, key: tuple, show_nsfw: bool, prefs: Prefs | No
 @router.get("/skips/{anime_id}/{episode}", response_model=list[SkipOut])
 async def skips(
     request: Request,
-    anime_id: Annotated[int, Path(ge=1)],
-    episode: Annotated[int, Path(ge=1)],
+    anime_id: AnimeId,
+    episode: PlayableEpisode,
     length: Annotated[float, Query(gt=0, le=86400)],
     user: CurrentUser,
 ):
@@ -407,7 +409,7 @@ async def skips(
 
 @router.put("/choice/{anime_id}", status_code=204)
 async def put_choice(
-    anime_id: Annotated[int, Path(ge=1)],
+    anime_id: AnimeId,
     body: StreamOption,
     request: Request,
     user: CurrentUser,
@@ -466,8 +468,8 @@ class LinkOut(BaseModel):
 async def link(
     request: Request,
     source: str,
-    anime_id: int,
-    episode: int,
+    anime_id: AnimeId,
+    episode: PlayableEpisode,
     user: CurrentUser,
     sid: CurrentSessionId,
     kind: Literal["hls", "mp4"] = "hls",
@@ -493,12 +495,16 @@ def _start_link(
     return f"/watch/hls?token={create_playback_token(user, sid, source, anime_id, episode, lang)}"
 
 
-@router.post("/{source}/{anime_id}/episodes/{episode}/play", response_model=PlaybackOut)
+@router.post(
+    "/{source}/{anime_id}/episodes/{episode}/play",
+    response_model=PlaybackOut,
+    dependencies=[throttle("play")],
+)
 async def play(
     request: Request,
     source: str,
-    anime_id: int,
-    episode: int,
+    anime_id: AnimeId,
+    episode: PlayableEpisode,
     user: CurrentUser,
     sid: CurrentSessionId,
     session: Session,

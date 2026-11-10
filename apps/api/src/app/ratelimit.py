@@ -275,6 +275,12 @@ ACTION_RULES: dict[str, tuple[int, float]] = {
     "room_invite": (60, 3600),
     # Minting a stream link, and starting a playback from one (each looks the stream up upstream).
     "stream_link": (120, 600),
+    # Saving a watch or reading position: a player saves every few seconds, a script can do more.
+    "progress_save": (300, 600),
+    # Resolving an episode asks the scrapers, warming one does too, and a search asks MAL.
+    "play": (90, 600),
+    "prepare": (120, 600),
+    "search": (120, 60),
     "stream_start": (120, 600),
     # TV sign-in: showing a code and polling it per address, entering codes per user.
     "device_start": (20, 600),

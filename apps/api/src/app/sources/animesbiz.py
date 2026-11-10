@@ -81,7 +81,7 @@ class AnimesBizSource:
             maxsize=4096, ttl=CACHE_TTL
         )
         self._streams: TTLCache[tuple, Stream | None] = TTLCache(maxsize=4096, ttl=CACHE_TTL)
-        self._expiry: dict[tuple, float] = {}
+        self._expiry: TTLCache[tuple, float] = TTLCache(maxsize=4096, ttl=CACHE_TTL)
         self._recent: TTLCache[tuple, None] = TTLCache(maxsize=4096, ttl=MISS_TTL)
         self._flights: SingleFlight[int, tuple[str, dict[int, str]] | None] = SingleFlight()
 

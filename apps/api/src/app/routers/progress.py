@@ -3,14 +3,16 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query, Request, Response
+from fastapi import APIRouter, Query, Request, Response
 from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.db import new_session, utcnow
-from app.deps import CurrentUser, Session
+from app.deps import CurrentUser, Session, throttle
+from app.errors import ApiError
+from app.ids import AnimeId, EpisodeNumber
 from app.models import ContinueHidden, User, WatchProgress
 from app.schemas import ProgressIn, ProgressOut
 
@@ -19,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 # Past this share of the episode it counts as watched, whatever the client says.
 COMPLETED_RATIO = 0.9
+# Saved episodes per account. Far past anything a person watches (a long-running show is a
+# thousand episodes), so only a script reaches it.
+MAX_PROGRESS_ROWS = 20_000
 
 
 def to_out(row: WatchProgress) -> ProgressOut:
@@ -76,9 +81,7 @@ async def continue_watching(
 
 
 @router.delete("/{anime_id}/continue", status_code=204)
-async def remove_from_continue_watching(
-    anime_id: Annotated[int, Path(ge=1)], user: CurrentUser, session: Session
-):
+async def remove_from_continue_watching(anime_id: AnimeId, user: CurrentUser, session: Session):
     """Hide a title from Continue watching. Progress is kept; watching it again brings it back."""
     stmt = insert(ContinueHidden).values(user_id=user.id, anime_id=anime_id, hidden_at=utcnow())
     await session.execute(
@@ -91,13 +94,23 @@ async def remove_from_continue_watching(
 
 
 @router.get("/{anime_id}", response_model=list[ProgressOut])
-async def anime_progress(anime_id: int, user: CurrentUser, session: Session):
+async def anime_progress(anime_id: AnimeId, user: CurrentUser, session: Session):
     rows = await session.scalars(
         select(WatchProgress)
         .where(WatchProgress.user_id == user.id, WatchProgress.anime_id == anime_id)
         .order_by(WatchProgress.episode)
     )
     return [to_out(r) for r in rows]
+
+
+async def ensure_room_for_new_row(session: AsyncSession, user_id: uuid.UUID) -> None:
+    """One account can't keep adding episodes forever: Continue watching, profiles and the
+    episode checker all read this table."""
+    rows = await session.scalar(
+        select(func.count()).select_from(WatchProgress).where(WatchProgress.user_id == user_id)
+    )
+    if (rows or 0) >= MAX_PROGRESS_ROWS:
+        raise ApiError(409, "progress_limit", "Too many saved episodes")
 
 
 async def _sync_mal(request: Request, user_id: uuid.UUID, anime_id: int, episode: int) -> None:
@@ -114,11 +127,13 @@ async def _sync_mal(request: Request, user_id: uuid.UUID, anime_id: int, episode
         logger.warning("MAL sync failed for %s ep %s", anime_id, episode, exc_info=True)
 
 
-@router.put("/{anime_id}/{episode}", response_model=ProgressOut)
+@router.put(
+    "/{anime_id}/{episode}", response_model=ProgressOut, dependencies=[throttle("progress_save")]
+)
 async def save_progress(
     request: Request,
-    anime_id: Annotated[int, Path(ge=1)],
-    episode: Annotated[int, Path(ge=0)],
+    anime_id: AnimeId,
+    episode: EpisodeNumber,
     body: ProgressIn,
     user: CurrentUser,
     session: Session,
@@ -133,6 +148,8 @@ async def save_progress(
             WatchProgress.episode == episode,
         )
     )
+    if was_done is None:
+        await ensure_room_for_new_row(session, user.id)
     insert_stmt = insert(WatchProgress).values(
         user_id=user.id,
         anime_id=anime_id,

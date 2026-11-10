@@ -7,8 +7,9 @@ from fastapi import APIRouter, Query, Request
 
 from app import hls
 from app.choose import union_episodes
-from app.deps import CurrentSessionId, CurrentUser, Session
+from app.deps import CurrentSessionId, CurrentUser, Session, throttle
 from app.errors import ApiError
+from app.ids import AnimeId
 from app.mal.client import MalClient, is_safe
 from app.mal.genres import GENRE_IDS, GENRES
 from app.models import SourceChoice
@@ -66,7 +67,7 @@ async def seasonal(request: Request, user: CurrentUser, page: Annotated[int, Que
 MIN_SEARCH_CHARS = 3
 
 
-@router.get("/search", response_model=AnimeListOut)
+@router.get("/search", response_model=AnimeListOut, dependencies=[throttle("search")])
 async def search(
     request: Request, user: CurrentUser, q: Annotated[str, Query(min_length=1, max_length=100)]
 ):
@@ -114,7 +115,7 @@ async def browse(
 @router.get("/{anime_id}", response_model=AnimeDetailsOut)
 async def details(
     request: Request,
-    anime_id: int,
+    anime_id: AnimeId,
     user: CurrentUser,
     lang: Annotated[Literal["en", "pt"], Query()] = "en",
 ):
@@ -141,7 +142,7 @@ async def details(
 
 @router.get("/{anime_id}/sources", response_model=SourcesOut)
 async def sources(
-    request: Request, anime_id: int, user: CurrentUser, sid: CurrentSessionId, session: Session
+    request: Request, anime_id: AnimeId, user: CurrentUser, sid: CurrentSessionId, session: Session
 ):
     """Which sources can play this title. Separate from the details so a slow scraper never
     holds the title page back."""
@@ -161,7 +162,7 @@ async def sources(
 @router.get("/{anime_id}/art", response_model=TitleArtOut)
 async def art(
     request: Request,
-    anime_id: int,
+    anime_id: AnimeId,
     user: CurrentUser,
     lang: Annotated[Literal["en", "pt"], Query()] = "en",
 ):

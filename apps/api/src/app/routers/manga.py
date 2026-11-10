@@ -11,14 +11,15 @@ import httpx
 from fastapi import APIRouter, Query, Request, Response
 from fastapi import Path as PathParam
 from fastapi.responses import FileResponse
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import hls
 from app.db import new_session, utcnow
-from app.deps import CurrentSessionId, CurrentUser, Session
+from app.deps import CurrentSessionId, CurrentUser, Session, throttle
 from app.errors import ApiError
+from app.ids import MangaId
 from app.mal.client import MANGA_RANKINGS, MalClient, is_safe
 from app.mal.genres import GENRE_IDS, GENRES
 from app.manga.base import Chapter, ChapterList, MangaSource
@@ -26,6 +27,7 @@ from app.manga.pagecache import MAX_PAGE_BYTES, PageCache
 from app.models import MalLink, MangaContinueHidden, MangaProgress, User
 from app.routers.anime import only_safe
 from app.routers.home import MIN_ROW, todays_genres
+from app.routers.progress import MAX_PROGRESS_ROWS
 from app.routers.watch import session_open
 from app.schemas import (
     ChapterOut,
@@ -332,7 +334,7 @@ async def _my_list(request: Request, user: User) -> list[MangaCard]:
     return _cards([i["node"] for i in (*reading, *planned)])
 
 
-@router.get("/search", response_model=MangaListOut)
+@router.get("/search", response_model=MangaListOut, dependencies=[throttle("search")])
 async def search(
     request: Request, user: CurrentUser, q: Annotated[str, Query(min_length=1, max_length=100)]
 ):
@@ -367,7 +369,7 @@ async def browse(
 
 
 @router.get("/{manga_id}", response_model=MangaDetailsOut)
-async def details(request: Request, manga_id: int, user: CurrentUser):
+async def details(request: Request, manga_id: MangaId, user: CurrentUser):
     mal = _mal(request)
     raw = await mal.visible_manga(manga_id, user.show_nsfw)
     related = raw.get("related_manga") or []
@@ -414,7 +416,7 @@ def _wanted_lang(user: User, lang: str | None, available: list[str]) -> str | No
 @router.get("/{manga_id}/chapters", response_model=ChaptersOut)
 async def chapters(
     request: Request,
-    manga_id: int,
+    manga_id: MangaId,
     user: CurrentUser,
     session: Session,
     lang: Annotated[str | None, Query(max_length=10)] = None,
@@ -498,7 +500,7 @@ async def chapters(
 @router.get("/{manga_id}/read/{source}/{chapter_id}", response_model=PagesOut)
 async def pages(
     request: Request,
-    manga_id: int,
+    manga_id: MangaId,
     source: str,
     chapter_id: str,
     user: CurrentUser,
@@ -550,9 +552,7 @@ async def pages(
 
 
 @router.delete("/{manga_id}/continue", status_code=204)
-async def remove_from_continue_reading(
-    manga_id: Annotated[int, PathParam(ge=1)], user: CurrentUser, session: Session
-):
+async def remove_from_continue_reading(manga_id: MangaId, user: CurrentUser, session: Session):
     """Hide a title from Continue reading. Progress is kept; reading it again brings it back."""
     statement = insert(MangaContinueHidden).values(
         user_id=user.id, manga_id=manga_id, hidden_at=utcnow()
@@ -566,11 +566,15 @@ async def remove_from_continue_reading(
     return Response(status_code=204)
 
 
-@router.put("/{manga_id}/progress/{chapter}", response_model=MangaProgressOut)
+@router.put(
+    "/{manga_id}/progress/{chapter}",
+    response_model=MangaProgressOut,
+    dependencies=[throttle("progress_save")],
+)
 async def put_progress(
     request: Request,
-    manga_id: int,
-    chapter: Annotated[str, PathParam(min_length=1, max_length=16)],
+    manga_id: MangaId,
+    chapter: Annotated[str, PathParam(min_length=1, max_length=16, pattern=r"^[^\x00]+$")],
     body: MangaProgressIn,
     user: CurrentUser,
     session: Session,
@@ -584,6 +588,12 @@ async def put_progress(
             MangaProgress.chapter == chapter,
         )
     )
+    if was_done is None:
+        rows = await session.scalar(
+            select(func.count()).select_from(MangaProgress).where(MangaProgress.user_id == user.id)
+        )
+        if (rows or 0) >= MAX_PROGRESS_ROWS:
+            raise ApiError(409, "progress_limit", "Too many saved chapters")
     values = {
         "page": page_index,
         "pages": body.pages,
