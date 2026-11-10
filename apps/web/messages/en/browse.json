@@ -23,7 +23,8 @@
   "search": {
     "title": "Search",
     "resultsFor": "Results for “{q}”",
-    "prompt": "Type a title to search.",
+    "prompt": "Type a title or pick a genre.",
+    "byGenre": "Browse by genre",
     "empty": "Nothing found for “{q}”.",
     "emptyHint": "Check the spelling, try a shorter name, or browse by genre.",
     "browse": "Browse titles",
