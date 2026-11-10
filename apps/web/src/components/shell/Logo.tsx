@@ -4,7 +4,7 @@ import { APP_NAME } from "@/lib/brand";
 
 /**
  * Outlined wordmark with the crescent as its full stop (the lockup is 1039x250). In the nav, the
- * narrowest phones show the crescent alone so the catalog switch beside it still fits.
+ * narrowest phones and the tablet-width desktop bar show the crescent alone so the rest still fits.
  */
 export function Logo({ size = "md" }: { size?: "md" | "lg" }) {
   const height = size === "lg" ? 56 : 32;
@@ -16,14 +16,14 @@ export function Logo({ size = "md" }: { size?: "md" | "lg" }) {
       height={height}
       unoptimized
       priority
-      className={size === "md" ? "hidden min-[380px]:block" : undefined}
+      className={size === "md" ? "hidden min-[380px]:block md:hidden lg:block short:block" : undefined}
     />
   );
   if (size === "lg") return lockup;
   return (
     <>
       {lockup}
-      <Image src="/logo-mark.svg" alt={APP_NAME} width={height} height={height} unoptimized priority className="block min-[380px]:hidden" />
+      <Image src="/logo-mark.svg" alt={APP_NAME} width={height} height={height} unoptimized priority className="block min-[380px]:hidden md:block lg:hidden short:hidden" />
     </>
   );
 }

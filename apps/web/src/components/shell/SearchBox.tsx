@@ -112,7 +112,7 @@ export function SearchBox({ mode = "anime" }: { mode?: Mode }) {
           onKeyDown={onKeyDown}
           aria-label={t("search")}
           placeholder={mode === "manga" ? t("searchManga") : t("searchPlaceholder")}
-          className="h-9 w-40 rounded-full border border-line bg-surface px-4 text-sm placeholder:text-muted focus:w-64 focus:border-accent lg:w-56"
+          className="h-9 w-40 rounded-full border border-line bg-surface px-4 text-sm placeholder:text-muted focus:border-accent lg:w-56 lg:focus:w-64"
         />
       </form>
       <ul
