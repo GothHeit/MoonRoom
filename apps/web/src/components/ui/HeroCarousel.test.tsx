@@ -49,4 +49,18 @@ describe("HeroCarousel", () => {
     expect(sources()).toEqual(["/art/1.jpg", "/art/2.jpg"]);
     vi.useRealTimers();
   });
+
+  it("stops rotating when paused and goes on when resumed", () => {
+    vi.useFakeTimers();
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as typeof window.matchMedia;
+    renderIntl(<HeroCarousel slides={slides} cta="Watch now" />);
+    const heading = () => screen.getByRole("heading", { level: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Pause featured titles" }));
+    act(() => void vi.advanceTimersByTime(20_000));
+    expect(heading()).toHaveTextContent("Frieren");
+    fireEvent.click(screen.getByRole("button", { name: "Resume featured titles" }));
+    act(() => void vi.advanceTimersByTime(8_100));
+    expect(heading()).toHaveTextContent("Dungeon Meshi");
+    vi.useRealTimers();
+  });
 });

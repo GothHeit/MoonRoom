@@ -7,7 +7,7 @@ export function HomeSkeleton() {
     <div aria-hidden="true">
       {/* Same split as the home hero: text beside the art side, which is a flat panel until the picture loads. */}
       <section className="pt-16 sm:pt-20 short:pt-12">
-        <HeroSplit>
+        <HeroSplit shortSplit>
           <Skeleton className="h-4 w-24" />
           <Skeleton className="mt-4 h-14 w-3/4 md:h-20" />
           <Skeleton className="mt-3 h-14 w-1/2 md:h-20" />

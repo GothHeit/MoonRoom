@@ -19,6 +19,8 @@
     "featured": "Featured",
     "slide": "Slide {n} of {total}",
     "goToSlide": "Show featured title {n}",
+    "pauseSlides": "Pause featured titles",
+    "resumeSlides": "Resume featured titles",
     "synopsisEnglish": "Synopsis in English"
   }
 }

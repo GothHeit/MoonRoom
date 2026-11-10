@@ -19,6 +19,8 @@
     "featured": "Destaques",
     "slide": "Destaque {n} de {total}",
     "goToSlide": "Mostrar destaque {n}",
+    "pauseSlides": "Pausar destaques",
+    "resumeSlides": "Retomar destaques",
     "synopsisEnglish": "Sinopse em inglês"
   }
 }

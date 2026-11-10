@@ -14,6 +14,8 @@ type Props = {
   eager?: boolean;
   /** Painted over the picture inside the art side, e.g. wide art that streams in after the poster. */
   overlay?: ReactNode;
+  /** Keeps the text beside the art on a phone held sideways, and the whole banner on its first screen. */
+  shortSplit?: boolean;
   children: ReactNode;
 };
 
@@ -21,14 +23,14 @@ type Props = {
  * Hero with the show's art on the right side up to the window's edge and the text on the flat
  * background beside it. On phones the art sits on top, full width, and the text below.
  */
-export function HeroSplit({ art, poster, posterAlt = "", eager = true, overlay, children }: Props) {
+export function HeroSplit({ art, poster, posterAlt = "", eager = true, overlay, shortSplit = false, children }: Props) {
   const image = art ?? poster;
   const loading = { fetchPriority: eager ? "high" : "auto", loading: eager ? "eager" : "lazy" } as const;
   return (
-    <div className="grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-      <div className="flex min-w-0 flex-col px-4 pb-10 pt-6 sm:px-8 md:justify-center md:py-12">{children}</div>
+    <div className={`grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] ${shortSplit ? "short:grid-cols-2" : ""}`}>
+      <div className={`flex min-w-0 flex-col px-4 pb-10 pt-6 sm:px-8 md:justify-center md:py-12 ${shortSplit ? "short:justify-center short:py-4" : ""}`}>{children}</div>
       <div
-        className={`relative order-first aspect-video md:order-none md:aspect-auto md:min-h-[clamp(24rem,36vw,44rem)] md:rounded-bl-ui ${art ? "" : "overflow-hidden bg-surface"}`}
+        className={`relative order-first aspect-video md:order-none md:aspect-auto md:min-h-[clamp(24rem,36vw,44rem)] md:rounded-bl-ui ${shortSplit ? "short:order-none short:aspect-auto short:min-h-0 short:rounded-bl-ui" : ""} ${art ? "" : "overflow-hidden bg-surface"}`}
       >
         {image &&
           (art ? (
@@ -38,7 +40,7 @@ export function HeroSplit({ art, poster, posterAlt = "", eager = true, overlay, 
               alt=""
               {...loading}
               decoding="async"
-              className="absolute inset-0 h-full w-full object-cover md:rounded-bl-ui"
+              className={`absolute inset-0 h-full w-full object-cover md:rounded-bl-ui ${shortSplit ? "short:rounded-bl-ui" : ""}`}
             />
           ) : (
             <>
