@@ -1,7 +1,10 @@
+import io
+
 import httpx
 import respx
+from PIL import Image
 
-from app.anizip import API, parse
+from app.anizip import API, on_blank_background, parse
 from tests.conftest import make_user
 from tests.mal_fixtures import mock_details
 
@@ -62,6 +65,54 @@ async def test_art_endpoint_is_cached_and_localized(client, session):
     }
     await client.get("/anime/5/art", headers=headers)
     assert upstream.call_count == 1
+
+
+def picture(background, figure="navy", mode: str = "RGB", kind: str = "JPEG") -> bytes:
+    """A wide picture: a figure in the middle that reaches the bottom edge, like key art."""
+    image = Image.new(mode, (640, 360), background)
+    image.paste(Image.new(mode, (360, 300), figure), (140, 60))
+    out = io.BytesIO()
+    image.save(out, kind)
+    return out.getvalue()
+
+
+def test_art_on_white_or_on_nothing_counts_as_blank():
+    assert on_blank_background(picture("white"))
+    assert on_blank_background(picture((0, 0, 0, 0), (20, 20, 90, 255), "RGBA", "PNG"))
+    assert not on_blank_background(picture("darkgreen"))
+    # A light sky over a dark ground is a scene, not a cut-out.
+    scene = Image.new("RGB", (640, 360), "white")
+    scene.paste(Image.new("RGB", (640, 200), "saddlebrown"), (0, 160))
+    out = io.BytesIO()
+    scene.save(out, "JPEG")
+    assert not on_blank_background(out.getvalue())
+
+
+@respx.mock
+async def test_wide_art_on_a_blank_background_is_left_out(client, session):
+    _, headers = await make_user(session, "kafka")
+    for anime_id, image in ((11, picture("white")), (12, picture("darkgreen"))):
+        mock_details(anime_id)
+        respx.get(API, params={"mal_id": str(anime_id)}).mock(
+            return_value=httpx.Response(200, json=answer())
+        )
+        respx.get(FANART).mock(return_value=httpx.Response(200, content=image))
+        r = await client.get(f"/anime/{anime_id}/art", headers=headers)
+        assert r.json()["backdrop"] == (None if anime_id == 11 else FANART)
+        assert r.json()["episodes"]["1"]["image"] == STILL
+
+
+@respx.mock
+async def test_wide_art_that_cannot_be_checked_is_kept(client, session):
+    _, headers = await make_user(session, "kafka")
+    for anime_id, response in ((13, httpx.Response(503)), (14, httpx.Response(200, content=b"x"))):
+        mock_details(anime_id)
+        respx.get(API, params={"mal_id": str(anime_id)}).mock(
+            return_value=httpx.Response(200, json=answer())
+        )
+        respx.get(FANART).mock(return_value=response)
+        r = await client.get(f"/anime/{anime_id}/art", headers=headers)
+        assert r.json()["backdrop"] == FANART
 
 
 @respx.mock
