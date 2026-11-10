@@ -6,6 +6,7 @@ import { renderAccount } from "@/test/account-intl";
 import { inviteStatus, InvitesPanel } from "./InvitesPanel";
 import { MalSection } from "./MalSection";
 import { PreferencesForm } from "./PreferencesForm";
+import { SessionsPanel, type LoginSession } from "./SessionsPanel";
 
 const replace = vi.fn();
 const refresh = vi.fn();
@@ -63,6 +64,34 @@ describe("PreferencesForm", () => {
     renderAccount(<PreferencesForm showNsfw shareActivity mangaLang={null} />);
     fireEvent.change(screen.getByLabelText(/Manga language/), { target: { value: "pt-br" } });
     await waitFor(() => expect(client.PATCH).toHaveBeenCalledWith("/me", { body: { manga_lang: "pt-br" } }));
+  });
+});
+
+describe("SessionsPanel", () => {
+  const session = (id: string, day: number, current = false): LoginSession => ({
+    id,
+    user_agent: null,
+    ip: `10.0.0.${day}`,
+    started_at: "2026-01-01T00:00:00Z",
+    last_active_at: `2026-01-${String(day).padStart(2, "0")}T00:00:00Z`,
+    current,
+  });
+
+  it("shows this device and the four used most recently until asked for all", () => {
+    const sessions = [session("old", 1), session("mine", 2, true), ...[3, 4, 5, 6, 7].map((d) => session(`s${d}`, d))];
+    renderAccount(<SessionsPanel sessions={sessions} />);
+    const ips = () => screen.getAllByTestId("session").map((row) => /10\.0\.0\.\d+/.exec(row.textContent ?? "")?.[0]);
+    expect(ips()).toEqual(["10.0.0.2", "10.0.0.7", "10.0.0.6", "10.0.0.5", "10.0.0.4"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show all (7)" }));
+    expect(ips()).toHaveLength(7);
+    fireEvent.click(screen.getByRole("button", { name: "Show recent only" }));
+    expect(ips()).toHaveLength(5);
+  });
+
+  it("has no show-all button for a short list", () => {
+    renderAccount(<SessionsPanel sessions={[session("mine", 2, true), session("phone", 1)]} />);
+    expect(screen.queryByRole("button", { name: /Show all/ })).not.toBeInTheDocument();
   });
 });
 

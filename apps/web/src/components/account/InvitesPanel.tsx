@@ -64,7 +64,7 @@ export function InvitesPanel({ invites }: { invites: Invite[] }) {
           <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
-            className="rounded-ui border border-line bg-bg px-3 py-2 text-fg"
+            className="rounded-ui border border-line bg-bg px-3 h-11 text-fg"
           >
             {DAY_CHOICES.map((d) => (
               <option key={d} value={d}>
