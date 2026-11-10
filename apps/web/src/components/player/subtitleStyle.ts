@@ -54,12 +54,20 @@ export function cueStyle(style: SubtitleStyle): CSSProperties {
 
 /**
  * Where the caption block sits; above the controls while they're showing. `controls` is how much
- * room the controls take at the bottom (the TV player's are taller).
+ * room the controls take at the bottom (the TV player's are taller). `resting` is the room
+ * something still takes there once the controls are gone, like the skip button.
  */
-export function blockPosition(position: SubtitleStyle["subtitle_position"], controlsShown: boolean, controls = "9rem"): CSSProperties {
+export function blockPosition(
+  position: SubtitleStyle["subtitle_position"],
+  controlsShown: boolean,
+  controls = "9rem",
+  resting?: string,
+): CSSProperties {
   if (position === "top") return { top: "8%" };
-  if (position === "raised") return { bottom: controlsShown ? `max(22%, ${controls})` : "22%" };
-  return { bottom: controlsShown ? controls : "6%" };
+  const base = position === "raised" ? "22%" : "6%";
+  const clear = controlsShown ? controls : resting;
+  if (!clear) return { bottom: base };
+  return { bottom: position === "raised" || !controlsShown ? `max(${base}, ${clear})` : clear };
 }
 
 /** A WebVTT cue's text without its markup (<i>, <c.color>, voice tags) and entities. */

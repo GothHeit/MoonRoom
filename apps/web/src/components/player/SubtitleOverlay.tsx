@@ -19,6 +19,8 @@ type Props = {
   draw?: boolean;
   /** Room the controls take at the bottom while shown (see blockPosition). */
   controlsHeight?: string;
+  /** Room something still takes at the bottom while the controls are hidden. */
+  restingHeight?: string;
 };
 
 /**
@@ -27,7 +29,7 @@ type Props = {
  * load, nothing is drawn natively) and every other track is disabled. In Safari's native
  * full screen our overlay is not shown, so the track is switched to "showing" until it ends.
  */
-export function SubtitleOverlay({ video, selected, tracksKey, style, controlsShown, draw = true, controlsHeight }: Props) {
+export function SubtitleOverlay({ video, selected, tracksKey, style, controlsShown, draw = true, controlsHeight, restingHeight }: Props) {
   const [lines, setLines] = useState<string[]>([]);
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export function SubtitleOverlay({ video, selected, tracksKey, style, controlsSho
       data-testid="subtitles"
       aria-live="off"
       className="pointer-events-none absolute inset-x-0 flex flex-col items-center gap-1 px-[6%] text-center transition-[bottom] duration-300"
-      style={blockPosition(style.subtitle_position, controlsShown, controlsHeight)}
+      style={blockPosition(style.subtitle_position, controlsShown, controlsHeight, restingHeight)}
     >
       {lines.map((line, i) => (
         <span key={i} className="whitespace-pre-wrap rounded-sm px-2 font-medium leading-snug" style={cueStyle(style)}>

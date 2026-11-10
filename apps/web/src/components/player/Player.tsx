@@ -15,7 +15,7 @@ import { RoomNotices } from "@/components/room/RoomNotices";
 import { useRoomSync, type RoomBinding } from "@/components/room/useRoomSync";
 
 import { useAutoNext } from "./autoNext";
-import { ControlBar, iconButton } from "./ControlBar";
+import { ControlBar, fade, iconButton } from "./ControlBar";
 import { DroppedPrompt } from "./DroppedPrompt";
 import { EndCard } from "./EndCard";
 import { ErrorPanel, errorKey } from "./ErrorPanel";
@@ -64,6 +64,10 @@ const HIDE_CONTROLS_MS = 3000;
 export const NEXT_COUNTDOWN = 10;
 // How long before the end the next episode is resolved, so auto-next starts at once.
 const WARM_NEXT_SECONDS = 180;
+// The skip button rests in the bottom corner and rides up above the controls when they show.
+// Captions keep clear of it in both places, so the two never share a line.
+const SKIP_REST = "max(1.5rem, env(safe-area-inset-bottom))";
+const SKIP_CAPTIONS = { resting: `calc(${SKIP_REST} + 3.5rem)`, controls: `calc(${SKIP_REST} + 9rem)` };
 
 export function Player(props: Props) {
   const { source, animeId, episode, title, episodes, lang, startAt, subtitleLang, room, showSkips } = props;
@@ -273,6 +277,7 @@ export function Player(props: Props) {
   const others = canSwitchStream ? streams.filter((s) => !sameStream(s, { source, lang })) : [];
   const streamName = automatic ? t("autoPlaying", { stream: playingName }) : playingName;
   const shown = active || !playing || ended || settingsOpen || error !== null;
+  const skipOffered = skip !== undefined && !error && !ended && !settingsOpen;
 
   return (
     <div
@@ -348,6 +353,8 @@ export function Player(props: Props) {
         tracksKey={tracks.map((track) => track.url).join()}
         style={style}
         controlsShown={shown && !error}
+        controlsHeight={skipOffered ? SKIP_CAPTIONS.controls : undefined}
+        restingHeight={skipOffered ? SKIP_CAPTIONS.resting : undefined}
       />
 
       {!error && waiting && (
@@ -364,19 +371,20 @@ export function Player(props: Props) {
       <div
         className={`pointer-events-none absolute inset-0 flex flex-col justify-between pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`}
       >
-        <div className="pointer-events-auto flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent px-4 pb-10 pt-4 sm:px-8">
+        <div className={`${fade} top-0 h-[calc(7rem+env(safe-area-inset-top))] bg-gradient-to-b [@media(min-height:32rem)]:h-[calc(10rem+env(safe-area-inset-top))]`} />
+        <div className="pointer-events-auto relative flex items-center gap-3 px-4 pt-4 sm:px-8">
           <Link href={backHref} aria-label={t("back")} className={iconButton}>
             <PlayerIcon name="back" />
           </Link>
-          <div className="min-w-0">
-            <p className="truncate font-display text-xl leading-tight">{title}</p>
-            <p className="text-sm text-muted">
+          <h1 className="min-w-0">
+            <span className="block truncate text-xl leading-tight">{title}</span>
+            <span className="block truncate font-sans text-sm tracking-normal text-soft">
               {t("episode", { episode })}
               {!automatic && answered !== source && (
                 <span className="ml-2">· {t("fallbackSource", { source: playingName })}</span>
               )}
-            </p>
-          </div>
+            </span>
+          </h1>
           {room ? (
             room.topBar
           ) : (
@@ -476,14 +484,19 @@ export function Player(props: Props) {
         </>
       )}
 
-      {skip && !error && !ended && !settingsOpen && (
-        <button
-          type="button"
-          onClick={skipNow}
-          className="press absolute bottom-28 right-4 min-h-11 rounded-full border border-white/40 bg-black/70 px-5 py-2.5 text-sm font-bold text-fg hover:bg-black/90 sm:right-8"
+      {skip && skipOffered && (
+        <div
+          style={{ bottom: SKIP_REST }}
+          className={`absolute right-[max(1rem,env(safe-area-inset-right))] transition-transform duration-300 motion-reduce:transition-none sm:right-[max(2rem,env(safe-area-inset-right))] ${shown ? "-translate-y-[5.5rem]" : ""}`}
         >
-          {t(skip.kind === "intro" ? "skipIntro" : skip.kind === "recap" ? "skipRecap" : "skipOutro")}
-        </button>
+          <button
+            type="button"
+            onClick={skipNow}
+            className="press min-h-11 rounded-full border border-white/40 bg-black/70 px-5 py-2.5 text-sm font-bold text-fg hover:bg-black/90"
+          >
+            {t(skip.kind === "intro" ? "skipIntro" : skip.kind === "recap" ? "skipRecap" : "skipOutro")}
+          </button>
+        </div>
       )}
 
       {dropped.asking && !error && <DroppedPrompt onAccept={dropped.accept} onDismiss={dropped.dismiss} />}

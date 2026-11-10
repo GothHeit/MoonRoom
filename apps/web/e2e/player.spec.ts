@@ -18,6 +18,7 @@ test("resumes from the saved position and saves on pause", async ({ page }) => {
   await signIn(page);
   await page.goto("/en/watch/stub/4/2");
   await expect(page.getByText("Episode 2", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Moon Test 4\s*Episode 2/);
   await expect.poll(() => currentTime(page)).toBeGreaterThanOrEqual(12);
   await expect.poll(() => video(page).evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
 

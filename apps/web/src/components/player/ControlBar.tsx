@@ -9,6 +9,9 @@ import { SEEK_STEP } from "./usePlayerKeys";
 export const iconButton =
   "press flex h-11 w-11 items-center justify-center rounded-full text-fg hover:bg-white/10 active:bg-white/10";
 
+// The dark fade behind the header and the controls, so both read over a bright picture.
+export const fade = "pointer-events-none absolute inset-x-0 from-black/90 via-black/70 via-50% to-transparent";
+
 type Props = {
   current: number;
   duration: number;
@@ -38,10 +41,11 @@ export function ControlBar(props: Props) {
   // space so nothing moves, but show it only once the length is known.
   const known = Number.isFinite(duration) && duration > 0;
   return (
-    <div className="pointer-events-auto bg-gradient-to-t from-black/80 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 sm:px-8">
+    <div className="pointer-events-auto relative isolate px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 sm:px-8">
+      <div className={`${fade} bottom-0 -z-10 h-[calc(9rem+env(safe-area-inset-bottom))] bg-gradient-to-t [@media(min-height:32rem)]:h-[calc(12rem+env(safe-area-inset-bottom))]`} />
       <div
         aria-hidden={!known}
-        className={`flex items-center gap-3 text-xs tabular-nums text-muted ${known ? "" : "invisible"}`}
+        className={`flex items-center gap-3 text-xs tabular-nums text-fg ${known ? "" : "invisible"}`}
       >
         <span>{formatTime(current)}</span>
         <input

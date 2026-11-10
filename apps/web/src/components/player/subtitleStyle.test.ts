@@ -24,5 +24,14 @@ describe("blockPosition", () => {
     expect(blockPosition("bottom", true)).toEqual({ bottom: "9rem" });
     expect(blockPosition("bottom", false)).toEqual({ bottom: "6%" });
     expect(blockPosition("top", true)).toEqual({ top: "8%" });
+    expect(blockPosition("raised", true)).toEqual({ bottom: "max(22%, 9rem)" });
+    expect(blockPosition("raised", false)).toEqual({ bottom: "22%" });
+  });
+
+  it("stays above what is left at the bottom once the controls hide", () => {
+    expect(blockPosition("bottom", true, "12rem", "5rem")).toEqual({ bottom: "12rem" });
+    expect(blockPosition("bottom", false, "12rem", "5rem")).toEqual({ bottom: "max(6%, 5rem)" });
+    expect(blockPosition("raised", false, "12rem", "5rem")).toEqual({ bottom: "max(22%, 5rem)" });
+    expect(blockPosition("top", false, "12rem", "5rem")).toEqual({ top: "8%" });
   });
 });
