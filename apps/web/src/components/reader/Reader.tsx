@@ -125,7 +125,7 @@ export function Reader({ mangaId, source, title, mediaType, chapter, previous, n
   );
 
   return (
-    <div className="fixed inset-0 z-[60] select-none bg-[#0d0719] text-fg" data-mode={settings.mode}>
+    <div className="fixed inset-0 z-[60] select-none bg-reader text-fg" data-mode={settings.mode}>
       {settings.mode === "page" ? (
         <div
           // With the bars up, a page fits between them; sideways, it keeps clear of the notch.

@@ -30,6 +30,8 @@
   --color-numeral: #5b4a8a;
   --color-success: #58d68d;
   --color-danger: #ff8a9b;
+  /* Manga reader stage, darker than bg on purpose. */
+  --color-reader: #0d0719;
 
   /* Flat placeholders for art that has not loaded or does not exist. */
   --color-poster-1: #2c1f66;
