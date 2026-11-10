@@ -1,7 +1,9 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Suspense } from "react";
 
 import { PushSync } from "@/components/shell/PushSync";
 import { InstallHint } from "@/components/shell/InstallHint";
+import { NavProgress } from "@/components/shell/NavProgress";
 import { TabBar } from "@/components/shell/TabBar";
 import { TopNav } from "@/components/shell/TopNav";
 import { serverApi, unwrap } from "@/lib/server-api";
@@ -26,6 +28,9 @@ export default async function AppLayout({ children, params }: LayoutProps<"/[loc
       >
         {t("skip")}
       </a>
+      <Suspense>
+        <NavProgress />
+      </Suspense>
       <TopNav userId={me.id} username={me.username} avatar={me.avatar} isAdmin={me.is_admin} pending={pending} />
       <main id="main" tabIndex={-1} className="pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-16 short:pb-[calc(4rem+env(safe-area-inset-bottom))]">{children}</main>
       <InstallHint />
