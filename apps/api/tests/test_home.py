@@ -5,6 +5,7 @@ import respx
 from sqlalchemy import text
 
 from app.anizip import API as ANIZIP
+from app.config import get_settings
 from app.db import utcnow
 from app.main import app as fastapi_app
 from app.mal.client import API_BASE, current_season
@@ -112,6 +113,7 @@ async def test_my_list_row_shows_watching_then_plan_to_watch(client, session):
     mock_season(node(1))
     mock_ranking(node(10))
     mock_details(1)
+    mock_details(31)
 
     def answer(request):
         status = request.url.params["status"]
@@ -317,3 +319,24 @@ async def test_similar_row_recommends_from_the_last_title_watched(client, sessio
     assert similar["about"]["id"] == 20
     assert [i["anime"]["id"] for i in similar["items"]] == list(range(50, 56))
     assert rows[0]["id"] == "continue_watching"
+
+
+@respx.mock
+async def test_pinned_title_is_first_hero_for_that_user_only(client, session, monkeypatch):
+    fastapi_app.state.sources = {}
+    monkeypatch.setenv("HERO_PINS", "kafka:790")
+    get_settings.cache_clear()
+    _, mine = await make_user(session, "kafka")
+    _, other = await make_user(session, "friend")
+    mock_season(node(1, "Popular", mean=7.5), node(2, "Best", mean=8.9))
+    mock_ranking(node(10, "Classic"))
+    mock_details(1)
+    mock_details(2)
+    mock_details(790)
+    try:
+        titles = lambda r: [h["anime"]["id"] for h in r.json()["heroes"]]  # noqa: E731
+        assert titles(await client.get("/home", headers=mine)) == [790, 2, 1]
+        assert titles(await client.get("/home", headers=other)) == [2, 1]
+    finally:
+        monkeypatch.delenv("HERO_PINS")
+        get_settings.cache_clear()

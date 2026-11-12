@@ -1,11 +1,13 @@
 import asyncio
 import logging
+from collections import Counter
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Literal
 
 from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
 
+from app.config import get_settings
 from app.db import utcnow
 from app.deps import CurrentUser, Session
 from app.errors import ApiError
@@ -27,6 +29,8 @@ log = logging.getLogger(__name__)
 
 ROW_SIZE = 20
 HERO_COUNT = 5
+# Titles from the viewer's own MAL list among the heroes.
+PLAN_HEROES = 2
 # The home page waits this long for a hero's wide art. A slower lookup keeps going and fills the
 # cache for the next visit.
 WIDE_ART_BUDGET = 1.5
@@ -106,15 +110,19 @@ async def _mal_rows(
     session: Session,
     skip: set[int],
     hidden: dict[int, datetime],
-) -> tuple[list[HomeItem], list[HomeItem]]:
-    """The "my list" row, and the MAL titles that fill Continue watching."""
+) -> tuple[list[HomeItem], list[HomeItem], list[HomeItem]]:
+    """The "my list" row, the MAL titles that fill Continue watching, and the planned ones."""
     if await session.get(MalLink, user.id) is None:
-        return [], []
+        return [], [], []
     accounts = request.app.state.mal_accounts
     watching = (await accounts.animelist(session, user, "watching"))["data"]
     planned = (await accounts.animelist(session, user, "plan_to_watch"))["data"]
     nodes = [i["node"] for i in (*watching, *planned)]
-    return _items(nodes), _mal_continue(watching, skip, hidden, user.show_nsfw)
+    return (
+        _items(nodes),
+        _mal_continue(watching, skip, hidden, user.show_nsfw),
+        _items([i["node"] for i in planned]),
+    )
 
 
 def todays_genres(today: date, count: int = GENRE_ROWS) -> list[int]:
@@ -177,15 +185,53 @@ async def _wide_art(anizip: "AniZip | None", anime_id: int) -> str | None:
     return art.backdrop
 
 
+def parse_hero_pins(raw: str) -> dict[str, list[int]]:
+    """ "name:id,name:id" to the MAL ids pinned as featured for each username."""
+    pins: dict[str, list[int]] = {}
+    for part in raw.split(","):
+        name, _, anime_id = part.strip().partition(":")
+        if name.strip() and anime_id.strip().isdigit():
+            pins.setdefault(name.strip().lower(), []).append(int(anime_id))
+    return pins
+
+
+def pick_heroes(
+    seasonal: list[dict],
+    pinned: list[dict],
+    taste: list[AnimeCard],
+    plan: list[AnimeCard],
+    seen: set[int],
+    seed: int,
+) -> list[dict]:
+    """Pins first, then a couple of titles from the viewer's own list, then the season's titles
+    that fit what they watch, best scored first. Titles already being watched never repeat."""
+    has_art = lambda n: bool((n.get("main_picture") or {}).get("large"))  # noqa: E731
+    picks = [n for n in pinned if has_art(n)]
+    taken = {n["id"] for n in picks}
+
+    # Their own list, shuffled by day so the picks rotate without jumping on every refresh.
+    mine = [
+        c for c in plan if c.id not in seen and c.id not in taken and c.main_picture is not None
+    ]
+    mine.sort(key=lambda c: hash((seed, c.id)) % 9973)
+    for card in mine[:PLAN_HEROES]:
+        picks.append(card.model_dump(mode="json"))
+        taken.add(card.id)
+
+    liked = Counter(g.id for c in taste for g in c.genres)
+    fit = lambda n: sum(min(liked[g.get("id")], 3) for g in n.get("genres") or [])  # noqa: E731
+    rest = [n for n in seasonal if has_art(n) and n["id"] not in seen | taken]
+    rest.sort(key=lambda n: (n.get("mean") or 0) + 0.15 * fit(n), reverse=True)
+    return (picks + rest)[:HERO_COUNT]
+
+
 async def _heroes(
     mal: MalClient,
-    seasonal: list[dict],
+    picks: list[dict],
     synopses: "PtSynopses | None" = None,
     anizip: "AniZip | None" = None,
 ) -> list[HomeHero]:
-    """The best-scored titles of the season that have a large picture."""
-    candidates = [n for n in seasonal if (n.get("main_picture") or {}).get("large")]
-    picks = sorted(candidates, key=lambda n: n.get("mean") or 0, reverse=True)[:HERO_COUNT]
+    """The featured titles, each with a large picture."""
 
     async def one(pick: dict) -> HomeHero:
         details, wide_art = await asyncio.gather(
@@ -247,38 +293,72 @@ async def home(
     pt_synopses = request.app.state.pt_synopses if lang == "pt" else None
     anizip = request.app.state.anizip
 
-    async def seasonal_with_heroes():
-        seasonal = await soft(mal.seasonal(1, user.show_nsfw), "seasonal")
-        nodes = [i["node"] for i in (seasonal or {}).get("data", [])]
-        return seasonal, await _heroes(mal, nodes, pt_synopses, anizip)
+    pinned_ids = parse_hero_pins(get_settings().hero_pins).get(user.username.lower(), [])
 
+    async def pinned_nodes() -> list[dict]:
+        found = await asyncio.gather(
+            *(soft(mal.details(i), f"pinned hero {i}") for i in pinned_ids)
+        )
+        return [n for n in found if n is not None]
+
+    def start(coro):
+        return asyncio.create_task(coro)
+
+    pinned_task = start(pinned_nodes())
+    seasonal_task = start(soft(mal.seasonal(1, user.show_nsfw), "seasonal"))
+    continuing_task = start(_continue_row(mal, progress, user.show_nsfw))
+    mal_rows_task = start(
+        soft(_mal_rows(request, user, session, {p.anime_id for p in progress}, hidden), "MAL lists")
+    )
+    friends_task = start(_friends_popular_row(mal, friend_ids, user.show_nsfw))
+    top_task = start(soft(mal.top(user.show_nsfw), "top"))
+    genre_task = start(soft(_genre_rows(mal, user.show_nsfw), "genre rows"))
+    similar_task = start(soft(_similar_row(mal, progress, user.show_nsfw), "similar row"))
+
+    async def build_heroes() -> list[HomeHero]:
+        # Starts as soon as the rows it draws on are in, while the other rows are still loading.
+        seasonal, pinned, continuing, mal_rows = await asyncio.gather(
+            seasonal_task, pinned_task, continuing_task, mal_rows_task
+        )
+        my_list, from_mal, planned = mal_rows or ([], [], [])
+        seasonal_nodes = [i["node"] for i in (seasonal or {}).get("data", [])]
+        watching_cards = [i.anime for i in [*continuing, *from_mal][:ROW_SIZE]]
+        picks = pick_heroes(
+            seasonal_nodes,
+            pinned,
+            [*watching_cards, *(i.anime for i in my_list)],
+            [i.anime for i in planned],
+            {c.id for c in watching_cards} | {p.anime_id for p in progress},
+            hash((user.id, date.today().toordinal())),
+        )
+        return await _heroes(mal, picks, pt_synopses, anizip)
+
+    heroes_task = start(build_heroes())
     (
-        seasonal_and_heroes,
-        friends_popular,
-        top,
+        seasonal,
         continuing,
         mal_rows,
+        friends_popular,
+        top,
         genre_rows,
         similar,
     ) = await asyncio.gather(
-        seasonal_with_heroes(),
-        _friends_popular_row(mal, friend_ids, user.show_nsfw),
-        soft(mal.top(user.show_nsfw), "top"),
-        _continue_row(mal, progress, user.show_nsfw),
-        soft(
-            _mal_rows(request, user, session, {p.anime_id for p in progress}, hidden), "MAL lists"
-        ),
-        soft(_genre_rows(mal, user.show_nsfw), "genre rows"),
-        soft(_similar_row(mal, progress, user.show_nsfw), "similar row"),
+        seasonal_task,
+        continuing_task,
+        mal_rows_task,
+        friends_task,
+        top_task,
+        genre_task,
+        similar_task,
     )
-    seasonal, heroes = seasonal_and_heroes
-    my_list, from_mal = mal_rows or ([], [])
+    heroes = await heroes_task
+    my_list, from_mal, _ = mal_rows or ([], [], [])
     # What was watched here comes first; MAL's Watching list fills the rest.
     continuing = [*continuing, *from_mal][:ROW_SIZE]
+    seasonal_nodes = [i["node"] for i in (seasonal or {}).get("data", [])]
     if seasonal is None and top is None:
         raise ApiError(502, "mal_unavailable", "MyAnimeList is unavailable")
 
-    seasonal_nodes = [i["node"] for i in (seasonal or {}).get("data", [])]
     top_nodes = [i["node"] for i in (top or {}).get("data", [])]
     rows = [
         HomeRow(id="continue_watching", items=continuing),

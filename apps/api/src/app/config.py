@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     # Product name in one place: it may still change.
     app_name: str = "MoonRoom"
+    # Titles always featured first on a user's home page: "username:mal_id,username:mal_id".
+    hero_pins: str = ""
 
     database_url: str = "postgresql+asyncpg://app:app@localhost:5432/app"
     db_pool_size: int = 10
