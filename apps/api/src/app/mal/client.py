@@ -5,6 +5,7 @@ clear `mal_unavailable` error instead of a KeyError on an error body.
 """
 
 import asyncio
+import logging
 from datetime import date
 from typing import Any
 
@@ -17,6 +18,9 @@ from app.sharedcache import SharedCache
 from app.singleflight import SingleFlight
 
 API_BASE = "https://api.myanimelist.net/v2"
+log = logging.getLogger(__name__)
+RETRIES = 1  # one quick retry for MAL hiccups
+_RETRY_STATUSES = {429, 500, 502, 503, 504}
 
 LIST_FIELDS = (
     "alternative_titles,main_picture,mean,media_type,num_episodes,start_season,rating,"
@@ -147,16 +151,33 @@ class MalClient:
     async def _fetch(
         self, path: str, params: dict[str, Any], not_found: str = "anime_not_found"
     ) -> dict:
-        try:
-            async with self._slots:
-                response = await self._http.get(
-                    f"{self._api_base}{path}", headers=self._headers, params=params, timeout=15
-                )
-        except httpx.HTTPError as exc:
-            raise ApiError(502, "mal_unavailable", f"MyAnimeList request failed: {exc}") from exc
+        response = None
+        for attempt in range(RETRIES + 1):
+            try:
+                async with self._slots:
+                    response = await self._http.get(
+                        f"{self._api_base}{path}",
+                        headers=self._headers,
+                        params=params,
+                        timeout=15,
+                    )
+            except httpx.HTTPError as exc:
+                log.warning("MAL %s failed (attempt %d): %r", path, attempt + 1, exc)
+                if attempt == RETRIES:
+                    raise ApiError(
+                        502, "mal_unavailable", f"MyAnimeList request failed: {exc}"
+                    ) from exc
+            else:
+                if response.status_code not in _RETRY_STATUSES or attempt == RETRIES:
+                    break
+                status = response.status_code
+                log.warning("MAL %s answered %d (attempt %d)", path, status, attempt + 1)
+            await asyncio.sleep(0.4 * (attempt + 1))
+        assert response is not None
         if response.status_code == 404:
             raise ApiError(404, not_found, "Title not found")
         if response.status_code != 200:
+            log.warning("MAL %s gave up with %d", path, response.status_code)
             raise ApiError(502, "mal_unavailable", f"MyAnimeList answered {response.status_code}")
         return response.json()
 
