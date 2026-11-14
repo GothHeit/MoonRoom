@@ -36,6 +36,8 @@ CHAPTERS_TTL = 3600
 OWNER_TTL = 24 * 3600
 # How alike a MangaDex title must be to the MAL one when MangaDex has no MAL link for it.
 MIN_RATIO = 88
+# Searches per title: each one is a request to MangaDex, and only a miss goes on to the next.
+MAX_QUERIES = 5
 # Languages the app shows first, in order; everything else follows alphabetically.
 PREFERRED_LANGS = ("pt-br", "en")
 
@@ -88,6 +90,23 @@ def pick_language(available: list[str], wanted: str | None) -> str | None:
     if wanted and wanted in available:
         return wanted
     return order_languages(available)[0]
+
+
+def search_queries(manga: dict) -> list[str]:
+    """What to search MangaDex for, best first: the titles, then the synonyms (MAL often keeps
+    the romanisation MangaDex uses there), then the part after a colon. A search stops at the
+    first query that finds the title."""
+    alt = manga.get("alternative_titles") or {}
+    candidates = [manga.get("title"), alt.get("en"), alt.get("ja"), *(alt.get("synonyms") or [])]
+    title = manga.get("title") or ""
+    if ":" in title:
+        candidates.append(title.split(":", 1)[1])
+    out: list[str] = []
+    for item in candidates:
+        text = (item or "").strip()
+        if text and text not in out:
+            out.append(text)
+    return out[:MAX_QUERIES]
 
 
 def match_entry(detail: dict, entries: list[dict]) -> dict | None:
@@ -165,16 +184,14 @@ class MangaDexSource:
         if shared is not None:
             self._matches[mal_id] = shared
             return None if shared.get("missing") else shared
-        alt = manga.get("alternative_titles") or {}
-        queries: list[str] = []
-        for title in (manga.get("title"), alt.get("en"), alt.get("ja")):
-            if title and title not in queries:
-                queries.append(title)
         seen: dict[str, dict] = {}
-        for query in queries[:2]:
+        found = None
+        for query in search_queries(manga):
             for entry in await self._search(query):
                 seen.setdefault(entry["id"], entry)
-        found = match_entry(manga, list(seen.values()))
+            found = match_entry(manga, list(seen.values()))
+            if found is not None:
+                break
         if found is None:
             self._matches[mal_id] = _MISSING
             await self._shared.set("mangadex-match", mal_id, _MISSING, MATCH_TTL / 4)

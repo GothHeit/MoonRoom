@@ -4,7 +4,14 @@ import httpx
 import pytest
 import respx
 
-from app.manga.mangadex import API, MangaDexSource, match_entry, order_languages, pick_language
+from app.manga.mangadex import (
+    API,
+    MangaDexSource,
+    match_entry,
+    order_languages,
+    pick_language,
+    search_queries,
+)
 
 FRIEREN = {
     "id": 52991,
@@ -95,7 +102,7 @@ async def test_chapters_dedupe_groups_and_skip_external_ones(source):
     assert "translatedLanguage%5B%5D=en" in str(feed.calls.last.request.url)
     # The match and the list are remembered.
     await source.chapters(FRIEREN, "en")
-    assert search.call_count == 2 and feed.call_count == 1  # two titles searched, once
+    assert search.call_count == 1 and feed.call_count == 1  # the first search matched, once
 
 
 @respx.mock
@@ -103,7 +110,7 @@ async def test_a_title_mangadex_lacks_is_remembered_as_missing(source):
     search = respx.get(f"{API}/manga").mock(return_value=httpx.Response(200, json={"data": []}))
     assert await source.chapters(FRIEREN, None) is None
     assert await source.chapters(FRIEREN, None) is None
-    assert search.call_count == 2  # one per title searched, once
+    assert search.call_count == 3  # one per title and synonym searched, once
 
 
 C1 = "11111111-1111-4111-8111-111111111111"
@@ -147,3 +154,14 @@ async def test_pages_come_from_the_at_home_server_for_the_titles_own_chapters(so
     gone = "33333333-3333-4333-8333-333333333333"
     respx.get(f"{API}/chapter/{gone}").mock(return_value=httpx.Response(404))
     assert await source.pages(FRIEREN, gone) is None
+
+
+def test_search_queries_try_synonyms_and_the_part_after_the_colon():
+    manga = {
+        "title": "Seiyoku Monster Sanshimai: Bitch na Harem Sakusei",
+        "alternative_titles": {"synonyms": ["Bitch Gal Sanshimal Harem Sakusei"]},
+    }
+    queries = search_queries(manga)
+    assert queries[0] == manga["title"]
+    assert "Bitch Gal Sanshimal Harem Sakusei" in queries
+    assert "Bitch na Harem Sakusei" in queries
