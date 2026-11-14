@@ -60,6 +60,17 @@ async def test_mal_errors_become_clear_api_errors(client, session):
     assert r.json()["error"]["code"] == "mal_unavailable"
 
 
+@respx.mock
+async def test_a_mal_hiccup_is_retried_once(client, session):
+    _, headers = await make_user(session, "kafka")
+    route = respx.get(f"{API_BASE}/manga").mock(
+        side_effect=[httpx.Response(503), httpx.Response(200, json={"data": []})]
+    )
+    r = await client.get("/manga/search", params={"q": "bitch gal ni"}, headers=headers)
+    assert r.status_code == 200
+    assert route.call_count == 2
+
+
 async def test_anime_routes_need_login(client):
     assert (await client.get("/anime/top")).status_code == 401
 
