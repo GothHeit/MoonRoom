@@ -8,10 +8,19 @@ export type ClockSample = { offset: number; rtt: number };
 
 /**
  * The best guess of how far the server's clock is from this one (server = local + offset): the
- * sample with the quickest round trip, since its answer spent the least time on the way.
+ * median of the quickest quarter of the samples. The quick ones spent the least time on the way,
+ * so they are the least skewed; the median keeps one lucky outlier from deciding alone.
  */
 export function bestSample(samples: ClockSample[]): ClockSample | null {
-  return samples.reduce<ClockSample | null>((best, s) => (best === null || s.rtt < best.rtt ? s : best), null);
+  if (samples.length === 0) return null;
+  const quick = [...samples].sort((a, b) => a.rtt - b.rtt).slice(0, Math.max(1, Math.ceil(samples.length / 4)));
+  return { offset: median(quick.map((s) => s.offset)), rtt: median(quick.map((s) => s.rtt)) };
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /** One measurement from a request sent at t0 and answered at t1 with the server's time. */
@@ -20,19 +29,31 @@ export function sample(t0: number, serverNow: number, t1: number): ClockSample {
   return { offset: serverNow + rtt / 2 - t1, rtt };
 }
 
-const FIRST_PINGS = 5;
-const KEEP = 8;
+const JOIN_PINGS = 20;
+const REFRESH_PINGS = 8;
+const KEEP = 24;
+/** Samples needed before the clock is trusted enough to steer by. */
+const READY_AT = 5;
 const EVERY_MS = 30_000;
+/** However far the group check pushes this viewer, never more than this (ms). */
+const MAX_TRIM_MS = 1000;
 
 /**
- * Measures the offset between this device's clock and the server's, NTP style: a few pings on
- * start, then one every 30 s, keeping the quickest of the last few. `measure` runs a fresh
- * round, for when the page comes back from the background.
+ * Measures the offset between this device's clock and the server's, NTP style: about twenty pings
+ * on start, then a handful every 30 s, keeping the last few dozen and trusting the quickest
+ * quarter. `measure` runs a fresh round, for when the page comes back from the background.
+ *
+ * Even then the offset is only as good as the guess that the way there and back took equally
+ * long, which through a tunnel it doesn't. `setTrim` lets the room's group check shave off what is
+ * left: it shifts this viewer's idea of server time a little, toward where the others are.
  */
 export function useServerClock() {
   const samples = useRef<ClockSample[]>([]);
   const offset = useRef(0);
+  const trim = useRef(0);
   const rtt = useRef<number | null>(null);
+  const ready = useRef(false);
+  const running = useRef(false);
 
   const ping = useCallback(async () => {
     const t0 = Date.now();
@@ -40,24 +61,42 @@ export function useServerClock() {
     if (!data) return;
     samples.current = [...samples.current, sample(t0, data.now, Date.now())].slice(-KEEP);
     const best = bestSample(samples.current);
-    if (best) {
+    if (best && (samples.current.length >= READY_AT || !ready.current)) {
       offset.current = best.offset;
       rtt.current = best.rtt;
+      if (samples.current.length >= READY_AT) ready.current = true;
     }
   }, []);
 
+  const burst = useCallback(
+    async (count: number) => {
+      if (running.current) return;
+      running.current = true;
+      try {
+        for (let i = 0; i < count; i++) await ping();
+      } finally {
+        running.current = false;
+      }
+    },
+    [ping],
+  );
+
   const measure = useCallback(async () => {
     samples.current = [];
-    for (let i = 0; i < FIRST_PINGS; i++) await ping();
-  }, [ping]);
+    await burst(JOIN_PINGS);
+  }, [burst]);
 
   useEffect(() => {
     void measure();
-    const id = setInterval(() => void ping(), EVERY_MS);
+    const id = setInterval(() => void burst(REFRESH_PINGS), EVERY_MS);
     return () => clearInterval(id);
-  }, [measure, ping]);
+  }, [measure, burst]);
 
-  const serverNow = useCallback(() => Date.now() + offset.current, []);
-  const ready = useCallback(() => rtt.current !== null, []);
-  return { serverNow, ready, measure, offset, rtt };
+  const serverNow = useCallback(() => Date.now() + offset.current + trim.current, []);
+  const isReady = useCallback(() => ready.current, []);
+  /** Sets how far (seconds) this viewer's idea of server time is shifted, within a limit. */
+  const setTrim = useCallback((seconds: number) => {
+    trim.current = Math.max(-MAX_TRIM_MS, Math.min(MAX_TRIM_MS, seconds * 1000));
+  }, []);
+  return { serverNow, ready: isReady, measure, setTrim, offset, trim, rtt };
 }
