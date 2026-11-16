@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import type { StreamChoice } from "@/lib/watch-target";
 
-import { APPLY_WINDOW_MS, commandFor, correction, type LocalEvent, type Playback, type VideoState } from "./sync";
+import { APPLY_WINDOW_MS, commandFor, correction, nextTrim, type LocalEvent, type Playback, type VideoState } from "./sync";
 
 export type RoomBinding = {
   playback: Playback;
@@ -23,6 +23,16 @@ export type RoomBinding = {
   switchStream?: (to: StreamChoice) => unknown;
   /** Called when a locked viewer tries to control the video. */
   onLocked: () => void;
+  /** The group check: reports this viewer's position and moves their clock toward the others. */
+  peers?: {
+    /** Resolves to the trim (seconds) that would put this viewer at the group's median, or null. */
+    report: (position: number, uplinkMs: number, trim: number) => Promise<number | null>;
+    /** The shift (seconds) this viewer's idea of server time has now. */
+    trim: () => number;
+    setTrim: (seconds: number) => void;
+    /** The clock's best round trip (ms), or null before it is measured. */
+    rtt: () => number | null;
+  };
   /** Shows the sync numbers over the video, for checking a real device. */
   debug?: { offset: () => number; rtt: () => number | null };
   /** Rendered in the player's top bar, after the title. */
@@ -55,6 +65,10 @@ const FIRST_SEEK_COST = 0.15;
 const MAX_SEEK_COST = 1;
 /** After the viewer's own action, the room's answer is awaited this long before steering again. */
 const ANSWER_MS = 2500;
+/** How often a playing viewer tells the room where they are. */
+export const PEER_REPORT_MS = 5000;
+/** A report is skipped this soon after our own jump, while the player is still landing. */
+const SETTLE_MS = 3000;
 
 /**
  * Keeps a player in step with a room: works out where the room is right now on the server's
@@ -150,6 +164,40 @@ export function useRoomSync(video: VideoControls, room: RoomBinding | undefined)
       clearTimeout(startTimer.current);
     };
   }, [inRoom, apply]);
+
+  // The group check: now and then, say where the video is and let the room tell how far that is
+  // from the others. Each device's clock offset is a little off, so left alone two viewers can
+  // each believe they are on time and stay a fraction of a second apart.
+  useEffect(() => {
+    if (!inRoom) return;
+    let busy = false;
+    const id = setInterval(() => {
+      const current = latest.current;
+      const peers = current?.peers;
+      const state = controls.current.read();
+      if (!peers || !current?.clockReady() || !state || busy) return;
+      if (state.paused || state.seeking || !current.playback.playing) return;
+      const now = Date.now();
+      if (now < lastSeekAt.current + SETTLE_MS || now < ignoreUntil.current) return;
+      if (awaiting.current) return;
+      const clockRtt = peers.rtt();
+      const sentAt = now;
+      busy = true;
+      const trimNow = peers.trim();
+      peers
+        .report(state.currentTime, (clockRtt ?? 0) / 2, trimNow)
+        .then((target) => {
+          if (target === null) return;
+          const next = nextTrim(peers.trim(), target, Date.now() - sentAt, clockRtt);
+          if (next !== null) peers.setTrim(next);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          busy = false;
+        });
+    }, PEER_REPORT_MS);
+    return () => clearInterval(id);
+  }, [inRoom]);
 
   // Reports a stall once it lasts, and the recovery after it. The room decides whether it
   // matters: a paused room ignores it.

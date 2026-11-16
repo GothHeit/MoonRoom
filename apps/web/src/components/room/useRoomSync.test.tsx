@@ -2,12 +2,16 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { VideoState } from "./sync";
-import { useRoomSync, type RoomBinding, type VideoControls } from "./useRoomSync";
+import { PEER_REPORT_MS, useRoomSync, type RoomBinding, type VideoControls } from "./useRoomSync";
 
 const NOW = 1_000_000;
 
-function setup(video: VideoState, clockReady = true) {
+function setup(video: VideoState, clockReady = true, offset: number | null = null) {
   const send = vi.fn();
+  const report = vi.fn<(position: number, uplink: number, trim: number) => Promise<number | null>>(() =>
+    Promise.resolve(offset),
+  );
+  const setTrim = vi.fn();
   const controls: VideoControls = {
     read: () => video,
     seek: vi.fn((s: number) => {
@@ -30,9 +34,20 @@ function setup(video: VideoState, clockReady = true) {
     onLocked: vi.fn(),
     topBar: null,
     overlay: null,
+    peers: { report, trim: () => 0, setTrim, rtt: () => 40 },
   };
   const hook = renderHook(() => useRoomSync(controls, room));
-  return { hook, send, controls };
+  return { hook, send, controls, report, setTrim };
+}
+
+/** Lets time pass with the video keeping up with the room, as a synced player does. */
+async function playFor(video: VideoState, ms: number) {
+  for (let t = 0; t < ms; t += 250) {
+    video.currentTime += 0.25;
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+  }
 }
 
 describe("useRoomSync", () => {
@@ -68,5 +83,29 @@ describe("useRoomSync", () => {
     act(() => vi.advanceTimersByTime(1000));
     expect(controls.seek).not.toHaveBeenCalled();
     expect(controls.setRate).not.toHaveBeenCalled();
+  });
+
+  it("tells the room where it is now and then, and trims its clock toward the group", async () => {
+    const video: VideoState = { currentTime: 21, paused: false, playbackRate: 1, seeking: false, wireless: false };
+    const { report, setTrim } = setup(video, true, 0.2);
+    await playFor(video, PEER_REPORT_MS);
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(report).toHaveBeenCalledWith(expect.closeTo(26, 0), 20, 0);
+    expect(setTrim).toHaveBeenCalledWith(expect.closeTo(0.1));
+  });
+
+  it("does not report while paused", async () => {
+    const paused: VideoState = { currentTime: 21, paused: true, playbackRate: 1, seeking: false, wireless: false };
+    const a = setup(paused, true, 0.2);
+    await playFor(paused, PEER_REPORT_MS);
+    expect(a.report).not.toHaveBeenCalled();
+  });
+
+  it("does nothing with an answer of null, as when it is alone in the room", async () => {
+    const playing: VideoState = { currentTime: 21, paused: false, playbackRate: 1, seeking: false, wireless: false };
+    const b = setup(playing, true, null);
+    await playFor(playing, PEER_REPORT_MS);
+    expect(b.report).toHaveBeenCalled();
+    expect(b.setTrim).not.toHaveBeenCalled();
   });
 });

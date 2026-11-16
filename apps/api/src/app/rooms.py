@@ -8,6 +8,7 @@ RoomStore) so a restart or a deploy picks the rooms up again and viewers just re
 
 import asyncio
 import secrets
+import statistics
 import time
 import uuid
 from collections.abc import Callable
@@ -43,6 +44,12 @@ INVITE_TTL_SECONDS = 30 * 60
 START_LEAD_SECONDS = 0.4
 SEEK_LEAD_SECONDS = 1.0
 EPISODE_LEAD_SECONDS = 3.0
+# A position report older than this no longer counts toward the group's median; a viewer's
+# lead is the median of their last few reports, and needs a few before it counts at all.
+LEAD_FRESH_SECONDS = 40.0
+LEAD_REPORTS_KEPT = 7
+LEAD_REPORTS_NEEDED = 3
+MAX_UPLINK_SECONDS = 1.0
 MAX_INVITES_PER_ROOM = 50
 MAX_INVITES_PER_PERSON = 10
 
@@ -84,6 +91,9 @@ class Room:
     buffering: dict[uuid.UUID, float] = field(default_factory=dict)
     # True while the room is paused only because someone is buffering.
     held: bool = False
+    # Each viewer's recent reports of how far ahead of the room they are (seconds), each with the
+    # monotonic time it came in; cleared whenever the room moves, since a seek makes them stale.
+    leads: dict[uuid.UUID, list[tuple[float, float]]] = field(default_factory=dict)
     # Until when a viewer who held the room may not hold it again.
     hold_blocked: dict[uuid.UUID, float] = field(default_factory=dict)
     # When the host was last seen leaving (monotonic), so a room whose host never came back
@@ -107,6 +117,7 @@ class Room:
         self.playing = playing
         self.moved_at = time.monotonic() + (lead if playing else 0.0)
         self.version += 1
+        self.leads.clear()
 
     def playback(self, by: uuid.UUID | None = None) -> dict:
         """Where the room is: at `position` at server time `at` (epoch ms, possibly a moment
@@ -191,6 +202,7 @@ class Room:
             return
         del self.members[user_id]
         self.votes.pop(user_id, None)
+        self.leads.pop(user_id, None)
         self._stop_buffering(user_id)
         if user_id == self.host_id:
             self.host_left_at = time.monotonic()
@@ -286,6 +298,38 @@ class Room:
             self.broadcast("playback", self.playback())
         self.buffering[user_id] = now
         self._state()
+
+    def report_position(
+        self, user_id: uuid.UUID, position: float, uplink: float, trim: float
+    ) -> float | None:
+        """A viewer says where their video is and how far they have already shifted their idea of
+        server time (`trim`, seconds). Returns the trim they should have to sit at the group's
+        median, or None while there is not enough to compare (paused, held, starting, alone, or
+        too few reports yet).
+
+        Viewers each measure the server's clock with a little error, so everyone can believe they
+        are on time and still be 0.2 s apart. Comparing positions as they arrive here, all on the
+        one server clock, shows the real gap. A single report is noisy (its trip took however long
+        it took), so each viewer's lead is the median of their last few, with their own trim taken
+        out so that earlier reports stay comparable after they move."""
+        self._require_member(user_id)
+        now = time.monotonic()
+        if not self.playing or self.held or self.moved_at > now or user_id in self.buffering:
+            self.leads.pop(user_id, None)
+            return None
+        # The report left `uplink` seconds ago, so the room was that much earlier then.
+        lead = position - (self.now_position() - min(max(uplink, 0.0), MAX_UPLINK_SECONDS))
+        history = self.leads.setdefault(user_id, [])
+        history.append((lead - trim, now))
+        del history[:-LEAD_REPORTS_KEPT]
+        medians: dict[uuid.UUID, float] = {}
+        for member, reports in self.leads.items():
+            recent = [value for value, at in reports if now - at <= LEAD_FRESH_SECONDS]
+            if member in self.members and len(recent) >= LEAD_REPORTS_NEEDED:
+                medians[member] = statistics.median(recent)
+        if user_id not in medians or len(medians) < 2:
+            return None
+        return statistics.median(medians.values()) - medians[user_id]
 
     def _stop_buffering(self, user_id: uuid.UUID) -> None:
         if self.buffering.pop(user_id, None) is None:

@@ -49,6 +49,19 @@ test("mixed latency, three viewers", async ({ browser }) => {
   await s.finish(from);
 });
 
+// Each viewer's clock guess comes from pings whose two legs never take quite the same time, so
+// on jittery lines the guesses are off by different amounts, and so are the viewers' pictures.
+test("jittery lines, three viewers", async ({ browser }) => {
+  const { s, viewers } = await room(browser, "jitter-3", [
+    ["alice", { latency: 120, jitter: 100, skew: 1500 }],
+    ["bob", { latency: 120, jitter: 100, skew: -900 }],
+    ["carol", { latency: 120, jitter: 100, skew: 2000 }],
+  ]);
+  const from = await startPlaying(s, viewers[0]);
+  await s.wait(SECONDS);
+  await s.finish(from);
+});
+
 test("seeks by different viewers", async ({ browser }) => {
   const { s, viewers } = await room(browser, "seeks", [["alice", NEAR], ["bob", MID], ["carol", FAR]]);
   const from = await startPlaying(s, viewers[0]);

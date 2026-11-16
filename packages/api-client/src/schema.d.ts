@@ -1662,6 +1662,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/watch/rooms/{code}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report Position */
+        post: operations["report_position_watch_rooms__code__position_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/watch/rooms/{code}/reaction": {
         parameters: {
             query?: never;
@@ -2878,6 +2895,26 @@ export interface components {
             subtitle_position?: ("bottom" | "raised" | "top") | null;
             /** Subtitle Size */
             subtitle_size?: ("small" | "medium" | "large" | "huge") | null;
+        };
+        /** PositionIn */
+        PositionIn: {
+            /** Position */
+            position: number;
+            /**
+             * Trim
+             * @default 0
+             */
+            trim: number;
+            /**
+             * Uplink Ms
+             * @default 0
+             */
+            uplink_ms: number;
+        };
+        /** PositionOut */
+        PositionOut: {
+            /** Trim */
+            trim: number | null;
         };
         /** PresetIn */
         PresetIn: {
@@ -6348,6 +6385,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_position_watch_rooms__code__position_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PositionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PositionOut"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -78,6 +78,20 @@ class ControlIn(BaseModel):
     position: float | None = Field(default=None, ge=0, le=86_400)
 
 
+class PositionIn(BaseModel):
+    position: float = Field(ge=0, le=86_400)
+    # How long this viewer thinks the request takes to reach the server (ms): half their last ping.
+    uplink_ms: float = Field(default=0, ge=0, le=5_000)
+    # How far (seconds) this viewer has already shifted their idea of server time.
+    trim: float = Field(default=0, ge=-5, le=5)
+
+
+class PositionOut(BaseModel):
+    # The shift (seconds) this viewer should have to sit at the group's median; null when there
+    # is nothing to compare yet.
+    trim: float | None
+
+
 class ChatIn(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
 
@@ -168,6 +182,16 @@ async def control(code: str, body: ControlIn, request: Request, user: CurrentUse
 @router.post("/{code}/buffering", status_code=204)
 async def buffering(code: str, body: BufferingIn, request: Request, user: CurrentUser):
     _room(request, code).set_buffering(user.id, body.buffering)
+
+
+@router.post(
+    "/{code}/position", response_model=PositionOut, dependencies=[throttle("room_position")]
+)
+async def report_position(code: str, body: PositionIn, request: Request, user: CurrentUser):
+    target = _room(request, code).report_position(
+        user.id, body.position, body.uplink_ms / 1000, body.trim
+    )
+    return {"trim": None if target is None else round(target, 3)}
 
 
 @router.post("/{code}/chat", status_code=204, dependencies=[throttle("room_chat")])
