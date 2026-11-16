@@ -8,6 +8,7 @@ import {
   correction,
   expectedPosition,
   newer,
+  nextTrim,
   votesNeeded,
   type Playback,
   type VideoState,
@@ -120,12 +121,33 @@ describe("clock", () => {
     expect(sample(1000, 5100, 1200)).toEqual({ offset: 4000, rtt: 200 });
   });
 
-  it("trusts the quickest round trip", () => {
+  it("takes the median of the quickest quarter of the round trips", () => {
     expect(bestSample([{ offset: 50, rtt: 300 }, { offset: 12, rtt: 40 }, { offset: -30, rtt: 90 }])).toEqual({
       offset: 12,
       rtt: 40,
     });
     expect(bestSample([])).toBeNull();
+    // Twelve samples: the quickest three decide, so one lucky outlier (offset 200) is outvoted.
+    const many = [
+      { offset: 200, rtt: 20 },
+      { offset: 100, rtt: 22 },
+      { offset: 110, rtt: 25 },
+      ...Array.from({ length: 9 }, (_, i) => ({ offset: -500 + i, rtt: 80 + i })),
+    ];
+    expect(bestSample(many)).toEqual({ offset: 110, rtt: 22 });
+  });
+});
+
+describe("nextTrim", () => {
+  it("goes half way to the trim the room asked for", () => {
+    expect(nextTrim(0, -0.2, 40, 40)).toBeCloseTo(-0.1);
+    expect(nextTrim(-0.1, -0.2, 40, 40)).toBeCloseTo(-0.15);
+  });
+
+  it("ignores tiny changes and answers that took long to arrive", () => {
+    expect(nextTrim(0.1, 0.105, 40, 40)).toBeNull();
+    expect(nextTrim(0, 0.3, 400, 40)).toBeNull();
+    expect(nextTrim(0, 0.3, 400, null)).toBeCloseTo(0.15);
   });
 });
 

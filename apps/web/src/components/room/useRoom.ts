@@ -280,6 +280,16 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
       api.POST("/watch/rooms/{code}/buffering", { ...path, body: { buffering } }).catch(() => undefined),
     [path],
   );
+  const reportPosition = useCallback(
+    async (position: number, uplinkMs: number, trim: number) => {
+      const { data } = await api.POST("/watch/rooms/{code}/position", {
+        ...path,
+        body: { position, uplink_ms: uplinkMs, trim },
+      });
+      return data?.trim ?? null;
+    },
+    [path],
+  );
   const say = useCallback(
     (text: string) => report(api.POST("/watch/rooms/{code}/chat", { ...path, body: { text } })),
     [path, report],
@@ -318,6 +328,7 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
     toasts,
     send,
     setBuffering,
+    reportPosition,
     say,
     react,
     voteEpisode,

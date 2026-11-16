@@ -134,3 +134,19 @@ export function correction(playback: Playback, video: VideoState, serverNow: num
 export function votesNeeded(members: number): number {
   return Math.floor(members / 2) + 1;
 }
+
+/** A change of trim (seconds) smaller than this is not worth making. */
+export const TRIM_DEADBAND = 0.01;
+/** How much of the way to the room's target one answer goes; the rest comes with the next. */
+const TRIM_GAIN = 0.5;
+
+/**
+ * The trim (seconds this viewer shifts their idea of server time) after the room answered that
+ * `target` would put them at the group's median, or null to leave it. An answer whose own round
+ * trip was slow tells little about where the video was, so it is ignored.
+ */
+export function nextTrim(current: number, target: number, reportRtt: number, clockRtt: number | null): number | null {
+  if (Math.abs(target - current) < TRIM_DEADBAND) return null;
+  if (clockRtt !== null && reportRtt > Math.max(clockRtt * 2, clockRtt + 80)) return null;
+  return current + (target - current) * TRIM_GAIN;
+}

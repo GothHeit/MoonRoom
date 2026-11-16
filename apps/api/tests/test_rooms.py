@@ -580,3 +580,87 @@ async def test_a_room_whose_host_never_returns_goes_to_the_next_joiner():
     assert room.host_id == friend
     room.join(host, "kafka")
     assert room.host_id == friend
+
+
+def reports(room, user, position_offset, times=3, trim=0.0, uplink=0.0):
+    """The viewer reports as often as the check wants; returns the last answer."""
+    answer = None
+    for _ in range(times):
+        answer = room.report_position(user, room.now_position() + position_offset, uplink, trim)
+    return answer
+
+
+async def test_position_reports_give_each_viewer_the_trim_that_meets_the_group():
+    room, host = new_room()
+    guest, third = uuid.uuid4(), uuid.uuid4()
+    for user, name in ((host, "kafka"), (guest, "friend"), (third, "other")):
+        room.join(user, name)
+    room.control(host, "play", 0)
+    room.moved_at = time.monotonic() - 10
+    # Too few reports, or only one viewer reporting: nothing to compare.
+    assert reports(room, host, 0.0, times=2) is None
+    assert reports(room, host, 0.0) is None
+    assert reports(room, guest, 0.3) == pytest.approx(-0.15, abs=0.01)
+    assert reports(room, third, 0.0) == pytest.approx(0.0, abs=0.01)
+    # Three viewers: the median is the middle one, so the one ahead is told to fall back 0.3.
+    assert reports(room, guest, 0.3) == pytest.approx(-0.3, abs=0.01)
+    assert reports(room, host, 0.0) == pytest.approx(0.0, abs=0.01)
+
+
+async def test_a_viewers_own_trim_does_not_move_what_the_room_thinks_of_them():
+    room, host = new_room()
+    guest = uuid.uuid4()
+    room.join(host, "kafka")
+    room.join(guest, "friend")
+    room.control(host, "play", 0)
+    room.moved_at = time.monotonic() - 10
+    reports(room, host, 0.0)
+    assert reports(room, guest, 0.2) == pytest.approx(-0.1, abs=0.01)
+    # The guest shifted by -0.1 as told, so now sits 0.1 ahead: the answer stays the same.
+    assert reports(room, guest, 0.1, trim=-0.1) == pytest.approx(-0.1, abs=0.01)
+
+
+async def test_one_slow_report_does_not_decide():
+    room, host = new_room()
+    guest = uuid.uuid4()
+    room.join(host, "kafka")
+    room.join(guest, "friend")
+    room.control(host, "play", 0)
+    room.moved_at = time.monotonic() - 10
+    reports(room, host, 0.0, times=5)
+    reports(room, guest, 0.0, times=4)
+    # A report that spent 400 ms in the post office lands once among four good ones.
+    assert reports(room, guest, -0.4, times=1) == pytest.approx(0.0, abs=0.01)
+
+
+async def test_position_reports_ignore_a_paused_or_moving_room_and_stale_news():
+    room, host = new_room()
+    guest = uuid.uuid4()
+    room.join(host, "kafka")
+    room.join(guest, "friend")
+    assert reports(room, host, 0.0) is None
+    room.control(host, "play", 5)
+    # A scheduled start hasn't begun: nothing to compare.
+    assert reports(room, host, 0.0) is None
+    room.moved_at = time.monotonic() - 1
+    reports(room, host, 0.0)
+    reports(room, guest, 0.0)
+    assert len(room.leads) == 2
+    room.control(host, "seek", 40)
+    assert room.leads == {}
+    room.moved_at = time.monotonic() - 1
+    reports(room, host, 5.0)
+    # The old reports are stale once their time is up, so the guest has no one to compare with.
+    room.leads[host] = [(5.0, time.monotonic() - 60)] * 3
+    assert reports(room, guest, 0.0) is None
+
+
+async def test_the_uplink_time_is_taken_off_a_report():
+    room, host = new_room()
+    guest = uuid.uuid4()
+    room.join(host, "kafka")
+    room.join(guest, "friend")
+    room.control(host, "play", 0)
+    room.moved_at = time.monotonic() - 10
+    reports(room, host, -0.1, uplink=0.1)
+    assert reports(room, guest, 0.0) == pytest.approx(0.0, abs=0.02)

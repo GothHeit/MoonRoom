@@ -3372,6 +3372,55 @@
         "title": "PlayerPreferencesIn",
         "type": "object"
       },
+      "PositionIn": {
+        "properties": {
+          "position": {
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Position",
+            "type": "number"
+          },
+          "trim": {
+            "default": 0,
+            "maximum": 5.0,
+            "minimum": -5.0,
+            "title": "Trim",
+            "type": "number"
+          },
+          "uplink_ms": {
+            "default": 0,
+            "maximum": 5000.0,
+            "minimum": 0.0,
+            "title": "Uplink Ms",
+            "type": "number"
+          }
+        },
+        "required": [
+          "position"
+        ],
+        "title": "PositionIn",
+        "type": "object"
+      },
+      "PositionOut": {
+        "properties": {
+          "trim": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trim"
+          }
+        },
+        "required": [
+          "trim"
+        ],
+        "title": "PositionOut",
+        "type": "object"
+      },
       "PresetIn": {
         "properties": {
           "preset": {
@@ -9337,6 +9386,63 @@
           }
         ],
         "summary": "Lock",
+        "tags": [
+          "rooms"
+        ]
+      }
+    },
+    "/watch/rooms/{code}/position": {
+      "post": {
+        "operationId": "report_position_watch_rooms__code__position_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PositionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Report Position",
         "tags": [
           "rooms"
         ]
