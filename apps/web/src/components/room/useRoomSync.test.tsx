@@ -8,7 +8,9 @@ const NOW = 1_000_000;
 
 function setup(video: VideoState, clockReady = true, offset: number | null = null) {
   const send = vi.fn();
-  const report = vi.fn((_p: number, _u: number, _t: number) => Promise.resolve(offset));
+  const report = vi.fn<(position: number, uplink: number, trim: number) => Promise<number | null>>(() =>
+    Promise.resolve(offset),
+  );
   const setTrim = vi.fn();
   const controls: VideoControls = {
     read: () => video,
