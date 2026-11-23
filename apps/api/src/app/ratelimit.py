@@ -238,6 +238,8 @@ class AuthLimits:
         # values, so these stay tight.
         self.mfa_user = new("mfa_user", settings.login_user_limit, window)
         self.mfa_ip = new("mfa_ip", settings.login_ip_limit, window)
+        # Reset links answered to a stranger: wrong or reused tokens, per address.
+        self.reset_ip = new("reset_ip", 20, window)
         # Wrong TV PINs. A PIN has only 10^4 to 10^6 values, so a TV session gets a few tries
         # and the account a few more across every TV; successes take their hit back.
         self.pin_session = new("pin_session", 5, 300)
@@ -252,6 +254,7 @@ class AuthLimits:
             self.password_user,
             self.mfa_user,
             self.mfa_ip,
+            self.reset_ip,
             self.pin_session,
             self.pin_user,
         )

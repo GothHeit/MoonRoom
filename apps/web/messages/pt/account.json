@@ -183,6 +183,29 @@
       "cancel": "Cancelar",
       "saved": "PIN salvo. Suas TVs vão pedir.",
       "removed": "PIN removido."
-    }
+    },
+    "members": {
+      "title": "Membros",
+      "intro": "Todo mundo que tem conta. Se um amigo esquecer a senha, gere um link de uso único e envie você mesmo.",
+      "you": "Você",
+      "admin": "Admin",
+      "twoFactor": "2FA ativo",
+      "joined": "Entrou em {date}",
+      "resetPassword": "Redefinir senha",
+      "validFor": "Link válido por",
+      "hours": "{count, plural, one {# hora} other {# horas}}",
+      "make": "Gerar link",
+      "making": "Gerando…",
+      "failed": "Não foi possível gerar o link. Tente de novo.",
+      "linkTitle": "Link para {username}",
+      "linkBody": "Envie em privado. Funciona uma vez e para de funcionar {when}.",
+      "copy": "Copiar link",
+      "copied": "Link copiado.",
+      "copyFailed": "Não foi possível copiar. Selecione o link e copie à mão.",
+      "twoFactorNote": "Esta conta usa login em duas etapas, então a pessoa ainda precisa do app autenticador ou de um código de backup para entrar.",
+      "close": "Pronto",
+      "empty": "Nenhum membro ainda."
+    },
+    "menuMembers": "Membros"
   }
 }

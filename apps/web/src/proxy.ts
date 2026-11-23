@@ -15,7 +15,10 @@ import { deviceHeaders, refreshSession } from "./lib/session";
 
 const intl = createIntlMiddleware(routing);
 
-const PUBLIC_PATHS = ["/login", "/register", "/tv/login"];
+const PUBLIC_PATHS = ["/login", "/register", "/tv/login", "/reset-password"];
+
+/** Public pages that stay open to a signed-in browser, instead of sending it home. */
+const OPEN_PATHS = ["/reset-password"];
 
 /** The TV mode (/tv) has its own sign-in screen: a code approved on a phone. */
 const isTv = (path: string) => path === "/tv" || path.startsWith("/tv/");
@@ -86,7 +89,7 @@ export default async function proxy(request: NextRequest) {
     const { search } = request.nextUrl;
     return redirect(request, `/${locale}/login`, cookies, path === "/" ? undefined : `${path}${search}`);
   }
-  if (signedIn && isPublic) return redirect(request, isTv(path) ? `/${locale}/tv` : `/${locale}`, cookies);
+  if (signedIn && isPublic && !OPEN_PATHS.includes(path)) return redirect(request, isTv(path) ? `/${locale}/tv` : `/${locale}`, cookies);
 
   const response = renewed ? intl(renewed) : first;
   applyCookies(response.cookies, cookies);

@@ -17,10 +17,11 @@ let counter = 0;
 let refreshCalls = 0;
 // Which account a refresh token belongs to (its tag), so a renewed session stays the same account.
 const refreshTag = new Map();
-const USER_OF_TAG = { "": "kafka", "linked-": "linked", "expired-": "expired" };
+const USER_OF_TAG = { "": "kafka", "linked-": "linked", "expired-": "expired", "owner-": "owner" };
 const idOf = (username) => (username === "kafka" ? "1" : `id-${username}`);
-const userOf = (token) => USER_OF_TAG[/^access-((?:linked-|expired-)?)/.exec(token ?? "")?.[1] ?? ""] ?? "kafka";
+const userOf = (token) => USER_OF_TAG[/^access-((?:linked-|expired-|owner-)?)/.exec(token ?? "")?.[1] ?? ""] ?? "kafka";
 // The TV sign-in code flow: a test approves the pending code for an account.
+let resetSpent = false;
 let deviceApproved = null;
 let devicePending = false;
 
@@ -107,8 +108,8 @@ createServer(async (req, res) => {
     const { username, password } = await body(req);
     // "expired" signs in fine but has a MyAnimeList link whose token has expired; "linked" has a
     // working link and a small list.
-    const tag = { expired: "expired-", linked: "linked-" }[username] ?? "";
-    return (username === "kafka" || username in { expired: 1, linked: 1 }) && password === "password123"
+    const tag = { expired: "expired-", linked: "linked-", owner: "owner-" }[username] ?? "";
+    return (username === "kafka" || username in { expired: 1, linked: 1, owner: 1 }) && password === "password123"
       ? send(200, issue(tag))
       : send(401, error("invalid_credentials"));
   }
@@ -199,6 +200,30 @@ createServer(async (req, res) => {
     return send(200, { enabled: false, id: idOf(username), username, avatar: { kind: "none", version: 0 }, locked: false });
   }
   if (url.pathname === "/auth/pin/lock") return send(authed ? 204 : 401);
+  // Password reset links: "good-token" works once; the owner's member list.
+  if (url.pathname === "/admin/users") {
+    if (userOf(token) !== "owner") return send(403, error("forbidden"));
+    return send(200, [
+      { id: "id-friend", username: "friend", locale: "pt", is_admin: false, two_factor: false, created_at: "2026-11-01T00:00:00Z" },
+      { id: "id-lara", username: "lara_dev", locale: "en", is_admin: false, two_factor: true, created_at: "2026-11-05T00:00:00Z" },
+      { id: "id-owner", username: "owner", locale: "en", is_admin: true, two_factor: false, created_at: "2026-10-01T00:00:00Z" },
+    ]);
+  }
+  if (/^\/admin\/users\/[^/]+\/password-reset$/.test(url.pathname)) {
+    if (userOf(token) !== "owner") return send(403, error("forbidden"));
+    const id = url.pathname.split("/")[3];
+    return send(201, { token: "good-token", locale: id === "id-friend" ? "pt" : "en", expires_at: new Date(Date.now() + 3600_000).toISOString() });
+  }
+  if (url.pathname === "/auth/password-reset/check") {
+    const { token: given } = await body(req);
+    return given === "good-token" && !resetSpent ? send(200, { username: "friend", expires_at: "2027-01-01T00:00:00Z" }) : send(400, error("invalid_reset_link"));
+  }
+  if (url.pathname === "/auth/password-reset") {
+    const { token: given } = await body(req);
+    if (given !== "good-token" || resetSpent) return send(400, error("invalid_reset_link"));
+    resetSpent = true;
+    return send(204);
+  }
   if (url.pathname === "/me") {
     if (!authed) return send(401, error("not_authenticated"));
     if (req.method === "PATCH") {
@@ -212,7 +237,7 @@ createServer(async (req, res) => {
       locale: "en",
       show_nsfw: false,
       subtitle_lang: subtitleLang,
-      is_admin: false,
+      is_admin: username === "owner",
       avatar: { kind: "none", version: 0 },
       share_activity: true,
     });

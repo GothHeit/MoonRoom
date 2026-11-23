@@ -19,6 +19,12 @@ export function isProxyPathAllowed(path: string[]): boolean {
     }
     return path.length === 3 && second === "device" && ["lookup", "approve", "deny"].includes(path[2]);
   }
+  if (first === "admin") {
+    // The owner's member list and one-time password reset links; the API checks admin rights.
+    if (path.some(unsafeSegment)) return false;
+    if (path.length === 2) return second === "users";
+    return path.length === 4 && second === "users" && path[3] === "password-reset";
+  }
   if (first === "users") {
     const clean = !path.some(unsafeSegment);
     // /users/lookup, /users/{id}/avatar and /users/{id}/profile

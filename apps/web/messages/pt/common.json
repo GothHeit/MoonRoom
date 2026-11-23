@@ -66,7 +66,8 @@
     "upstream_failed": "A fonte não respondeu. Tente de novo.",
     "wrong_pin": "PIN errado.",
     "pin_required": "Digite o PIN para usar esta TV.",
-    "pin_not_on_tv": "Defina o PIN pelo celular ou computador."
+    "pin_not_on_tv": "Defina o PIN pelo celular ou computador.",
+    "invalid_reset_link": "Este link de redefinição é inválido, expirou ou já foi usado."
   },
   "row": {
     "previous": "Rolar para a esquerda",

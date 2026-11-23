@@ -9,6 +9,13 @@ describe("isProxyPathAllowed", () => {
     }
   });
 
+  it("allows only the owner's member list and reset links under admin", () => {
+    for (const path of [["admin", "users"], ["admin", "users", "abc", "password-reset"]]) expect(isProxyPathAllowed(path)).toBe(true);
+    for (const path of [["admin"], ["admin", "other"], ["admin", "users", "abc"], ["admin", "users", "..", "password-reset"], ["admin", "users", "a/b", "password-reset"], ["admin", "users", "abc", "password-reset", "x"]]) {
+      expect(isProxyPathAllowed(path)).toBe(false);
+    }
+  });
+
   it("allows only the phone's side of signing in a TV", () => {
     for (const step of ["lookup", "approve", "deny"]) expect(isProxyPathAllowed(["auth", "device", step])).toBe(true);
     for (const path of [["auth", "device"], ["auth", "device", "token"], ["auth", "device", "approve", "x"], ["auth", "refresh"]]) {

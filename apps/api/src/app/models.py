@@ -77,6 +77,24 @@ class RefreshToken(TimestampMixin, Base):
     is_tv: Mapped[bool] = mapped_column(default=False, server_default="false")
 
 
+class PasswordReset(TimestampMixin, Base):
+    """A one-time link an admin made for a friend who forgot their password. Only a hash of the
+    token is stored, like refresh tokens, so a database leak can't be used to take accounts."""
+
+    __tablename__ = "password_resets"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    expires_at: Mapped[datetime]
+    used_at: Mapped[datetime | None]
+
+
 class SessionUnlock(Base):
     """A TV session that entered the PIN, until `unlocked_until`. No row means locked."""
 

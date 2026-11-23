@@ -55,3 +55,28 @@ function withTrustedDevice(apiPath: string, body: string, request: Request): str
     return body;
   }
 }
+
+/**
+ * Forwards a public JSON call (no session involved, such as a password reset link) to the API
+ * and hands back its answer as it is. No cookies are read or set.
+ */
+export async function publicJsonRoute(apiPath: string, request: Request) {
+  if (!isSameOrigin(request)) return NextResponse.json(FORBIDDEN_ORIGIN, { status: 403 });
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
+    return NextResponse.json({ error: { code: "validation_failed", message: "Expected JSON" } }, { status: 415 });
+  }
+  try {
+    const upstream = await fetch(`${API_URL}${apiPath}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...deviceHeaders(request.headers) },
+      body: await request.text(),
+      cache: "no-store",
+    });
+    return new NextResponse(upstream.status === 204 ? null : await upstream.text(), {
+      status: upstream.status,
+      headers: upstream.status === 204 ? undefined : { "Content-Type": "application/json" },
+    });
+  } catch {
+    return NextResponse.json({ error: { code: "network", message: "API unreachable" } }, { status: 502 });
+  }
+}

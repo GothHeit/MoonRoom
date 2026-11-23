@@ -127,6 +127,16 @@ export function UserMenu({ userId, username, avatar, isAdmin = false, pending = 
               {tAccount("menuInvites")}
             </Link>
           )}
+          {isAdmin && (
+            <Link
+              href="/members"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="block w-full rounded-ui px-3 py-2 text-left text-sm hover:bg-line active:bg-line pointer-coarse:py-3"
+            >
+              {tAccount("menuMembers")}
+            </Link>
+          )}
           <button
             type="button"
             role="menuitem"

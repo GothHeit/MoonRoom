@@ -66,7 +66,8 @@
     "upstream_failed": "The source didn't answer. Try again.",
     "wrong_pin": "Wrong PIN.",
     "pin_required": "Enter the PIN to use this TV.",
-    "pin_not_on_tv": "Set the PIN from your phone or computer."
+    "pin_not_on_tv": "Set the PIN from your phone or computer.",
+    "invalid_reset_link": "This reset link is invalid, expired or already used."
   },
   "row": {
     "previous": "Scroll left",

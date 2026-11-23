@@ -89,9 +89,14 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
             {me.is_admin && <span className="ml-3 rounded-full bg-accent-deep px-2.5 py-0.5 text-xs">{t("settings.admin")}</span>}
           </p>
           {me.is_admin && (
-            <ButtonLink href="/invites" variant="secondary" className="mt-4">
-              {t("invites.manage")}
-            </ButtonLink>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <ButtonLink href="/invites" variant="secondary">
+                {t("invites.manage")}
+              </ButtonLink>
+              <ButtonLink href="/members" variant="secondary">
+                {t("members.title")}
+              </ButtonLink>
+            </div>
           )}
         </Section>
 

@@ -183,6 +183,29 @@
       "cancel": "Cancel",
       "saved": "PIN saved. Your TVs will ask for it.",
       "removed": "PIN removed."
-    }
+    },
+    "members": {
+      "title": "Members",
+      "intro": "Everyone with an account. If a friend forgets their password, make a one-time link and send it to them yourself.",
+      "you": "You",
+      "admin": "Admin",
+      "twoFactor": "2FA on",
+      "joined": "Joined {date}",
+      "resetPassword": "Reset password",
+      "validFor": "Link valid for",
+      "hours": "{count, plural, one {# hour} other {# hours}}",
+      "make": "Make link",
+      "making": "Making…",
+      "failed": "Couldn't make the link. Try again.",
+      "linkTitle": "Link for {username}",
+      "linkBody": "Send it to them privately. It works once and stops working {when}.",
+      "copy": "Copy link",
+      "copied": "Link copied.",
+      "copyFailed": "Couldn't copy. Select the link and copy it by hand.",
+      "twoFactorNote": "This account uses two-factor login, so they still need their authenticator app or a backup code to sign in.",
+      "close": "Done",
+      "empty": "No members yet."
+    },
+    "menuMembers": "Members"
   }
 }
