@@ -161,6 +161,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/anime/{anime_id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Anime Comments
+         * @description Newest first. Only comments by you and your friends.
+         */
+        get: operations["anime_comments_anime__anime_id__comments_get"];
+        put?: never;
+        /** Comment On Anime */
+        post: operations["comment_on_anime_anime__anime_id__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/anime/{anime_id}/friends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Anime Friends
+         * @description Where each friend who shares their activity is in this title, most recent first.
+         */
+        get: operations["anime_friends_anime__anime_id__friends_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/anime/{anime_id}/sources": {
         parameters: {
             query?: never;
@@ -505,6 +546,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/comments/{comment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Comment */
+        delete: operations["delete_comment_comments__comment_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit Comment
+         * @description Changes your own comment's text or spoiler mark.
+         */
+        patch: operations["edit_comment_comments__comment_id__patch"];
+        trace?: never;
+    };
     "/friends": {
         parameters: {
             query?: never;
@@ -819,6 +881,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/manga/{manga_id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Manga Comments
+         * @description Newest first. Only comments by you and your friends.
+         */
+        get: operations["manga_comments_manga__manga_id__comments_get"];
+        put?: never;
+        /** Comment On Manga */
+        post: operations["comment_on_manga_manga__manga_id__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/manga/{manga_id}/continue": {
         parameters: {
             query?: never;
@@ -834,6 +917,26 @@ export interface paths {
          * @description Hide a title from Continue reading. Progress is kept; reading it again brings it back.
          */
         delete: operations["remove_from_continue_reading_manga__manga_id__continue_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/manga/{manga_id}/friends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Manga Friends
+         * @description Which chapter each friend who shares their activity was on last, most recent first.
+         */
+        get: operations["manga_friends_manga__manga_id__friends_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2152,6 +2255,51 @@ export interface components {
             /** Now */
             now: number;
         };
+        /** CommentEdit */
+        CommentEdit: {
+            /** Body */
+            body?: string | null;
+            /** Spoiler */
+            spoiler?: boolean | null;
+        };
+        /** CommentIn */
+        CommentIn: {
+            /** Body */
+            body: string;
+            /**
+             * Spoiler
+             * @default false
+             */
+            spoiler: boolean;
+        };
+        /** CommentOut */
+        CommentOut: {
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Edited At */
+            edited_at: string | null;
+            /** Id */
+            id: string;
+            /** Mine */
+            mine: boolean;
+            /** Spoiler */
+            spoiler: boolean;
+            user: components["schemas"]["UserSummary"];
+        };
+        /** CommentsPage */
+        CommentsPage: {
+            /** Items */
+            items: components["schemas"]["CommentOut"][];
+            /** Next */
+            next: string | null;
+            /** Total */
+            total: number;
+        };
         /** ControlIn */
         ControlIn: {
             /**
@@ -2252,6 +2400,32 @@ export interface components {
              * Format: date-time
              */
             since: string;
+            user: components["schemas"]["UserSummary"];
+        };
+        /** FriendReading */
+        FriendReading: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Chapter */
+            chapter: string;
+            /** Completed */
+            completed: boolean;
+            user: components["schemas"]["UserSummary"];
+        };
+        /** FriendWatching */
+        FriendWatching: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Completed */
+            completed: boolean;
+            /** Episode */
+            episode: number;
             user: components["schemas"]["UserSummary"];
         };
         /** Genre */
@@ -3782,6 +3956,106 @@ export interface operations {
             };
         };
     };
+    anime_comments_anime__anime_id__comments_get: {
+        parameters: {
+            query?: {
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                anime_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentsPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    comment_on_anime_anime__anime_id__comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                anime_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    anime_friends_anime__anime_id__friends_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                anime_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendWatching"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     sources_anime__anime_id__sources_get: {
         parameters: {
             query?: never;
@@ -4381,6 +4655,70 @@ export interface operations {
             };
         };
     };
+    delete_comment_comments__comment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_comment_comments__comment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_friends_friends_get: {
         parameters: {
             query?: never;
@@ -4905,6 +5243,75 @@ export interface operations {
             };
         };
     };
+    manga_comments_manga__manga_id__comments_get: {
+        parameters: {
+            query?: {
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                manga_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentsPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    comment_on_manga_manga__manga_id__comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                manga_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     remove_from_continue_reading_manga__manga_id__continue_delete: {
         parameters: {
             query?: never;
@@ -4922,6 +5329,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    manga_friends_manga__manga_id__friends_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                manga_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendReading"][];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -67,7 +67,10 @@
     "wrong_pin": "Wrong PIN.",
     "pin_required": "Enter the PIN to use this TV.",
     "pin_not_on_tv": "Set the PIN from your phone or computer.",
-    "invalid_reset_link": "This reset link is invalid, expired or already used."
+    "invalid_reset_link": "This reset link is invalid, expired or already used.",
+    "comment_empty": "Write something first.",
+    "comment_too_long": "Keep it under 1000 characters.",
+    "comment_not_found": "That comment is gone."
   },
   "row": {
     "previous": "Scroll left",

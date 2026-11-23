@@ -1,7 +1,17 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Float, ForeignKey, Index, String, column, func, text
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Float,
+    ForeignKey,
+    Index,
+    String,
+    column,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.crypto import EncryptedString
@@ -383,3 +393,27 @@ class DeviceLogin(TimestampMixin, Base):
     approved_at: Mapped[datetime | None] = mapped_column(default=None)
     denied_at: Mapped[datetime | None] = mapped_column(default=None)
     used_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class TitleComment(Base):
+    """A comment on an anime or a manga. Only its author and the author's friends see it."""
+
+    __tablename__ = "title_comments"
+    __table_args__ = (
+        CheckConstraint(
+            "(anime_id IS NULL) <> (manga_id IS NULL)", name="ck_title_comments_one_title"
+        ),
+        Index("ix_title_comments_anime_created", "anime_id", "created_at"),
+        Index("ix_title_comments_manga_created", "manga_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    anime_id: Mapped[int | None]
+    manga_id: Mapped[int | None]
+    body: Mapped[str] = mapped_column(String(1000))
+    spoiler: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    edited_at: Mapped[datetime | None]

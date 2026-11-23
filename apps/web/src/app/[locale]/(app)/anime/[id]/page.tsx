@@ -5,6 +5,7 @@ import { cache, Suspense } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import type { ListState } from "@/components/title/AddToList";
+import { TitleComments, TitleCommentsLink } from "@/components/comments/TitleComments";
 import { EpisodeList } from "@/components/title/EpisodeList";
 import { titleArt } from "@/components/title/titleArt";
 import { TitleHeader } from "@/components/title/TitleHeader";
@@ -129,6 +130,11 @@ export default async function TitlePage({ params }: PageProps<"/[locale]/anime/[
             <WatchHint id={id} />
           </Suspense>
         }
+        comments={
+          <Suspense fallback={null}>
+            <TitleCommentsLink kind="anime" id={id} />
+          </Suspense>
+        }
       />
       <div className="flex flex-col gap-10 py-6">
         <Suspense fallback={<EpisodesSkeleton />}>
@@ -163,6 +169,9 @@ export default async function TitlePage({ params }: PageProps<"/[locale]/anime/[
             ))}
           </Row>
         )}
+        <Suspense fallback={null}>
+          <TitleComments kind="anime" id={id} last={anime.num_episodes} />
+        </Suspense>
       </div>
     </>
   );

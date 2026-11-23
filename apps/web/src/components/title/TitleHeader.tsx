@@ -20,9 +20,11 @@ type Props = {
   list: ListState;
   /** Painted over the poster once the wide picture of the show is known (streamed in). */
   art?: ReactNode;
+  /** The "N comments" link, streamed in; renders a list item or nothing. */
+  comments?: ReactNode;
 };
 
-export async function TitleHeader({ anime, badge, play, hint, list, art }: Props) {
+export async function TitleHeader({ anime, badge, play, hint, list, art, comments }: Props) {
   const t = await getTranslations("titlePage");
   const locale = await getLocale();
   const tGenres = await getTranslations("genres");
@@ -49,11 +51,12 @@ export async function TitleHeader({ anime, badge, play, hint, list, art }: Props
         {anime.title}
       </h1>
       {english && english !== anime.title && <p className="mt-2 text-muted">{english}</p>}
-      {facts.length > 0 && (
+      {(facts.length > 0 || comments) && (
         <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-soft">
           {facts.map((f) => (
             <li key={f}>{f}</li>
           ))}
+          {comments}
         </ul>
       )}
     </>

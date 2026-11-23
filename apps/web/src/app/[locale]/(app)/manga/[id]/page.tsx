@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { cache, Suspense } from "react";
 
+import { TitleComments, TitleCommentsLink } from "@/components/comments/TitleComments";
 import { ChapterList } from "@/components/manga/ChapterList";
 import { MangaHeader } from "@/components/manga/MangaHeader";
 import { AddToList, type ListState } from "@/components/title/AddToList";
@@ -139,6 +140,11 @@ export default async function MangaPage({ params, searchParams }: Params) {
             <AddToList kind="manga" titleId={id} state={list} />
           </>
         }
+        comments={
+          <Suspense fallback={null}>
+            <TitleCommentsLink kind="manga" id={id} />
+          </Suspense>
+        }
       />
       <div className="flex flex-col gap-10 py-6">
         <Suspense key={`${lang ?? ""}/${source ?? ""}`} fallback={<ChaptersSkeleton />}>
@@ -165,6 +171,9 @@ export default async function MangaPage({ params, searchParams }: Params) {
             ))}
           </Row>
         )}
+        <Suspense fallback={null}>
+          <TitleComments kind="manga" id={id} last={manga.num_chapters} />
+        </Suspense>
       </div>
     </>
   );

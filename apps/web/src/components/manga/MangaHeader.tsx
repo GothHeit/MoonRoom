@@ -12,10 +12,12 @@ type Props = {
   /** Streamed in once the sources are known: the "read here" badge and the primary pill. */
   badge: ReactNode;
   action: ReactNode;
+  /** The "N comments" link, streamed in; renders a list item or nothing. */
+  comments?: ReactNode;
 };
 
 /** The title page header: cover, serif title, facts, synopsis. The same layout as the anime one. */
-export async function MangaHeader({ manga, badge, action }: Props) {
+export async function MangaHeader({ manga, badge, action, comments }: Props) {
   const t = await getTranslations("manga.page");
   const tGenres = await getTranslations("genres");
   const label = (group: string, key: string | null | undefined) => (key && t.has(`${group}.${key}`) ? t(`${group}.${key}`) : key);
@@ -38,11 +40,12 @@ export async function MangaHeader({ manga, badge, action }: Props) {
         {kicker && <p className="kicker mt-3">{kicker}</p>}
         <h1 className="mt-2 break-words text-4xl leading-[0.95] tracking-[-0.02em] md:text-5xl xl:text-6xl">{manga.title}</h1>
         {english && english !== manga.title && <p className="mt-2 text-muted">{english}</p>}
-        {facts.length > 0 && (
+        {(facts.length > 0 || comments) && (
           <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-soft">
             {facts.map((f) => (
               <li key={f}>{f}</li>
             ))}
+            {comments}
           </ul>
         )}
         <div className="mt-6 flex flex-wrap gap-3">{action}</div>

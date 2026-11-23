@@ -67,7 +67,10 @@
     "wrong_pin": "PIN errado.",
     "pin_required": "Digite o PIN para usar esta TV.",
     "pin_not_on_tv": "Defina o PIN pelo celular ou computador.",
-    "invalid_reset_link": "Este link de redefinição é inválido, expirou ou já foi usado."
+    "invalid_reset_link": "Este link de redefinição é inválido, expirou ou já foi usado.",
+    "comment_empty": "Escreva alguma coisa primeiro.",
+    "comment_too_long": "Use no máximo 1000 caracteres.",
+    "comment_not_found": "Esse comentário não existe mais."
   },
   "row": {
     "previous": "Rolar para a esquerda",

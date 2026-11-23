@@ -1,0 +1,40 @@
+{
+  "comments": {
+    "heading": "Comments",
+    "count": "{count, plural, one {# comment} other {# comments}}",
+    "friendsOnly": "Only you and your friends can see these.",
+    "label": "Write a comment",
+    "editLabel": "Edit your comment",
+    "placeholder": "Share what you thought…",
+    "spoiler": "Spoiler",
+    "counter": "{count} / {max}",
+    "post": "Post",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "menu": "Comment options",
+    "you": "You",
+    "edited": "edited",
+    "reveal": "Spoiler. Tap to show",
+    "showAll": "Show all {count} comments",
+    "showMore": "Show more",
+    "loading": "Loading comments…",
+    "failed": "Couldn't load the comments.",
+    "retry": "Try again",
+    "emptyTitle": "No comments yet",
+    "emptyBody": "Be the first of your friends to say what you thought.",
+    "deleteTitle": "Delete this comment?",
+    "deleteBody": "It will be gone for you and your friends.",
+    "deleted": "Comment deleted",
+    "actionFailed": "That didn't work. Try again.",
+    "friends": {
+      "labelAnime": "Friends watching this",
+      "labelManga": "Friends reading this",
+      "onEpisode": "<b>{name}</b> is on ep {episode}",
+      "onChapter": "<b>{name}</b> is on ch. {chapter}",
+      "finished": "<b>{name}</b> finished it",
+      "more": "+{count} more"
+    }
+  }
+}

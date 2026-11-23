@@ -1,0 +1,40 @@
+{
+  "comments": {
+    "heading": "Comentários",
+    "count": "{count, plural, one {# comentário} other {# comentários}}",
+    "friendsOnly": "Só você e seus amigos veem isto.",
+    "label": "Escreva um comentário",
+    "editLabel": "Edite seu comentário",
+    "placeholder": "Conte o que achou…",
+    "spoiler": "Spoiler",
+    "counter": "{count} / {max}",
+    "post": "Publicar",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "delete": "Apagar",
+    "menu": "Opções do comentário",
+    "you": "Você",
+    "edited": "editado",
+    "reveal": "Spoiler. Toque para ver",
+    "showAll": "Ver todos os {count} comentários",
+    "showMore": "Ver mais",
+    "loading": "Carregando comentários…",
+    "failed": "Não deu para carregar os comentários.",
+    "retry": "Tentar de novo",
+    "emptyTitle": "Nenhum comentário ainda",
+    "emptyBody": "Seja o primeiro dos seus amigos a dizer o que achou.",
+    "deleteTitle": "Apagar este comentário?",
+    "deleteBody": "Ele some para você e para seus amigos.",
+    "deleted": "Comentário apagado",
+    "actionFailed": "Não funcionou. Tente de novo.",
+    "friends": {
+      "labelAnime": "Amigos assistindo",
+      "labelManga": "Amigos lendo",
+      "onEpisode": "<b>{name}</b> está no ep. {episode}",
+      "onChapter": "<b>{name}</b> está no cap. {chapter}",
+      "finished": "<b>{name}</b> terminou",
+      "more": "{count, plural, one {+# amigo} other {+# amigos}}"
+    }
+  }
+}
