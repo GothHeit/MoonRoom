@@ -22,6 +22,9 @@ export type LoginSession = {
   current: boolean;
 };
 
+/** How many devices show before "show all". */
+const RECENT = 5;
+
 export function SessionsPanel({ sessions }: { sessions: LoginSession[] }) {
   const t = useTranslations("account.sessions");
   const tErr = useTranslations("errors");
@@ -30,6 +33,12 @@ export function SessionsPanel({ sessions }: { sessions: LoginSession[] }) {
   const toast = useToast();
   const [busy, setBusy] = useState<string | "all" | null>(null);
   const [confirmingAll, setConfirmingAll] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  // This device first, then the ones used most recently; the rest wait behind "show all".
+  const ordered = [...sessions].sort(
+    (a, b) => Number(b.current) - Number(a.current) || b.last_active_at.localeCompare(a.last_active_at),
+  );
+  const shown = showAll ? ordered : ordered.slice(0, RECENT);
 
   function fail(error: unknown) {
     const code = errorCode(error);
@@ -71,7 +80,7 @@ export function SessionsPanel({ sessions }: { sessions: LoginSession[] }) {
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted">{t("intro")}</p>
       <ul className="flex flex-col divide-y divide-line rounded-ui border border-line">
-        {sessions.map((s) => {
+        {shown.map((s) => {
           const { browser, system } = describeAgent(s.user_agent);
           const device =
             browser && system ? t("device", { browser, system }) : (browser ?? system ?? t("unknownDevice"));
@@ -99,7 +108,12 @@ export function SessionsPanel({ sessions }: { sessions: LoginSession[] }) {
           );
         })}
       </ul>
-      <div>
+      <div className="flex flex-wrap gap-2">
+        {ordered.length > RECENT && (
+          <Button variant="ghost" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)}>
+            {showAll ? t("showRecent") : t("showAll", { count: ordered.length })}
+          </Button>
+        )}
         <Button variant="secondary" onClick={() => setConfirmingAll(true)} disabled={busy !== null}>
           {t("revokeAll")}
         </Button>

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { GridSkeleton, PosterGrid } from "@/components/grid/PosterGrid";
 import { SearchForm } from "@/components/shell/SearchForm";
+import { ButtonLink } from "@/components/ui/Button";
 import { PosterCard } from "@/components/ui/PosterCard";
 import { coverOf, mangaCaption, mangaHref } from "@/lib/manga";
 import { titled } from "@/lib/page-title";
@@ -49,7 +50,12 @@ export default async function MangaSearchPage({ params, searchParams }: PageProp
           <Results q={q} locale={locale} />
         </Suspense>
       ) : (
-        <p className="text-muted">{t("prompt")}</p>
+        <div className="flex flex-col items-start gap-6">
+          <p className="text-soft">{t("prompt")}</p>
+          <ButtonLink href="/manga/browse" variant="secondary">
+            {t("browse")}
+          </ButtonLink>
+        </div>
       )}
     </section>
   );

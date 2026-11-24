@@ -31,7 +31,8 @@
     "search": {
       "title": "Search manga",
       "resultsFor": "Manga for “{q}”",
-      "prompt": "Type a title to search.",
+      "prompt": "Type a manga title to search.",
+      "browse": "Browse manga",
       "empty": "No manga found for “{q}”."
     },
     "page": {

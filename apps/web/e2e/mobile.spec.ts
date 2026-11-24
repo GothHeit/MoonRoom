@@ -37,3 +37,31 @@ test("search works on a phone from the Search tab", async ({ page }) => {
   await expect(page).toHaveURL(/\/en\/search\?q=dungeon$/);
   await expect(page.getByRole("link", { name: /Dungeon Meshi/ })).toBeVisible();
 });
+
+test("the account menu is a bottom sheet on a phone", async ({ page }) => {
+  await signIn(page, "en");
+  await page.getByRole("button", { name: "Account menu" }).tap();
+  const sheet = page.getByRole("dialog", { name: "Account menu" });
+  await expect(sheet.getByRole("menuitem", { name: "Sign out" })).toBeInViewport({ ratio: 1 });
+  // Pinned to the bottom edge, full width.
+  await expect.poll(async () => {
+    const box = await sheet.boundingBox();
+    const view = page.viewportSize()!;
+    return box && Math.round(box.y + box.height) === view.height && Math.round(box.width) === view.width;
+  }).toBe(true);
+
+  await page.getByTestId("sheet-scrim").tap({ position: { x: 20, y: 20 } });
+  await expect(sheet).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Account menu" }).tap();
+  await page.getByRole("menuitem", { name: "Settings" }).tap();
+  await expect(page).toHaveURL(/\/en\/settings$/);
+  await expect(sheet).toHaveCount(0);
+});
+
+test("search with nothing typed offers genres and Browse", async ({ page }) => {
+  await signIn(page, "en");
+  await page.goto("/en/search");
+  await page.getByRole("link", { name: "Fantasy" }).tap();
+  await expect(page).toHaveURL(/\/en\/browse\?genre=2$/);
+});

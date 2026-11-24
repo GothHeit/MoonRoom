@@ -1,6 +1,6 @@
 "use client";
 
-import { animate, LazyMotion, m, useDragControls, useMotionValue, type PanInfo } from "motion/react";
+import { animate, LazyMotion, m, useDragControls, useMotionValue, useTransform, type PanInfo } from "motion/react";
 import { useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 /** Where a flick would come to rest, the way scrolling decelerates (Apple's projection). */
@@ -31,18 +31,22 @@ type Props = {
   onClose: () => void;
   /** Layout for both forms: a sheet pinned to the bottom on phones, a popover from sm up. */
   className: string;
+  /** Phones only: dims the page behind the sheet; a tap on it dismisses the sheet. */
+  scrim?: boolean;
   children: (slots: Slots) => ReactNode;
 };
 
 /** A panel that phones get as a bottom sheet: it slides up, follows the finger from its header,
  * and a pull or a flick down dismisses it. Larger screens get a plain popover. */
-export function BottomSheet({ label, onClose, className, children }: Props) {
+export function BottomSheet({ label, onClose, className, scrim = false, children }: Props) {
   const [phone] = useState(() => matches("(max-width: 639px)"));
   const [still] = useState(() => matches("(prefers-reduced-motion: reduce)"));
   const ref = useRef<HTMLDivElement>(null);
   const y = useMotionValue(0);
   const drag = useDragControls();
   const sliding = phone && !still;
+  // The scrim fades with the sheet's travel, so a pull down lightens the page as it goes.
+  const scrimOpacity = useTransform(y, (v) => 1 - Math.min(1, v / (ref.current?.offsetHeight || 1)));
 
   // Before paint, so the sheet never shows a frame fully open before it slides up.
   useLayoutEffect(() => {
@@ -80,6 +84,15 @@ export function BottomSheet({ label, onClose, className, children }: Props) {
   }
   return (
     <LazyMotion features={loadFeatures} strict>
+      {scrim && (
+        <m.div
+          aria-hidden="true"
+          data-testid="sheet-scrim"
+          onClick={() => dismiss()}
+          className="fixed inset-0 touch-none bg-black/70"
+          style={{ opacity: scrimOpacity }}
+        />
+      )}
       <m.div
         ref={ref}
         role="dialog"

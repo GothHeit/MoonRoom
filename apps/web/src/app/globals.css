@@ -176,6 +176,28 @@ main:focus {
   }
 }
 
+/* The line across the top while the next page loads (NavProgress). It waits a moment before showing,
+   so a page that arrives at once never flashes it, then creeps toward the end and never gets there;
+   when the page lands it fills up and fades. Longer than the usual 300ms on purpose: it is a wait. */
+@utility nav-progress {
+  opacity: 0;
+  transform: scaleX(0);
+  &[data-state="loading"] {
+    opacity: 1;
+    transform: scaleX(0.85);
+    transition:
+      transform 8s cubic-bezier(0.1, 0.8, 0.2, 1) 180ms,
+      opacity 0s linear 180ms;
+  }
+  &[data-state="done"] {
+    opacity: 0;
+    transform: scaleX(1);
+    transition:
+      transform 160ms var(--ease-out),
+      opacity 160ms var(--ease-out) 140ms;
+  }
+}
+
 /* The wide art arrives after the poster is already there: fade it in instead of swapping. */
 @utility art-fade-in {
   animation: art-fade-in 400ms ease-out;

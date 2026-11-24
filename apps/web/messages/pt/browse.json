@@ -23,7 +23,8 @@
   "search": {
     "title": "Buscar",
     "resultsFor": "Resultados para “{q}”",
-    "prompt": "Digite um título para buscar.",
+    "prompt": "Digite um título ou escolha um gênero.",
+    "byGenre": "Explorar por gênero",
     "empty": "Nada encontrado para “{q}”.",
     "emptyHint": "Confira a grafia, tente um nome mais curto ou explore por gênero.",
     "browse": "Explorar títulos",

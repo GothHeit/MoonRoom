@@ -31,7 +31,8 @@
     "search": {
       "title": "Buscar mangá",
       "resultsFor": "Mangás para “{q}”",
-      "prompt": "Digite um título para buscar.",
+      "prompt": "Digite o nome de um mangá para buscar.",
+      "browse": "Explorar mangás",
       "empty": "Nenhum mangá encontrado para “{q}”."
     },
     "page": {

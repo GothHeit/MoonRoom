@@ -123,7 +123,8 @@ export function LinkDevice({ initialCode }: { initialCode: string }) {
         spellCheck={false}
         inputMode="text"
         required
-        className="text-lg font-bold tracking-[0.12em]"
+        // The example is dimmer and lighter than a typed code, so the empty field does not look filled in.
+        className="text-lg font-bold tracking-[0.12em] placeholder:font-normal placeholder:text-numeral"
       />
       {error && (
         <p role="alert" className="text-sm text-danger">

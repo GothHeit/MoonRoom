@@ -72,7 +72,7 @@ export function PreferencesForm({
           value={locale}
           disabled={busy}
           onChange={(e) => onLocale(e.target.value as "pt" | "en")}
-          className="w-full max-w-xs rounded-ui border border-line bg-bg px-3 py-2 text-fg"
+          className="w-full max-w-xs rounded-ui border border-line bg-bg px-3 h-11 text-fg"
         >
           {routing.locales.map((l) => (
             <option key={l} value={l}>
@@ -89,7 +89,7 @@ export function PreferencesForm({
           value={manga}
           disabled={busy}
           onChange={(e) => onManga(e.target.value)}
-          className="w-full max-w-xs rounded-ui border border-line bg-bg px-3 py-2 text-fg"
+          className="w-full max-w-xs rounded-ui border border-line bg-bg px-3 h-11 text-fg"
         >
           <option value="auto">{t("mangaLanguageAuto")}</option>
           <option value="pt-br">{languageName("pt-br")}</option>
