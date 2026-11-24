@@ -72,6 +72,8 @@ class Room:
     episode: int
     lang: str
     locked: bool = False
+    # Listed on friends' home pages, so they can join without a code.
+    open: bool = False
     playing: bool = False
     # Where the video is at `moved_at` (monotonic seconds), which is in the future while a
     # start is scheduled: until then a playing room waits at `position`.
@@ -141,6 +143,7 @@ class Room:
             "episode": self.episode,
             "lang": self.lang,
             "locked": self.locked,
+            "open": self.open,
             "members": [{"id": str(i), "username": m.username} for i, m in self.members.items()],
             "votes": {str(user): episode for user, episode in self.votes.items()},
             "buffering": [str(user) for user in self.buffering],
@@ -258,6 +261,12 @@ class Room:
         if user_id != self.host_id:
             raise ApiError(403, "host_only", "Only the host can do this")
         self.locked = locked
+        self._state()
+
+    def set_open(self, user_id: uuid.UUID, value: bool) -> None:
+        if user_id != self.host_id:
+            raise ApiError(403, "host_only", "Only the host can do this")
+        self.open = value
         self._state()
 
     def set_stream(self, user_id: uuid.UUID, source: str, lang: str) -> None:
@@ -453,6 +462,7 @@ class Room:
             "episode": self.episode,
             "lang": self.lang,
             "locked": self.locked,
+            "open": self.open,
             "playing": self.playing,
             "position": self.position,
             # When (wall clock) the room was at `position`.
@@ -481,6 +491,7 @@ class Room:
             episode=int(data["episode"]),
             lang=data["lang"],
             locked=bool(data["locked"]),
+            open=bool(data.get("open", False)),
             playing=bool(data["playing"]),
             position=float(data["position"]),
             moved_at=mono + (float(data["at"]) - now),
@@ -551,7 +562,14 @@ class Rooms:
         return room
 
     def create(
-        self, host_id: uuid.UUID, source: str, anime_id: int, title: str, episode: int, lang: str
+        self,
+        host_id: uuid.UUID,
+        source: str,
+        anime_id: int,
+        title: str,
+        episode: int,
+        lang: str,
+        open: bool = False,
     ) -> Room:
         # A host who left rooms behind (reloads, closed tabs) shouldn't be locked out by them.
         for old_code, old in list(self._rooms.items()):
@@ -564,9 +582,15 @@ class Rooms:
         code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
         while code in self._rooms:
             code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
-        room = Room(code, host_id, source, anime_id, title, episode, lang)
+        room = Room(code, host_id, source, anime_id, title, episode, lang, open=open)
         self._add(room)
         return room
+
+    def listed(self) -> list[Room]:
+        """Rooms open to friends that someone is in right now and that still have a seat."""
+        return [
+            r for r in self._rooms.values() if r.open and r.members and len(r.members) < MAX_MEMBERS
+        ]
 
     def sweep(self) -> None:
         """Drops rooms that have been empty past the grace period."""

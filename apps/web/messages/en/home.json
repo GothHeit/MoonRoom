@@ -13,12 +13,19 @@
       "seasonal": "This season",
       "top": "Top rated",
       "friends_popular": "Popular with friends",
-      "genre": "{genre}"
+      "genre": "{genre}",
+      "friendsRooms": "Watching together"
     },
     "empty": "Nothing to show yet. Try again in a moment.",
     "featured": "Featured",
     "slide": "Slide {n} of {total}",
     "goToSlide": "Show featured title {n}",
-    "synopsisEnglish": "Synopsis in English"
+    "synopsisEnglish": "Synopsis in English",
+    "friendsRoom": {
+      "joinShort": "Join",
+      "watching": "{count, plural, one {# watching} other {# watching}}",
+      "andMore": "{names} and {count} more",
+      "join": "Join {names} watching {title}"
+    }
   }
 }

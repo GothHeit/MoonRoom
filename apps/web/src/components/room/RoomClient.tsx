@@ -75,6 +75,7 @@ export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyl
     voteEpisode,
     withdrawVote,
     setLocked,
+    setOpen,
     switchStream,
   } = useRoom(initial, (code) => {
     // A locked room already shows its own toast through the control events.
@@ -228,6 +229,7 @@ export function RoomClient({ initial, meId, episodes, subtitleLang, subtitleStyl
             onVote={(episode) => void voteEpisode(episode)}
             onWithdraw={() => void withdrawVote()}
             onLock={(locked) => void setLocked(locked)}
+            onOpen={(open) => void setOpen(open)}
           />
         </aside>
       )}

@@ -91,6 +91,8 @@
       "network": "The room is out of reach"
     },
     "pageTitle": "{title} · Watch together",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "openToFriends": "Open to friends",
+    "openToFriendsHint": "Friends see this room on their home page and can join it."
   }
 }

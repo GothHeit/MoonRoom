@@ -13,12 +13,19 @@
       "seasonal": "Nesta temporada",
       "top": "Mais bem avaliados",
       "friends_popular": "Popular entre amigos",
-      "genre": "{genre}"
+      "genre": "{genre}",
+      "friendsRooms": "Assistindo juntos"
     },
     "empty": "Nada para mostrar ainda. Tente de novo em instantes.",
     "featured": "Destaques",
     "slide": "Destaque {n} de {total}",
     "goToSlide": "Mostrar destaque {n}",
-    "synopsisEnglish": "Sinopse em inglês"
+    "synopsisEnglish": "Sinopse em inglês",
+    "friendsRoom": {
+      "joinShort": "Entrar",
+      "watching": "{count} assistindo",
+      "andMore": "{names} e mais {count}",
+      "join": "Entrar na sala de {names} assistindo {title}"
+    }
   }
 }

@@ -28,6 +28,7 @@ type Props = {
   onVote: (episode: number) => void;
   onWithdraw: () => void;
   onLock: (locked: boolean) => void;
+  onOpen: (open: boolean) => void;
 };
 
 const AVATARS = ["bg-poster-1", "bg-poster-2", "bg-poster-3", "bg-poster-4"];
@@ -47,7 +48,7 @@ export function Avatar({ id, name, small = false }: { id: string; name: string; 
 }
 
 /** The room's side panel: chat, the people in the room and the episode, as tabs. */
-export function RoomPanel({ room, meId, messages, episodes, tab, onTab, onSay, onReact, onVote, onWithdraw, onLock }: Props) {
+export function RoomPanel({ room, meId, messages, episodes, tab, onTab, onSay, onReact, onVote, onWithdraw, onLock, onOpen }: Props) {
   const t = useTranslations("room");
   return (
     <div className="flex h-full min-h-0 flex-col text-sm">
@@ -75,7 +76,7 @@ export function RoomPanel({ room, meId, messages, episodes, tab, onTab, onSay, o
         className="flex min-h-0 flex-1 flex-col"
       >
         {tab === "chat" && <Chat meId={meId} messages={messages} onSay={onSay} onReact={onReact} />}
-        {tab === "people" && <People room={room} meId={meId} onLock={onLock} />}
+        {tab === "people" && <People room={room} meId={meId} onLock={onLock} onOpen={onOpen} />}
         {tab === "episode" && (
           <Episode room={room} meId={meId} episodes={episodes} onVote={onVote} onWithdraw={onWithdraw} />
         )}
@@ -182,7 +183,7 @@ function Chat({
   );
 }
 
-function People({ room, meId, onLock }: Pick<Props, "room" | "meId" | "onLock">) {
+function People({ room, meId, onLock, onOpen }: Pick<Props, "room" | "meId" | "onLock" | "onOpen">) {
   const t = useTranslations("room");
   const [copied, setCopied] = useState(false);
   const isHost = room.host_id === meId;
@@ -222,6 +223,15 @@ function People({ room, meId, onLock }: Pick<Props, "room" | "meId" | "onLock">)
           <label className="mt-4 flex min-h-11 items-center justify-between gap-3 border-t border-line pt-3">
             <span>{t("lockControls")}</span>
             <Switch checked={room.locked} onChange={onLock} label={t("lockControls")} />
+          </label>
+        )}
+        {isHost && (
+          <label className="mt-1 flex min-h-11 items-start justify-between gap-3 py-1">
+            <span>
+              {t("openToFriends")}
+              <span className="mt-0.5 block text-xs text-muted">{t("openToFriendsHint")}</span>
+            </span>
+            <Switch checked={room.open} onChange={onOpen} label={t("openToFriends")} />
           </label>
         )}
         {!isHost && room.locked && <p className="mt-4 text-muted">{t("lockedByHost")}</p>}

@@ -16,6 +16,7 @@ const room: RoomState = {
   episode: 1,
   lang: "sub",
   locked: false,
+  open: true,
   members: [
     { id: "host", username: "kafka" },
     { id: "a", username: "friend" },
@@ -35,6 +36,7 @@ function setup(meId: string, overrides: Partial<RoomState> = {}, tab: PanelTab =
     onVote: vi.fn(),
     onWithdraw: vi.fn(),
     onLock: vi.fn(),
+    onOpen: vi.fn(),
   };
   render(
     <NextIntlClientProvider locale="en" messages={intl}>
@@ -95,9 +97,11 @@ describe("RoomPanel", () => {
   });
 
   it("gives the host the lock and an immediate switch", async () => {
-    const { onLock } = setup("host", { votes: {} }, "people");
-    await userEvent.click(screen.getByRole("switch"));
+    const { onLock, onOpen } = setup("host", { votes: {} }, "people");
+    await userEvent.click(screen.getByRole("switch", { name: "Only the host controls playback" }));
     expect(onLock).toHaveBeenCalledWith(true);
+    await userEvent.click(screen.getByRole("switch", { name: "Open to friends" }));
+    expect(onOpen).toHaveBeenCalledWith(false);
     cleanup();
     const { onVote } = setup("host", { votes: {} });
     await userEvent.click(screen.getByRole("button", { name: "Switch now" }));

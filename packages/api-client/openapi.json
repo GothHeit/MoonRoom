@@ -1387,6 +1387,46 @@
         "title": "FriendReading",
         "type": "object"
       },
+      "FriendRoomOut": {
+        "description": "An open room of a friend, for the home page.",
+        "properties": {
+          "anime": {
+            "$ref": "#/components/schemas/AnimeCard"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "episode": {
+            "title": "Episode",
+            "type": "integer"
+          },
+          "host": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/UserSummary"
+            },
+            "title": "People",
+            "type": "array"
+          },
+          "watching": {
+            "title": "Watching",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "host",
+          "anime",
+          "episode",
+          "watching",
+          "people"
+        ],
+        "title": "FriendRoomOut",
+        "type": "object"
+      },
       "FriendWatching": {
         "properties": {
           "at": {
@@ -3419,6 +3459,19 @@
         "title": "NotificationsOut",
         "type": "object"
       },
+      "OpenIn": {
+        "properties": {
+          "open": {
+            "title": "Open",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "title": "OpenIn",
+        "type": "object"
+      },
       "PagesOut": {
         "properties": {
           "chapter": {
@@ -4765,6 +4818,17 @@
             "title": "Lang",
             "type": "string"
           },
+          "open": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open"
+          },
           "source": {
             "maxLength": 40,
             "minLength": 1,
@@ -4850,6 +4914,10 @@
             "title": "Members",
             "type": "array"
           },
+          "open": {
+            "title": "Open",
+            "type": "boolean"
+          },
           "playback": {
             "$ref": "#/components/schemas/RoomPlaybackOut"
           },
@@ -4882,6 +4950,7 @@
           "episode",
           "lang",
           "locked",
+          "open",
           "members",
           "votes",
           "buffering",
@@ -11792,6 +11861,37 @@
         ]
       }
     },
+    "/watch/rooms/friends": {
+      "get": {
+        "description": "Open rooms hosted by friends who share what they watch. Declared before /{code}.",
+        "operationId": "friends_rooms_watch_rooms_friends_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FriendRoomOut"
+                  },
+                  "title": "Response Friends Rooms Watch Rooms Friends Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Friends Rooms",
+        "tags": [
+          "rooms"
+        ]
+      }
+    },
     "/watch/rooms/{code}": {
       "get": {
         "operationId": "get_room_watch_rooms__code__get",
@@ -12214,6 +12314,56 @@
           }
         ],
         "summary": "Lock",
+        "tags": [
+          "rooms"
+        ]
+      }
+    },
+    "/watch/rooms/{code}/open": {
+      "put": {
+        "operationId": "set_open_watch_rooms__code__open_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Open",
         "tags": [
           "rooms"
         ]

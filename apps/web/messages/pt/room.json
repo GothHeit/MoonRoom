@@ -91,6 +91,8 @@
       "network": "Não dá para alcançar a sala"
     },
     "pageTitle": "{title} · Assistir juntos",
-    "signIn": "Entrar"
+    "signIn": "Entrar",
+    "openToFriends": "Aberta aos amigos",
+    "openToFriendsHint": "Seus amigos veem esta sala na página inicial e podem entrar."
   }
 }

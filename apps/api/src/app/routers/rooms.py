@@ -12,10 +12,12 @@ from pydantic import BaseModel, Field
 from app import db, pin
 from app.deps import CurrentUser, Session, bearer_identity, throttle
 from app.errors import ApiError
+from app.mal.client import is_safe
 from app.models import User
 from app.notifications import notify
 from app.rooms import REACTIONS, Room, Rooms
-from app.routers.friends import friend_ids
+from app.routers.friends import UserSummary, _cards, friend_ids, sharing_friend_ids, summaries
+from app.schemas import AnimeCard
 
 router = APIRouter(prefix="/watch/rooms", tags=["rooms"])
 _bearer = HTTPBearer(auto_error=False)
@@ -31,6 +33,8 @@ class RoomCreate(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     episode: int = Field(ge=0, le=10_000)
     lang: Literal["sub", "dub"] = "sub"
+    # Listed on friends' home pages. Left out: yes, except for adult titles.
+    open: bool | None = None
 
 
 class MemberOut(BaseModel):
@@ -58,6 +62,7 @@ class RoomOut(BaseModel):
     episode: int
     lang: Literal["sub", "dub"]
     locked: bool
+    open: bool
     members: list[MemberOut]
     # User id -> the episode they voted to switch to.
     votes: dict[str, int]
@@ -66,6 +71,22 @@ class RoomOut(BaseModel):
     playback: RoomPlaybackOut
     # Goes up with every new snapshot; `tick` events carry it so a missed one is noticed.
     revision: int
+
+
+class FriendRoomOut(BaseModel):
+    """An open room of a friend, for the home page."""
+
+    code: str
+    host: UserSummary
+    anime: AnimeCard
+    episode: int
+    watching: int
+    # Up to three people in the room, the host first when they are in it.
+    people: list[UserSummary]
+
+
+class OpenIn(BaseModel):
+    open: bool
 
 
 class ClockOut(BaseModel):
@@ -134,7 +155,11 @@ async def create_room(body: RoomCreate, request: Request, user: CurrentUser):
     details = await request.app.state.mal.visible_details(body.anime_id, user.show_nsfw)
     title = str(details.get("title") or f"#{body.anime_id}")
     rooms: Rooms = request.app.state.rooms
-    room = rooms.create(user.id, body.source, body.anime_id, title, body.episode, body.lang)
+    # Adult titles start private: the host chooses to list them.
+    listed = is_safe(details) if body.open is None else body.open
+    room = rooms.create(
+        user.id, body.source, body.anime_id, title, body.episode, body.lang, open=listed
+    )
     return room.snapshot()
 
 
@@ -142,6 +167,38 @@ async def create_room(body: RoomCreate, request: Request, user: CurrentUser):
 async def clock():
     """The server's clock, so viewers can line their own up with it. Declared before /{code}."""
     return {"now": round(time.time() * 1000)}
+
+
+@router.get("/friends", response_model=list[FriendRoomOut])
+async def friends_rooms(request: Request, user: CurrentUser, session: Session):
+    """Open rooms hosted by friends who share what they watch. Declared before /{code}."""
+    sharing = set(await sharing_friend_ids(session, user.id))
+    rooms: Rooms = request.app.state.rooms
+    found = [
+        r
+        for r in rooms.listed()
+        if r.host_id in sharing and r.host_id != user.id and user.id not in r.members
+    ]
+    if not found:
+        return []
+    ids = {r.host_id for r in found} | {i for r in found for i in list(r.members)[:3]}
+    people = await summaries(session, list(ids))
+    await session.commit()  # MAL lookups below: don't hold a connection through them
+    cards = await _cards(request.app.state.mal, list({r.anime_id for r in found}), user.show_nsfw)
+    return [
+        FriendRoomOut(
+            code=r.code,
+            host=people[r.host_id],
+            anime=cards[r.anime_id],
+            episode=r.episode,
+            watching=len(r.members),
+            people=[
+                people[i] for i in sorted(r.members, key=lambda m: m != r.host_id) if i in people
+            ][:3],
+        )
+        for r in found
+        if r.anime_id in cards and r.host_id in people
+    ]
 
 
 @router.get("/{code}", response_model=RoomOut)
@@ -221,6 +278,11 @@ async def switch_stream(code: str, body: StreamIn, request: Request, user: Curre
     if body.source not in request.app.state.sources:
         raise ApiError(404, "source_not_found", f"Video source '{body.source}' is not enabled")
     room.set_stream(user.id, body.source, body.lang)
+
+
+@router.put("/{code}/open", status_code=204)
+async def set_open(code: str, body: OpenIn, request: Request, user: CurrentUser):
+    _room(request, code).set_open(user.id, body.open)
 
 
 @router.put("/{code}/lock", status_code=204)

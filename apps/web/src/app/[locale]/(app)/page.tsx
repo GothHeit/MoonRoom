@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Suspense } from "react";
 
+import { FriendsRooms } from "@/components/rows/FriendsRooms";
 import { FriendsActivity } from "@/components/rows/FriendsActivity";
 import { HomeRows } from "@/components/rows/HomeRows";
 import { HomeSkeleton } from "@/components/rows/HomeSkeleton";
@@ -15,10 +16,11 @@ async function HomeContent({ locale }: { locale: string }) {
   const tTitle = await getTranslations("titlePage");
   const tGenres = await getTranslations("genres");
   const api = await serverApi();
-  const [home, activity] = await Promise.all([
+  const [home, activity, rooms] = await Promise.all([
     unwrap(api.GET("/home", { params: { query: { lang: locale === "pt" ? "pt" : "en" } } }), locale),
     // The feed is a bonus: the home page works without it.
     api.GET("/friends/activity", { params: { query: { limit: 20 } } }).then((r) => r.data ?? [], () => []),
+    api.GET("/watch/rooms/friends").then((r) => r.data ?? [], () => []),
   ]);
   const slides = home.heroes.map(({ anime, synopsis, synopsis_lang, backdrop, wide_art }) => ({
     id: anime.id,
@@ -44,6 +46,7 @@ async function HomeContent({ locale }: { locale: string }) {
   return (
     <>
       {slides.length > 0 && <HeroCarousel slides={slides} cta={t("play")} />}
+      <FriendsRooms rooms={rooms} />
       {home.rows.length > 0 ? (
         <HomeRows rows={home.rows} />
       ) : (

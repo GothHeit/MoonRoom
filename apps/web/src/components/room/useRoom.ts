@@ -306,6 +306,10 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
     () => report(api.DELETE("/watch/rooms/{code}/episode", path)),
     [path, report],
   );
+  const setOpen = useCallback(
+    (open: boolean) => report(api.PUT("/watch/rooms/{code}/open", { ...path, body: { open } })),
+    [path, report],
+  );
   const switchStream = useCallback(
     (to: StreamChoice) => report(api.PUT("/watch/rooms/{code}/stream", { ...path, body: to })),
     [path, report],
@@ -334,6 +338,7 @@ export function useRoom(initial: RoomState, onError?: (code: string) => void) {
     voteEpisode,
     withdrawVote,
     setLocked,
+    setOpen,
     switchStream,
   };
 }

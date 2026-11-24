@@ -2037,6 +2037,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/watch/rooms/friends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Friends Rooms
+         * @description Open rooms hosted by friends who share what they watch. Declared before /{code}.
+         */
+        get: operations["friends_rooms_watch_rooms_friends_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/watch/rooms/{code}": {
         parameters: {
             query?: never;
@@ -2175,6 +2195,23 @@ export interface paths {
         get?: never;
         /** Lock */
         put: operations["lock_watch_rooms__code__lock_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/watch/rooms/{code}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Open */
+        put: operations["set_open_watch_rooms__code__open_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2812,6 +2849,22 @@ export interface components {
             completed: boolean;
             user: components["schemas"]["UserSummary"];
         };
+        /**
+         * FriendRoomOut
+         * @description An open room of a friend, for the home page.
+         */
+        FriendRoomOut: {
+            anime: components["schemas"]["AnimeCard"];
+            /** Code */
+            code: string;
+            /** Episode */
+            episode: number;
+            host: components["schemas"]["UserSummary"];
+            /** People */
+            people: components["schemas"]["UserSummary"][];
+            /** Watching */
+            watching: number;
+        };
         /** FriendWatching */
         FriendWatching: {
             /**
@@ -3444,6 +3497,11 @@ export interface components {
             /** Unread */
             unread: number;
         };
+        /** OpenIn */
+        OpenIn: {
+            /** Open */
+            open: boolean;
+        };
         /** PagesOut */
         PagesOut: {
             chapter: components["schemas"]["ChapterOut"];
@@ -3909,6 +3967,8 @@ export interface components {
              * @enum {string}
              */
             lang: "sub" | "dub";
+            /** Open */
+            open?: boolean | null;
             /** Source */
             source: string;
             /** Title */
@@ -3943,6 +4003,8 @@ export interface components {
             locked: boolean;
             /** Members */
             members: components["schemas"]["MemberOut"][];
+            /** Open */
+            open: boolean;
             playback: components["schemas"]["RoomPlaybackOut"];
             /** Revision */
             revision: number;
@@ -8039,6 +8101,26 @@ export interface operations {
             };
         };
     };
+    friends_rooms_watch_rooms_friends_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendRoomOut"][];
+                };
+            };
+        };
+    };
     get_room_watch_rooms__code__get: {
         parameters: {
             query?: never;
@@ -8305,6 +8387,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LockIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_open_watch_rooms__code__open_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenIn"];
             };
         };
         responses: {
