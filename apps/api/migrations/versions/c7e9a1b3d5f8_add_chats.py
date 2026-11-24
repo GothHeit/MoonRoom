@@ -74,9 +74,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "ix_chat_messages_chat_created", "chat_messages", ["chat_id", "created_at"]
-    )
+    op.create_index("ix_chat_messages_chat_created", "chat_messages", ["chat_id", "created_at"])
 
 
 def downgrade() -> None:
