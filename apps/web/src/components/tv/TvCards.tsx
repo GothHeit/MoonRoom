@@ -60,6 +60,37 @@ export function TvWideCard({ href, title, image, caption, progress, seed = title
   );
 }
 
+type Room = Omit<Poster, "caption"> & {
+  /** "Ep 5", after the title. */
+  episode: string;
+  /** "3 watching", on the picture. */
+  watching: string;
+  /** Who is in the room: "Junior, Claudia and 2 more". */
+  who: string;
+  /** What a screen reader says for the whole card. */
+  label: string;
+};
+
+/** A 16:9 card for a room a friend has open: OK joins it. */
+export function TvRoomCard({ href, title, image, episode, watching, who, label, seed = title, focusKey, className = "w-[26rem] shrink-0" }: Room) {
+  return (
+    <TvLink href={href} focusKey={focusKey} label={label} className={className}>
+      <div className={`${ART} aspect-video ${placeholderFor(seed)}`}>
+        {image && (
+          // eslint-disable-next-line @next/next/no-img-element -- thumbnails come from remote catalogs
+          <img src={image} alt="" width={416} height={234} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+        )}
+        <span className="absolute right-3.5 top-3.5 flex min-h-10 items-center rounded-full bg-bg px-4 text-[1.375rem] font-bold">{watching}</span>
+      </div>
+      <p className={`mt-4 flex min-w-0 ${TITLE}`}>
+        <span className="truncate">{title}</span>
+        <span className="shrink-0 whitespace-pre text-muted">{` · ${episode}`}</span>
+      </p>
+      <p className="mt-1 truncate text-[1.5rem] text-muted">{who}</p>
+    </TvLink>
+  );
+}
+
 /** A poster leaning on a big serif rank numeral, for the top-ranked row. */
 export function TvRankedCard({ rank, ...poster }: Poster & { rank: number }) {
   return (

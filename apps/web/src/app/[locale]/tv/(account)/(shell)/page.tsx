@@ -15,7 +15,12 @@ async function HomeContent({ locale }: { locale: string }) {
   const t = await getTranslations("home");
   const tTitle = await getTranslations("titlePage");
   const tGenres = await getTranslations("genres");
-  const home = await unwrap((await serverApi()).GET("/home", { params: { query: { lang: locale === "pt" ? "pt" : "en" } } }), locale, "tv");
+  const api = await serverApi();
+  const [home, rooms] = await Promise.all([
+    unwrap(api.GET("/home", { params: { query: { lang: locale === "pt" ? "pt" : "en" } } }), locale, "tv"),
+    // The rooms row is a bonus: the home works without it.
+    api.GET("/watch/rooms/friends").then((r) => r.data ?? [], () => []),
+  ]);
   const slides: TvSlide[] = home.heroes.map(({ anime, synopsis, backdrop, wide_art }) => ({
     id: anime.id,
     title: anime.title,
@@ -38,8 +43,8 @@ async function HomeContent({ locale }: { locale: string }) {
   return (
     <>
       {slides.length > 0 && <TvHero slides={slides} />}
-      {home.rows.length > 0 ? (
-        <TvHomeRows rows={home.rows} />
+      {home.rows.length > 0 || rooms.length > 0 ? (
+        <TvHomeRows rows={home.rows} rooms={rooms} />
       ) : (
         <p className="px-[var(--tv-x)] py-24 text-[1.75rem] text-muted">{t("empty")}</p>
       )}

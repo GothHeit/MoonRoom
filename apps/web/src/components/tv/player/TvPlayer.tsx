@@ -17,6 +17,7 @@ import { useProgressSaver } from "@/components/player/useProgressSaver";
 import { useSkips } from "@/components/player/useSkips";
 import { useSubtitles } from "@/components/player/useSubtitles";
 import { togglePlayback } from "@/components/player/useVideoControls";
+import { useRoomSync, type RoomBinding } from "@/components/room/useRoomSync";
 import { useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { AUTO_SOURCE } from "@/lib/pick-stream";
@@ -27,7 +28,7 @@ import { isBack, mediaKey, registerMediaKeys } from "../keys";
 import { tvHref } from "../paths";
 import { setFocus } from "../spatial";
 import { useTvSeek } from "./seek";
-import { TvEndCard, TvPlayerError } from "./TvPlayerCards";
+import { TvEndCard, TvJoinCard, TvPlayerError } from "./TvPlayerCards";
 import { PLAY_KEY, SEEK_KEY, TvControl, TvSeekBar } from "./TvPlayerControls";
 import { TvPlayerMenu, type MenuSection } from "./TvPlayerMenu";
 import { usePlainSubtitles } from "./usePlainSubtitles";
@@ -50,6 +51,8 @@ type Props = {
   subtitleLang: string | null;
   subtitleStyle: SubtitleStyle;
   showSkips: boolean;
+  /** Set when watching together: the room drives playback and picks the next episode. */
+  room?: RoomBinding;
 };
 
 type Panel = "subtitles" | "audio" | "source";
@@ -69,10 +72,11 @@ const PANEL_BUTTON: Record<Panel, string> = { subtitles: "tvp-subtitles", audio:
  * The TV mode's player: the same play pipeline as the site (sources with fallback, signed links,
  * subtitles, progress, skips, next episode), driven by the remote. While it plays nothing is on
  * screen; any key brings up the controls. Left and right seek, OK plays or pauses, Back
- * closes a panel or leaves, and the media keys work whenever the TV hands them over.
+ * closes a panel or leaves, and the media keys work whenever the TV hands them over. In a room
+ * the same keys ask the room, which moves everyone together.
  */
 export function TvPlayer(props: Props) {
-  const { source, animeId, episode, title, episodes, thumbnails, poster, lang, startAt, subtitleLang, showSkips } = props;
+  const { source, animeId, episode, title, episodes, thumbnails, poster, lang, startAt, subtitleLang, showSkips, room } = props;
   const t = useTranslations("player");
   const tv = useTranslations("tv.player");
   const locale = useLocale();
@@ -119,12 +123,32 @@ export function TvPlayer(props: Props) {
     lowMemory: true,
   });
   const seek = useTvSeek(video);
+  const sync = useRoomSync(
+    {
+      read: () => {
+        const v = video.current;
+        if (!v || v.readyState < 1) return null;
+        return { currentTime: v.currentTime, paused: v.paused, playbackRate: v.playbackRate, seeking: v.seeking, wireless: false };
+      },
+      seek: (seconds) => {
+        if (video.current) video.current.currentTime = seconds;
+      },
+      play: () => video.current?.play() ?? Promise.resolve(),
+      pause: () => video.current?.pause(),
+      setRate: (rate) => {
+        if (video.current) video.current.playbackRate = rate;
+      },
+    },
+    room,
+  );
 
   const names: StreamNames = { has: (key) => t.has(key), t: (key, values) => t(key, values) };
   const playingFrom: StreamChoice = { source: answered, lang: answeredLang };
   const automatic = source === AUTO_SOURCE;
   const picked: StreamChoice = automatic ? { source, lang } : playingFrom;
   const playingName = streamLabel(names, playingFrom);
+  // In a room only the host moves everyone to another stream.
+  const canSwitchStream = !room || room.switchStream !== undefined;
   const audioNames = hls.audioTracks.map((a) => ({ ...a, label: languageName(a.lang, locale) ?? a.label }));
   const titleHref = tvHref(`/anime/${animeId}`);
 
@@ -193,8 +217,11 @@ export function TvPlayer(props: Props) {
   }, [router, titleHref]);
 
   const goNext = useCallback(() => {
-    if (next !== undefined) router.replace(tvHref(watchHref(source, animeId, next, lang)));
-  }, [next, router, source, animeId, lang]);
+    if (next === undefined) return;
+    // In a room the next episode is a vote, and the room moves everyone together.
+    if (room) void room.pickEpisode(next);
+    else router.replace(tvHref(watchHref(source, animeId, next, lang)));
+  }, [next, router, source, animeId, lang, room]);
 
   useEffect(() => {
     if (countdown === null) return;
@@ -235,6 +262,11 @@ export function TvPlayer(props: Props) {
       return;
     }
     void api.PUT("/watch/choice/{anime_id}", { params: { path: { anime_id: animeId } }, body: to }).catch(() => undefined);
+    // The room reloads everyone's player at the room's position.
+    if (room) {
+      void room.switchStream?.(to);
+      return;
+    }
     router.replace(tvHref(watchHref(to.source, animeId, episode, to.lang, video.current?.currentTime ?? current)));
   }
 
@@ -246,7 +278,9 @@ export function TvPlayer(props: Props) {
 
   const shown = active || !playing || ended || panel !== null || seek.target !== null || error !== null;
   // What the remote is driving: a card or panel keeps it, otherwise the control card does.
-  const mode = error ? "error" : ended ? "ended" : panel ? "panel" : "controls";
+  // The TV refused to start the room's video on its own: one press of OK joins.
+  const blocked = room !== undefined && sync.blocked;
+  const mode = error ? "error" : blocked ? "blocked" : ended ? "ended" : panel ? "panel" : "controls";
 
   // Latest values for the key listener, which is added once.
   const latest = { mode, shown, skip: !!skip, togglePlay, skipNow, exit, goNext, seek, poke, closePanel };
@@ -331,6 +365,7 @@ export function TvPlayer(props: Props) {
     if (!v) return;
     setDuration(v.duration);
     setAskStreams(true);
+    sync.onLoadedMetadata();
     if (!started.current) {
       started.current = true;
       const from = attempt > 0 ? current : startAt;
@@ -384,7 +419,7 @@ export function TvPlayer(props: Props) {
     source: [
       {
         title: t("source"),
-        options: streams.map((s) => ({
+        options: (canSwitchStream ? streams : []).map((s) => ({
           key: `stream-${s.source}-${s.lang}`,
           label: streamLabel(names, s),
           selected: sameStream(s, picked),
@@ -408,8 +443,10 @@ export function TvPlayer(props: Props) {
       },
     ],
   };
-  const panelTitle: Record<Panel, string> = { subtitles: t("subtitles"), audio: t("audio"), source: t("source") };
-  const others = streams.filter((s) => !sameStream(s, { source, lang }));
+  const panelTitle: Record<Panel, string> = { subtitles: t("subtitles"), audio: t("audio"), source: canSwitchStream ? t("source") : t("settings.quality") };
+  const others = canSwitchStream ? streams.filter((s) => !sameStream(s, { source, lang })) : [];
+  // This TV's video comes from another source than the room's, so it may not line up exactly.
+  const otherSource = room && url && !automatic && answered !== source ? streamLabel(names, { source, lang }) : null;
   const sourceLine = automatic ? t("autoPlaying", { stream: playingName }) : playingName;
 
   return (
@@ -422,7 +459,7 @@ export function TvPlayer(props: Props) {
       <video
         ref={video}
         src={kind === "mp4" ? (url ?? undefined) : undefined}
-        autoPlay
+        autoPlay={!room}
         playsInline
         onClick={togglePlay}
         onLoadedMetadata={onLoadedMetadata}
@@ -436,17 +473,28 @@ export function TvPlayer(props: Props) {
           setEnded(false);
           setCountdown(null);
           poke();
+          sync.onPlay();
         }}
         onPause={(e) => {
           setPlaying(false);
           save(e.currentTarget);
+          // The pause at the end of an episode is the video finishing, not someone pausing.
+          if (!e.currentTarget.ended) sync.onPause();
         }}
+        onSeeked={sync.onSeeked}
         onEnded={onEnded}
-        onWaiting={() => setWaiting(true)}
-        onCanPlay={() => setWaiting(false)}
+        onWaiting={() => {
+          setWaiting(true);
+          sync.onWaiting();
+        }}
+        onCanPlay={() => {
+          setWaiting(false);
+          sync.onReady();
+        }}
         onPlaying={() => {
           setWaiting(false);
           setBegun(true);
+          sync.onReady();
         }}
         onError={() => url && setError("playback_failed")}
         className="absolute inset-0 h-full w-full"
@@ -468,7 +516,7 @@ export function TvPlayer(props: Props) {
         controlsHeight={CONTROLS_HEIGHT}
       />
 
-      {!error && waiting && !ended && (
+      {!error && waiting && !ended && !blocked && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
           <span className="h-20 w-20 animate-spin rounded-full border-[6px] border-line-strong border-t-accent" />
           <span className="sr-only">{t("loading")}</span>
@@ -479,7 +527,9 @@ export function TvPlayer(props: Props) {
         <TvPlayerError error={error} onRetry={retry} onExit={exit} others={others} names={names} onSwitch={switchStream} />
       )}
 
-      {ended && !error && (
+      {blocked && !error && <TvJoinCard onJoin={sync.unblock} />}
+
+      {ended && !error && !blocked && (
         <TvEndCard
           title={title}
           next={next}
@@ -497,7 +547,7 @@ export function TvPlayer(props: Props) {
         />
       )}
 
-      {skip && !error && !ended && !panel && (
+      {skip && !error && !ended && !panel && !blocked && (
         <div className="absolute right-[var(--tv-x)]" style={{ bottom: shown ? `calc(${CONTROLS_HEIGHT} + 1rem)` : "4rem" }}>
           {shown ? (
             <TvControl focusKey="tvp-skip" label={t(skipKey(skip.kind))} onPress={skipNow} />
@@ -510,7 +560,7 @@ export function TvPlayer(props: Props) {
         </div>
       )}
 
-      {!error && !ended && (
+      {!error && !ended && !blocked && (
         <div
           aria-hidden={!shown}
           className={`pointer-events-none absolute inset-0 transition-opacity duration-[160ms] ease-out ${shown ? "opacity-100" : "opacity-0"}`}
@@ -521,7 +571,13 @@ export function TvPlayer(props: Props) {
           <div className="absolute left-[var(--tv-x)] right-[var(--tv-x)] top-12 flex items-baseline gap-6">
             <p className="min-w-0 truncate font-display text-[4rem] leading-tight">{title}</p>
             <p className="shrink-0 text-[2.25rem] font-bold text-soft">{t("episode", { episode })}</p>
+            {room && <div className="ml-auto shrink-0 self-center pl-6">{room.topBar}</div>}
           </div>
+          {otherSource && (
+            <p role="status" className="absolute left-[var(--tv-x)] top-[9.5rem] max-w-[60rem] text-[1.375rem] text-soft">
+              {t("roomOtherSource", { room: otherSource })}
+            </p>
+          )}
           <div className={`absolute inset-x-[var(--tv-x)] bottom-20 ${shown ? "pointer-events-auto" : ""}`}>
             <TvSeekBar current={current} duration={duration} target={seek.target} onNudge={seek.nudge} onEnter={togglePlay} />
             <div className="mt-4 flex items-center gap-6">
@@ -533,12 +589,17 @@ export function TvPlayer(props: Props) {
               <div className="flex shrink-0 items-center gap-6">
                 {tracks.length > 0 && <TvControl focusKey="tvp-subtitles" label={t("subtitles")} onPress={() => setPanel("subtitles")} />}
                 {audioNames.length > 1 && <TvControl focusKey="tvp-audio" label={t("audio")} onPress={() => setPanel("audio")} />}
-                <TvControl focusKey="tvp-source" label={t("source")} onPress={() => setPanel("source")} />
+                {/* A room's guest can't move the room to another source; what is left is the picture quality. */}
+                {(canSwitchStream || hls.qualities.length > 1) && (
+                  <TvControl focusKey="tvp-source" label={canSwitchStream ? t("source") : t("settings.quality")} onPress={() => setPanel("source")} />
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {room?.overlay}
 
       {panel && !error && <TvPlayerMenu title={panelTitle[panel]} sections={sections[panel]} empty={tv("nothingElse")} />}
     </div>

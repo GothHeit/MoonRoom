@@ -79,6 +79,22 @@ export function TvPlayerError({ error, onRetry, onExit, others, names, onSwitch 
   );
 }
 
+/** The TV wouldn't start the room's video by itself: one press of OK joins everyone. */
+export function TvJoinCard({ onJoin }: { onJoin: () => void }) {
+  const tv = useTranslations("tv.room");
+  return (
+    <Card focusKey="tvp-join" start="tvp-join-ok">
+      <h2 className="text-[3.5rem] leading-tight">{tv("joinTitle")}</h2>
+      <p className="mt-5 text-[1.75rem] leading-snug text-soft">{tv("joinBody")}</p>
+      <div className="mt-10 flex justify-center">
+        <TvButton variant="primary" focusKey="tvp-join-ok" onPress={onJoin}>
+          {tv("join")}
+        </TvButton>
+      </div>
+    </Card>
+  );
+}
+
 type EndProps = {
   /** The show's title. */
   title: string;

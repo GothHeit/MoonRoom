@@ -99,6 +99,13 @@
       "plain": "Simples (mais leve para a TV)",
       "nothingElse": "Nada mais para escolher neste episódio."
     },
+    "room": {
+      "endedBody": "Seus amigos fecharam a sala, ou todo mundo saiu.",
+      "joinTitle": "Entrar no vídeo da sala",
+      "joinBody": "Aperte OK para começar a assistir com todo mundo.",
+      "join": "Entrar",
+      "home": "Voltar ao Início"
+    },
     "pin": {
       "title": "Digite seu PIN",
       "locked": "O MoonRoom de {name} está bloqueado nesta TV",

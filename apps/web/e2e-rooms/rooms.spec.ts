@@ -218,3 +218,58 @@ test("chat reaches the other viewer, beside the video or over it", async ({ brow
   await host.getByRole("button", { name: /^Open chat/ }).click();
   await expect(hostPanel.getByText("over the video")).toBeVisible();
 });
+
+test("a TV joins a friend's open room from Home with the remote and follows it", async ({ browser }) => {
+  const host = await viewer(browser, "carol");
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  contexts.push(context);
+  const tv = await context.newPage();
+  await stubVideo(tv);
+  await signIn(tv, "en", "dave");
+  // Friends: one asks, the other asking back accepts.
+  expect((await host.request.post("/api/proxy/friends/requests", { data: { username: "dave" } })).status()).toBe(201);
+  expect((await tv.request.post("/api/proxy/friends/requests", { data: { username: "carol" } })).status()).toBe(201);
+
+  const created = await host.request.post("/api/proxy/watch/rooms", {
+    data: { source: "zoko", anime_id: 4, title: "Moon Test", episode: 1, open: true },
+  });
+  const code: string = (await created.json()).code;
+  await enter(host, code);
+
+  // Opening the TV app asks who is watching first.
+  await tv.goto("/en/tv");
+  await tv.getByRole("button", { name: "dave" }).click();
+  const card = tv.getByRole("link", { name: "Join carol watching Moon Test" });
+  await expect(card).toBeVisible();
+  // A held key's pace: the remote navigation ignores presses closer together than that.
+  const press = async (key: string) => {
+    await tv.keyboard.press(key);
+    await tv.waitForTimeout(150);
+  };
+  for (let i = 0; i < 4 && !(await card.evaluate((el) => el === document.activeElement)); i++) await press("ArrowDown");
+  await expect(card).toBeFocused();
+  await press("Enter");
+  await expect(tv).toHaveURL(new RegExp(`/en/tv/room/${code}$`));
+  await expect.poll(() => tv.locator("video").evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2);
+  await expect(host.getByRole("button", { name: /People, 2 watching/ })).toBeVisible();
+  await expect(tv.getByText("2 watching")).toBeVisible();
+
+  // The room plays: the TV follows.
+  await host.getByRole("button", { name: "Play", exact: true }).click();
+  await expect.poll(() => playing(tv)).toBe(true);
+  await expectInSync(host, tv);
+
+  // OK on the remote pauses everyone, and a friend's message shows over the TV's picture.
+  await settle(tv);
+  await press("Enter");
+  if (await playing(tv)) await press("Enter");
+  await expect.poll(() => playing(host)).toBe(false);
+  await host.getByRole("textbox", { name: "Message" }).fill("hello tv");
+  await host.keyboard.press("Enter");
+  await expect(tv.getByText("hello tv")).toBeVisible();
+
+  // Back leaves the room and returns to Home.
+  await press("Escape");
+  await expect(tv).toHaveURL(/\/en\/tv$/);
+  await expect(host.getByRole("button", { name: /People, 1 watching/ })).toBeVisible();
+});

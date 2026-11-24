@@ -99,6 +99,13 @@
       "plain": "Simple (lighter for the TV)",
       "nothingElse": "Nothing else to pick for this episode."
     },
+    "room": {
+      "endedBody": "Your friends closed it, or everyone left.",
+      "joinTitle": "Join the room’s video",
+      "joinBody": "Press OK to start watching with everyone.",
+      "join": "Join",
+      "home": "Back to Home"
+    },
     "pin": {
       "title": "Enter your PIN",
       "locked": "{name}’s MoonRoom is locked on this TV",

@@ -82,9 +82,11 @@ export function RoomOverlay({ playback, serverNow, toasts, reactions, reconnecti
   );
 }
 
-/** 3, 2, 1 over the video before an episode starts, so nobody misses the first second. */
-function Countdown({ playback, serverNow }: Pick<Props, "playback" | "serverNow">) {
-  const t = useTranslations("room");
+/**
+ * The seconds left (3, 2, 1) before a scheduled start, or null when there is nothing to count:
+ * shown over the video before an episode starts, so nobody misses the first second.
+ */
+export function useCountdown(playback: Playback, serverNow: () => number): number | null {
   const [left, setLeft] = useState<{ version: number; ms: number } | null>(null);
 
   useEffect(() => {
@@ -99,7 +101,13 @@ function Countdown({ playback, serverNow }: Pick<Props, "playback" | "serverNow"
   }, [playback, serverNow]);
 
   if (!left || left.version !== playback.version || left.ms <= 0 || !playback.playing) return null;
-  const n = Math.ceil(left.ms / 1000);
+  return Math.ceil(left.ms / 1000);
+}
+
+function Countdown({ playback, serverNow }: Pick<Props, "playback" | "serverNow">) {
+  const t = useTranslations("room");
+  const n = useCountdown(playback, serverNow);
+  if (n === null) return null;
   return (
     <div role="status" className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2">
       <span
