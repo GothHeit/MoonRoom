@@ -39,3 +39,16 @@ async def test_prune_drops_only_long_dead_rows(client, session):
     hashes = set(await session.scalars(select(RefreshToken.token_hash)))
     assert hashes == {"live", "rotated-recently"}
     assert await session.scalar(select(func.count()).select_from(MalOAuthState)) == 1
+
+
+async def test_prune_drops_old_password_reset_links(client, session):
+    from app.models import PasswordReset
+
+    user, _ = await make_user(session, "ana", login=False)
+    now = utcnow()
+    for name, expires in [("fresh", now + timedelta(hours=1)), ("old", now - timedelta(days=30))]:
+        session.add(PasswordReset(user_id=user.id, token_hash=name, expires_at=expires))
+    await session.commit()
+
+    await prune()
+    assert set(await session.scalars(select(PasswordReset.token_hash))) == {"fresh"}

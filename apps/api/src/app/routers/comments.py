@@ -47,6 +47,8 @@ MAX_FRIENDS = 12
 # How many of the people who commented a locked episode is named.
 MAX_PREVIEW = 3
 EXCERPT = 140
+# How long a viewer's MAL progress on one title is reused to decide locked or not, in seconds.
+MAL_COUNT_TTL = 90
 
 Reaction = Literal["heart", "laugh", "wow", "cry", "fire", "clap"]
 REACTIONS: tuple[str, ...] = ("heart", "laugh", "wow", "cry", "fire", "clap")
@@ -176,6 +178,11 @@ async def _visible_authors(session: Session, user: User) -> list[uuid.UUID]:
 
 async def _mal_count(request: Request, session: Session, user: User, kind: str, title: int) -> int:
     """Episodes watched or chapters read on the user's MAL list; 0 when unlinked or MAL fails."""
+    cache = request.app.state.shared_cache
+    key = [str(user.id), kind, title]
+    hit = await cache.get("comments-mal-count", key)
+    if hit is not None:
+        return int(hit)
     if await session.get(MalLink, user.id) is None:
         return 0
     try:
@@ -183,10 +190,11 @@ async def _mal_count(request: Request, session: Session, user: User, kind: str, 
     except Exception:
         log.warning("comments: MAL list entry for %s %s unavailable", kind, title)
         return 0
-    if not entry:
-        return 0
     field = "num_episodes_watched" if kind == "anime" else "num_chapters_read"
-    return int(entry.get(field) or 0)
+    count = int(entry.get(field) or 0) if entry else 0
+    # Short, so a user who just updated MAL waits at most this long for a comment to unlock.
+    await cache.set("comments-mal-count", key, count, MAL_COUNT_TTL)
+    return count
 
 
 async def finished_episode(
@@ -556,6 +564,9 @@ async def reply(
     if parent.parent_id is not None:
         parent = await _readable(request, session, user, parent.parent_id)
     text = clean_body(body.body)
+    # The title's name comes from MAL; end the transaction first so no connection waits on it.
+    await session.commit()
+    title = ((await _title_name(request, parent) or "")[:300]) or None
     row = TitleComment(
         user_id=user.id,
         anime_id=parent.anime_id,
@@ -581,7 +592,7 @@ async def reply(
             comment_id=parent.id,
             reply_id=row.id,
             excerpt=excerpt(text),
-            title=(await _title_name(request, parent) or "")[:300] or None,
+            title=title,
         )
     await session.commit()
     people = await summaries(session, [user.id])

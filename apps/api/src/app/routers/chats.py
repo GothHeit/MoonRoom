@@ -198,7 +198,9 @@ def _clean_name(raw: str | None) -> str | None:
     if raw is None:
         return None
     # Control and format characters (bidi marks, zero-width spaces) are dropped, like in text.
-    name = " ".join("".join(ch for ch in raw if unicodedata.category(ch) not in _DROP).split())
+    # Tabs and line breaks become spaces first, so "a\nb" stays two words.
+    spaced = "".join(" " if ch.isspace() else ch for ch in raw)
+    name = " ".join("".join(ch for ch in spaced if unicodedata.category(ch) not in _DROP).split())
     if len(name) > MAX_NAME:
         raise ApiError(422, "name_too_long", f"Keep the name under {MAX_NAME} characters")
     return name or None
@@ -391,8 +393,11 @@ async def _direct_with(session: Session, user: User, other_id: uuid.UUID) -> tup
     return chat, True
 
 
-async def _resolve_share(request: Request, share: ShareIn) -> dict:
-    """The title's name and art, from MyAnimeList and ani.zip, never from the client."""
+async def _resolve_share(request: Request, session: Session, share: ShareIn) -> dict:
+    """The title's name and art, from MyAnimeList and ani.zip, never from the client.
+
+    The open transaction is ended first so no database connection waits on those calls."""
+    await session.commit()
     mal = request.app.state.mal
     work = mal.details(share.id) if share.kind == "anime" else mal.manga_details(share.id)
     try:
@@ -725,7 +730,7 @@ async def send(
         raise ApiError(422, "message_empty", "Write something first")
     if not await _can_send(session, user, chat, await _member_ids(session, chat.id)):
         raise ApiError(403, "not_friends", "You can only message friends")
-    share = await _resolve_share(request, body.share) if body.share is not None else None
+    share = await _resolve_share(request, session, body.share) if body.share is not None else None
     row = await _post(request, session, user, chat, text, share)
     await session.commit()
     await _broadcast(request, session, [row])
@@ -770,6 +775,8 @@ async def share_to(body: ShareToIn, request: Request, user: CurrentUser, session
     if len(chat_ids) + len(user_ids) > MAX_TARGETS:
         raise ApiError(422, "too_many_targets", f"Send to at most {MAX_TARGETS} at once")
     text = _clean_text(body.body)
+    # Resolved before anything is locked or created, so the lookups hold no connection or row.
+    share = await _resolve_share(request, session, body.share)
     targets: dict[uuid.UUID, Chat] = {}
     created: list[tuple[uuid.UUID, uuid.UUID]] = []
     for chat_id in chat_ids:
@@ -785,7 +792,6 @@ async def share_to(body: ShareToIn, request: Request, user: CurrentUser, session
     # Each message sent counts against the limit, not just the request.
     for _ in range(len(targets) - 1):
         request.app.state.action_limits.hit("chat_message", str(user.id))
-    share = await _resolve_share(request, body.share)
     rows = [await _post(request, session, user, chat, text, share) for chat in targets.values()]
     await session.commit()
     for chat_id, other in created:

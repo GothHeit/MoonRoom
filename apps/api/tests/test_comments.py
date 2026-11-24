@@ -1,3 +1,4 @@
+from app.db import utcnow
 from tests.conftest import make_user
 from tests.test_friends import befriend, watch
 
@@ -256,3 +257,27 @@ async def test_reactions_toggle_and_count(client, session):
     ]
     after = (await client.delete(f"{url}/heart", headers=bob)).json()
     assert after[0] == {"kind": "heart", "count": 1, "mine": False}
+
+
+async def test_the_mal_progress_check_is_reused_for_a_short_while(client, session, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.main import app as fastapi_app
+    from app.models import MalLink
+    from app.routers.comments import _mal_count
+
+    ana, _ = await make_user(session, "ana", login=False)
+    session.add(MalLink(user_id=ana.id, access_token="x", refresh_token="y", expires_at=utcnow()))
+    await session.commit()
+    calls = []
+
+    class Accounts:
+        async def entry(self, _s, _u, title, kind):
+            calls.append((kind, title))
+            return {"num_episodes_watched": 4}
+
+    monkeypatch.setattr(fastapi_app.state, "mal_accounts", Accounts())
+    request = SimpleNamespace(app=fastapi_app)
+    assert await _mal_count(request, session, ana, "anime", 99) == 4  # type: ignore[arg-type]
+    assert await _mal_count(request, session, ana, "anime", 99) == 4  # type: ignore[arg-type]
+    assert calls == [("anime", 99)]
