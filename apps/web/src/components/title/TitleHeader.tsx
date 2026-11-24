@@ -22,9 +22,11 @@ type Props = {
   art?: ReactNode;
   /** The "N comments" link, streamed in; renders a list item or nothing. */
   comments?: ReactNode;
+  /** The round "send to a friend" button. */
+  send?: ReactNode;
 };
 
-export async function TitleHeader({ anime, badge, play, hint, list, art, comments }: Props) {
+export async function TitleHeader({ anime, badge, play, hint, list, art, comments, send }: Props) {
   const t = await getTranslations("titlePage");
   const locale = await getLocale();
   const tGenres = await getTranslations("genres");
@@ -66,6 +68,7 @@ export async function TitleHeader({ anime, badge, play, hint, list, art, comment
       <div className="mt-6 flex flex-wrap gap-3">
         {play}
         <AddToList titleId={anime.id} state={list} />
+        {send}
       </div>
       {hint}
 

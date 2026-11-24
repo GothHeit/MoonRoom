@@ -8,6 +8,7 @@ import type { ListState } from "@/components/title/AddToList";
 import { TitleComments, TitleCommentsLink } from "@/components/comments/TitleComments";
 import { EpisodeList } from "@/components/title/EpisodeList";
 import { titleArt } from "@/components/title/titleArt";
+import { SendToFriend } from "@/components/messages/SendToFriend";
 import { TitleHeader } from "@/components/title/TitleHeader";
 import {
   WatchBadge,
@@ -102,6 +103,7 @@ export default async function TitlePage({ params }: PageProps<"/[locale]/anime/[
   const t = await getTranslations("titlePage");
 
   const [anime, list] = await Promise.all([unwrap(details(id, locale), locale), listState(id)]);
+  const poster = anime.main_picture?.medium ?? anime.main_picture?.large;
 
   // The sources come from scrapers that can be slow or down: the page renders without them and
   // the parts that need them stream in.
@@ -134,6 +136,18 @@ export default async function TitlePage({ params }: PageProps<"/[locale]/anime/[
           <Suspense fallback={null}>
             <TitleCommentsLink kind="anime" id={id} />
           </Suspense>
+        }
+        send={
+          <SendToFriend
+            kind="anime"
+            id={id}
+            title={anime.title}
+            poster={poster}
+            part={watchPlan(id).then(
+              (plan) => plan?.next.episode || null,
+              () => null,
+            )}
+          />
         }
       />
       <div className="flex flex-col gap-10 py-6">

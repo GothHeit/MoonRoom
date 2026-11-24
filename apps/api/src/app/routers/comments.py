@@ -141,16 +141,16 @@ def decode_cursor(raw: str) -> tuple[datetime, uuid.UUID]:
         raise ApiError(422, "validation_failed", "Bad page cursor") from None
 
 
-def clean_body(raw: str) -> str:
+def clean_body(raw: str, limit: int = MAX_BODY, too_long: str = "comment_too_long") -> str:
     """Drops control and format characters (keeping line breaks), at most one blank line in a
-    row, and the spaces around. Raises when nothing is left or it is too long."""
+    row, and the spaces around. Raises when nothing is left or it is longer than `limit`."""
     text = raw.replace("\r\n", "\n").replace("\r", "\n")
     text = "".join(ch for ch in text if ch in _KEEP or unicodedata.category(ch) not in _DROP)
     text = _BLANK_RUNS.sub("\n\n", text).strip()
     if not text:
         raise ApiError(422, "comment_empty", "Write something first")
-    if len(text) > MAX_BODY:
-        raise ApiError(422, "comment_too_long", f"Keep it under {MAX_BODY} characters")
+    if len(text) > limit:
+        raise ApiError(422, too_long, f"Keep it under {limit} characters")
     return text
 
 

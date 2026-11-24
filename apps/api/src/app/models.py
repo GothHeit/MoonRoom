@@ -452,3 +452,77 @@ class CommentReaction(Base):
     # heart, laugh, wow, cry, fire or clap.
     kind: Mapped[str] = mapped_column(String(8), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class Chat(Base):
+    """A conversation in Messages: one between two friends (`direct`) or a small group."""
+
+    __tablename__ = "chats"
+    __table_args__ = (
+        CheckConstraint("kind IN ('direct', 'group')", name="ck_chats_kind"),
+        CheckConstraint("(kind = 'direct') = (direct_key IS NOT NULL)", name="ck_chats_direct_key"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(String(8))
+    # The two member ids, smaller first, so a pair of friends has one direct chat at most.
+    direct_key: Mapped[str | None] = mapped_column(String(80), unique=True)
+    # Groups only; None until someone names it (the members' names are shown instead).
+    name: Mapped[str | None] = mapped_column(String(60))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # When its newest message was sent (or when it was made), for ordering the list.
+    last_message_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class ChatMember(Base):
+    """Someone in a chat, how far they have read and whether they muted it."""
+
+    __tablename__ = "chat_members"
+
+    chat_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("chats.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    joined_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # Messages sent after this are unread for them.
+    last_read_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # A muted chat sends no phone notification and doesn't count on the Messages icon.
+    muted: Mapped[bool] = mapped_column(default=False, server_default="false")
+
+
+class ChatMessage(Base):
+    """A message: text, a shared title (or one of its episodes or chapters), or both.
+
+    A share keeps the title's name and art as they were when sent, so the card still reads
+    right when MyAnimeList can't answer."""
+
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        Index("ix_chat_messages_chat_created", "chat_id", "created_at"),
+        CheckConstraint(
+            "body IS NOT NULL OR anime_id IS NOT NULL OR manga_id IS NOT NULL",
+            name="ck_chat_messages_not_empty",
+        ),
+        CheckConstraint("anime_id IS NULL OR manga_id IS NULL", name="ck_chat_messages_one_title"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    body: Mapped[str | None] = mapped_column(String(2000))
+    anime_id: Mapped[int | None]
+    manga_id: Mapped[int | None]
+    episode: Mapped[int | None]
+    chapter: Mapped[str | None] = mapped_column(String(16))
+    share_title: Mapped[str | None] = mapped_column(String(300))
+    # A wide picture (episode still or title fanart) and the poster; either may be missing.
+    share_image: Mapped[str | None] = mapped_column(String(500))
+    share_poster: Mapped[str | None] = mapped_column(String(500))
+    # Adult titles show without art to people who hide adult titles.
+    share_adult: Mapped[bool] = mapped_column(default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)

@@ -295,6 +295,9 @@ ACTION_RULES: dict[str, tuple[int, float]] = {
     # Posting, editing or replying to a comment, and reacting to one.
     "comment": (30, 600),
     "comment_reaction": (120, 600),
+    # Messages and shares sent, and chats opened or groups made.
+    "chat_message": (60, 60),
+    "chat_create": (30, 600),
     "room_reaction": (60, 60),
     "room_position": (30, 60),
 }

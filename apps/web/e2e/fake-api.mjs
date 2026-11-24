@@ -1,6 +1,7 @@
 // Minimal stand-in for the API, so the web e2e tests need no database.
 import { createServer } from "node:http";
 
+import { handleChats } from "./fake-chats.mjs";
 import { handleComments } from "./fake-comments.mjs";
 import { handleManga, MANGA } from "./fake-manga.mjs";
 import { choiceFor, handleWatch, streamFor } from "./fake-watch.mjs";
@@ -176,6 +177,7 @@ createServer(async (req, res) => {
   }
   if (await handleWatch(req, res, { url, send, error, body, authed })) return;
   if ((await handleComments(req, url, { send, error, body, authed })) !== false) return;
+  if ((await handleChats(req, res, url, { send, error, body, authed })) !== false) return;
   if (url.pathname === "/users/00000000-0000-4000-8000-000000000001/profile") {
     if (!authed) return send(401, error("not_authenticated"));
     const at = "2026-01-01T00:00:00Z";

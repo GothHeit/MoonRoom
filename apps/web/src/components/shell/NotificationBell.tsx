@@ -152,7 +152,7 @@ export function NotificationBell() {
           if (!open) void load();
           setOpen((v) => !v);
         }}
-        className="press relative flex h-11 w-11 items-center justify-center rounded-full text-muted hover:text-fg"
+        className="press relative flex h-11 w-10 items-center justify-center rounded-full after:absolute after:inset-y-0 after:-inset-x-0.5 sm:after:hidden text-muted hover:text-fg sm:w-11"
       >
         <Icon name="bell" />
         {unread > 0 && (

@@ -567,6 +567,266 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Chats
+         * @description The viewer's chats, most recent message first.
+         */
+        get: operations["list_chats_chats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/direct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Direct
+         * @description The chat with a friend, made the first time.
+         */
+        post: operations["open_direct_chats_direct_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Events
+         * @description Server-sent events for every chat the viewer is in: `message` (a MessageOut), `deleted`
+         *     ({chat_id, message_id}), `read` ({chat_id, user_id, at}), `chat` ({chat_id}: its name or
+         *     members changed, or it is new), `left` ({chat_id}: the viewer is no longer in it), `resync`
+         *     (load everything again) and `tick` to keep the line open.
+         */
+        get: operations["events_chats_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Group */
+        post: operations["create_group_chats_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share To
+         * @description Sends a title (or an episode or chapter) as a card, with an optional note, to several
+         *     chats and friends at once.
+         */
+        post: operations["share_to_chats_share_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unread
+         * @description For the badge on the Messages icon.
+         */
+        get: operations["unread_chats_unread_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/{chat_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Chat */
+        get: operations["get_chat_chats__chat_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename Group
+         * @description Any member can name a group, or clear its name.
+         */
+        patch: operations["rename_group_chats__chat_id__patch"];
+        trace?: never;
+    };
+    "/chats/{chat_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Members
+         * @description Adds friends of the viewer to a group.
+         */
+        post: operations["add_members_chats__chat_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/{chat_id}/members/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Leave Group
+         * @description Leaves a group; the last one out deletes it. A direct chat can't be left.
+         */
+        delete: operations["leave_group_chats__chat_id__members_me_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/{chat_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Messages
+         * @description The newest messages, or those before `before`; each page is oldest first.
+         */
+        get: operations["messages_chats__chat_id__messages_get"];
+        put?: never;
+        /** Send */
+        post: operations["send_chats__chat_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/{chat_id}/messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unsend
+         * @description Takes back one of the viewer's own messages, for everyone.
+         */
+        delete: operations["unsend_chats__chat_id__messages__message_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/{chat_id}/mute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Mute */
+        put: operations["mute_chats__chat_id__mute_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/{chat_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark Read
+         * @description Marks everything in the chat read, and tells the others (for the "Seen" line).
+         */
+        put: operations["mark_read_chats__chat_id__read_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/comments/{comment_id}": {
         parameters: {
             query?: never;
@@ -2336,6 +2596,39 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ChatList */
+        ChatList: {
+            /** Items */
+            items: components["schemas"]["ChatOut"][];
+        };
+        /** ChatOut */
+        ChatOut: {
+            /** Can Send */
+            can_send: boolean;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "direct" | "group";
+            last: components["schemas"]["MessageOut"] | null;
+            /**
+             * Last Message At
+             * Format: date-time
+             */
+            last_message_at: string;
+            /** Members */
+            members: components["schemas"]["UserSummary"][];
+            /** Muted */
+            muted: boolean;
+            /** Name */
+            name: string | null;
+            /** Read At */
+            read_at: string | null;
+            /** Unread */
+            unread: number;
+        };
         /** ClockOut */
         ClockOut: {
             /** Now */
@@ -2456,6 +2749,14 @@ export interface components {
             /** User Code */
             user_code: string;
         };
+        /** DirectIn */
+        DirectIn: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
         /** EndpointIn */
         EndpointIn: {
             /** Endpoint */
@@ -2544,6 +2845,18 @@ export interface components {
             name: string;
             /** Nsfw */
             nsfw: boolean;
+        };
+        /** GroupEdit */
+        GroupEdit: {
+            /** Name */
+            name?: string | null;
+        };
+        /** GroupIn */
+        GroupIn: {
+            /** Name */
+            name?: string | null;
+            /** User Ids */
+            user_ids: string[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3007,6 +3320,42 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** MembersIn */
+        MembersIn: {
+            /** User Ids */
+            user_ids: string[];
+        };
+        /** MessageIn */
+        MessageIn: {
+            /** Body */
+            body?: string | null;
+            share?: components["schemas"]["ShareIn"] | null;
+        };
+        /** MessageOut */
+        MessageOut: {
+            /** Body */
+            body: string | null;
+            /** Chat Id */
+            chat_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Mine */
+            mine: boolean;
+            share: components["schemas"]["ShareOut"] | null;
+            user: components["schemas"]["UserSummary"];
+        };
+        /** MessagesPage */
+        MessagesPage: {
+            /** Items */
+            items: components["schemas"]["MessageOut"][];
+            /** Next */
+            next: string | null;
+        };
         /**
          * MfaChallengeOut
          * @description The password was right but the account has two-factor login: send the code next.
@@ -3049,6 +3398,11 @@ export interface components {
             token_type: "bearer";
             /** Trusted Device */
             trusted_device?: string | null;
+        };
+        /** MuteIn */
+        MuteIn: {
+            /** Muted */
+            muted: boolean;
         };
         /** NotificationOut */
         NotificationOut: {
@@ -3625,6 +3979,11 @@ export interface components {
             /** Year */
             year: number;
         };
+        /** SentOut */
+        SentOut: {
+            /** Chat Ids */
+            chat_ids: string[];
+        };
         /** SessionOut */
         SessionOut: {
             /** Current */
@@ -3655,6 +4014,58 @@ export interface components {
         SettingsOut: {
             /** Muted */
             muted: string[];
+        };
+        /**
+         * ShareIn
+         * @description A title to share, or one of its episodes (anime) or chapters (manga).
+         */
+        ShareIn: {
+            /** Chapter */
+            chapter?: string | null;
+            /** Episode */
+            episode?: number | null;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "anime" | "manga";
+        };
+        /** ShareOut */
+        ShareOut: {
+            /** Chapter */
+            chapter: string | null;
+            /** Episode */
+            episode: number | null;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
+            /** Id */
+            id: number;
+            /** Image */
+            image: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "anime" | "manga";
+            /** Poster */
+            poster: string | null;
+            /** Title */
+            title: string;
+        };
+        /** ShareToIn */
+        ShareToIn: {
+            /** Body */
+            body?: string | null;
+            /** Chat Ids */
+            chat_ids?: string[];
+            share: components["schemas"]["ShareIn"];
+            /** User Ids */
+            user_ids?: string[];
         };
         /** SkipOut */
         SkipOut: {
@@ -3790,6 +4201,11 @@ export interface components {
             otpauth_uri: string;
             /** Secret */
             secret: string;
+        };
+        /** UnreadOut */
+        UnreadOut: {
+            /** Chats */
+            chats: number;
         };
         /**
          * UserSummary
@@ -4850,6 +5266,454 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TokensOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_chats_chats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatList"];
+                };
+            };
+        };
+    };
+    open_direct_chats_direct_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DirectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    events_chats_events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_group_chats_groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_to_chats_share_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareToIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unread_chats_unread_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadOut"];
+                };
+            };
+        };
+    };
+    get_chat_chats__chat_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_group_chats__chat_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_members_chats__chat_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembersIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_group_chats__chat_id__members_me_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_chats__chat_id__messages_get: {
+        parameters: {
+            query?: {
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagesPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_chats__chat_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unsend_chats__chat_id__messages__message_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mute_chats__chat_id__mute_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MuteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_chats__chat_id__read_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

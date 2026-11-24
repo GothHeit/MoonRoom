@@ -811,6 +811,109 @@
         "title": "ChatIn",
         "type": "object"
       },
+      "ChatList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChatOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ChatList",
+        "type": "object"
+      },
+      "ChatOut": {
+        "properties": {
+          "can_send": {
+            "title": "Can Send",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "direct",
+              "group"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_message_at": {
+            "format": "date-time",
+            "title": "Last Message At",
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/UserSummary"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "muted": {
+            "title": "Muted",
+            "type": "boolean"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "unread": {
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "members",
+          "muted",
+          "unread",
+          "last",
+          "last_message_at",
+          "can_send",
+          "read_at"
+        ],
+        "title": "ChatOut",
+        "type": "object"
+      },
       "ClockOut": {
         "properties": {
           "now": {
@@ -1133,6 +1236,20 @@
         "title": "DeviceStartOut",
         "type": "object"
       },
+      "DirectIn": {
+        "properties": {
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "DirectIn",
+        "type": "object"
+      },
       "EndpointIn": {
         "properties": {
           "endpoint": {
@@ -1346,6 +1463,55 @@
           "nsfw"
         ],
         "title": "GenreOut",
+        "type": "object"
+      },
+      "GroupEdit": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "GroupEdit",
+        "type": "object"
+      },
+      "GroupIn": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "user_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "user_ids"
+        ],
+        "title": "GroupIn",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2857,6 +3023,137 @@
         "title": "MemberOut",
         "type": "object"
       },
+      "MembersIn": {
+        "properties": {
+          "user_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "user_ids"
+        ],
+        "title": "MembersIn",
+        "type": "object"
+      },
+      "MessageIn": {
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShareIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "MessageIn",
+        "type": "object"
+      },
+      "MessageOut": {
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "chat_id": {
+            "title": "Chat Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mine": {
+            "title": "Mine",
+            "type": "boolean"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShareOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserSummary"
+          }
+        },
+        "required": [
+          "id",
+          "chat_id",
+          "user",
+          "body",
+          "share",
+          "created_at",
+          "mine"
+        ],
+        "title": "MessageOut",
+        "type": "object"
+      },
+      "MessagesPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MessageOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "required": [
+          "items",
+          "next"
+        ],
+        "title": "MessagesPage",
+        "type": "object"
+      },
       "MfaChallengeOut": {
         "description": "The password was right but the account has two-factor login: send the code next.",
         "properties": {
@@ -2941,6 +3238,19 @@
           "expires_in"
         ],
         "title": "MfaTokensOut",
+        "type": "object"
+      },
+      "MuteIn": {
+        "properties": {
+          "muted": {
+            "title": "Muted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "muted"
+        ],
+        "title": "MuteIn",
         "type": "object"
       },
       "NotificationOut": {
@@ -4651,6 +4961,22 @@
         "title": "SeasonalOut",
         "type": "object"
       },
+      "SentOut": {
+        "properties": {
+          "chat_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Chat Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "chat_ids"
+        ],
+        "title": "SentOut",
+        "type": "object"
+      },
       "SessionOut": {
         "properties": {
           "current": {
@@ -4735,6 +5061,178 @@
           "muted"
         ],
         "title": "SettingsOut",
+        "type": "object"
+      },
+      "ShareIn": {
+        "description": "A title to share, or one of its episodes (anime) or chapters (manga).",
+        "properties": {
+          "chapter": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter"
+          },
+          "episode": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Episode"
+          },
+          "id": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "anime",
+              "manga"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "ShareIn",
+        "type": "object"
+      },
+      "ShareOut": {
+        "properties": {
+          "chapter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter"
+          },
+          "episode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Episode"
+          },
+          "hidden": {
+            "default": false,
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "kind": {
+            "enum": [
+              "anime",
+              "manga"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "poster": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poster"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "episode",
+          "chapter",
+          "title",
+          "image",
+          "poster"
+        ],
+        "title": "ShareOut",
+        "type": "object"
+      },
+      "ShareToIn": {
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "chat_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Chat Ids",
+            "type": "array"
+          },
+          "share": {
+            "$ref": "#/components/schemas/ShareIn"
+          },
+          "user_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "share"
+        ],
+        "title": "ShareToIn",
         "type": "object"
       },
       "SkipOut": {
@@ -5089,6 +5587,19 @@
           "otpauth_uri"
         ],
         "title": "TwoFactorSetupOut",
+        "type": "object"
+      },
+      "UnreadOut": {
+        "properties": {
+          "chats": {
+            "title": "Chats",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chats"
+        ],
+        "title": "UnreadOut",
         "type": "object"
       },
       "UserSummary": {
@@ -6776,6 +7287,705 @@
         "summary": "Register",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/chats": {
+      "get": {
+        "description": "The viewer's chats, most recent message first.",
+        "operationId": "list_chats_chats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Chats",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/direct": {
+      "post": {
+        "description": "The chat with a friend, made the first time.",
+        "operationId": "open_direct_chats_direct_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Open Direct",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/events": {
+      "get": {
+        "description": "Server-sent events for every chat the viewer is in: `message` (a MessageOut), `deleted`\n({chat_id, message_id}), `read` ({chat_id, user_id, at}), `chat` ({chat_id}: its name or\nmembers changed, or it is new), `left` ({chat_id}: the viewer is no longer in it), `resync`\n(load everything again) and `tick` to keep the line open.",
+        "operationId": "events_chats_events_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Events",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/groups": {
+      "post": {
+        "operationId": "create_group_chats_groups_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Group",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/share": {
+      "post": {
+        "description": "Sends a title (or an episode or chapter) as a card, with an optional note, to several\nchats and friends at once.",
+        "operationId": "share_to_chats_share_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareToIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Share To",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/unread": {
+      "get": {
+        "description": "For the badge on the Messages icon.",
+        "operationId": "unread_chats_unread_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unread",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/{chat_id}": {
+      "get": {
+        "operationId": "get_chat_chats__chat_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Chat",
+        "tags": [
+          "chats"
+        ]
+      },
+      "patch": {
+        "description": "Any member can name a group, or clear its name.",
+        "operationId": "rename_group_chats__chat_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rename Group",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/{chat_id}/members": {
+      "post": {
+        "description": "Adds friends of the viewer to a group.",
+        "operationId": "add_members_chats__chat_id__members_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembersIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Members",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/{chat_id}/members/me": {
+      "delete": {
+        "description": "Leaves a group; the last one out deletes it. A direct chat can't be left.",
+        "operationId": "leave_group_chats__chat_id__members_me_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Leave Group",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/{chat_id}/messages": {
+      "get": {
+        "description": "The newest messages, or those before `before`; each page is oldest first.",
+        "operationId": "messages_chats__chat_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagesPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Messages",
+        "tags": [
+          "chats"
+        ]
+      },
+      "post": {
+        "operationId": "send_chats__chat_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Send",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/{chat_id}/messages/{message_id}": {
+      "delete": {
+        "description": "Takes back one of the viewer's own messages, for everyone.",
+        "operationId": "unsend_chats__chat_id__messages__message_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unsend",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/{chat_id}/mute": {
+      "put": {
+        "operationId": "mute_chats__chat_id__mute_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MuteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mute",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
+    "/chats/{chat_id}/read": {
+      "put": {
+        "description": "Marks everything in the chat read, and tells the others (for the \"Seen\" line).",
+        "operationId": "mark_read_chats__chat_id__read_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mark Read",
+        "tags": [
+          "chats"
         ]
       }
     },

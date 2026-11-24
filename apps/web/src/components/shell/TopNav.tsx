@@ -8,6 +8,7 @@ import { APP_NAME } from "@/lib/brand";
 
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { Logo } from "./Logo";
+import { MessagesIcon } from "./MessagesIcon";
 import { NotificationBell } from "./NotificationBell";
 import { ModeSwitch } from "./ModeSwitch";
 import { isActive, modeOf, navItemsFor } from "./nav-items";
@@ -38,7 +39,7 @@ export function TopNav({ userId, username, avatar, isAdmin, pending = 0 }: { use
       data-scrolled={scrolled}
       className={`fixed inset-x-0 top-0 z-40 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] border-b bg-bg transition-colors ${scrolled ? "border-line" : "border-transparent"}`}
     >
-      <nav aria-label={t("main")} className="flex h-16 items-center gap-3 px-4 sm:h-20 sm:gap-6 sm:px-8 md:gap-5 lg:gap-8 short:h-12">
+      <nav aria-label={t("main")} className="flex h-16 items-center gap-2.5 px-4 sm:h-20 sm:gap-6 sm:px-8 md:gap-4 lg:gap-8 short:h-12">
         <Link href={mode === "manga" ? "/manga" : "/"} aria-label={APP_NAME} className="flex min-h-11 shrink-0 items-center">
           <Logo />
         </Link>
@@ -63,7 +64,10 @@ export function TopNav({ userId, username, avatar, isAdmin, pending = 0 }: { use
           <div className="hidden md:block short:hidden">
             <SearchBox mode={mode} />
           </div>
-          <NotificationBell />
+          <div className="-mr-1 flex items-center sm:mr-0 sm:gap-1 md:gap-0 lg:gap-1">
+            <MessagesIcon />
+            <NotificationBell />
+          </div>
           <div className="hidden xl:block short:hidden">
             <LocaleSwitcher />
           </div>

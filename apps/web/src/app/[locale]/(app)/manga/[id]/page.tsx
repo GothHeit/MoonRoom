@@ -7,6 +7,7 @@ import { cache, Suspense } from "react";
 import { TitleComments, TitleCommentsLink } from "@/components/comments/TitleComments";
 import { ChapterList } from "@/components/manga/ChapterList";
 import { MangaHeader } from "@/components/manga/MangaHeader";
+import { SendToFriend } from "@/components/messages/SendToFriend";
 import { AddToList, type ListState } from "@/components/title/AddToList";
 import { ButtonLink } from "@/components/ui/Button";
 import { PosterCard } from "@/components/ui/PosterCard";
@@ -60,6 +61,13 @@ async function ReadBadge({ id, lang, source }: { id: number; lang?: string; sour
       {here ? t("readHere") : t("trackingOnly")}
     </p>
   );
+}
+
+/** The chapter the viewer is on, offered beside the whole title when sending it to a friend. */
+async function currentChapter(id: number, lang?: string, source?: string): Promise<string | null> {
+  const listing = await chapters(id, lang, source).catch(() => null);
+  const n = listing ? readAction(listing, id)?.n : null;
+  return n && /^\d{1,6}(\.\d{1,3})?$/.test(n) ? n : null;
 }
 
 /** The primary pill: start, continue or read the next chapter. Nothing when no source has the title. */
@@ -119,6 +127,7 @@ export default async function MangaPage({ params, searchParams }: Params) {
   const t = await getTranslations("manga.page");
   const [manga, list] = await Promise.all([unwrap(details(id), locale), listState(id)]);
   const related = manga.related_manga ?? [];
+  const cover = manga.main_picture?.medium ?? manga.main_picture?.large;
   const recommendations = manga.recommendations ?? [];
 
   // The chapters come from a source that can be slow: the page renders without them and the
@@ -138,6 +147,7 @@ export default async function MangaPage({ params, searchParams }: Params) {
               <ReadAction id={id} lang={lang} source={source} />
             </Suspense>
             <AddToList kind="manga" titleId={id} state={list} />
+            <SendToFriend kind="manga" id={id} title={manga.title} poster={cover} part={currentChapter(id, lang, source)} />
           </>
         }
         comments={

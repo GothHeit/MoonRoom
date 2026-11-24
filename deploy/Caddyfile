@@ -11,8 +11,8 @@
 	# Don't advertise the server software.
 	header -Server
 
-	# Live streams (watch-together rooms) must not wait to fill a compression buffer.
-	@compressible not path_regexp ^/api/proxy/watch/rooms/[^/]+/events$
+	# Live streams (watch-together rooms, messages) must not wait to fill a compression buffer.
+	@compressible not path_regexp ^/api/proxy/(watch/rooms/[^/]+/events|chats/events)$
 	encode @compressible zstd gzip
 
 	# "Is the site up?" for the TV wrapper, which asks from another origin. When this server or the

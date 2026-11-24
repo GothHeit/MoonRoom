@@ -10,6 +10,7 @@ from app import db
 from app import push as phone_push
 from app.aniskip import AniSkip
 from app.anizip import AniZip
+from app.chats import ChatHub, ChatPusher
 from app.cleanup import prune
 from app.config import get_settings
 from app.errors import install_error_handlers
@@ -26,6 +27,7 @@ from app.routers import (
     anime,
     auth,
     avatars,
+    chats,
     comments,
     device_login,
     friends,
@@ -112,6 +114,8 @@ async def lifespan(app: FastAPI):
         app.state.action_limits = ActionLimits()
         app.state.session_check = SessionCheck()
         app.state.rooms = Rooms(settings.max_rooms_per_host)
+        app.state.chat_hub = ChatHub()
+        app.state.chat_pusher = ChatPusher(http, settings)
         app.state.room_store = RoomStore(settings.redis_url)
         await restore(app.state.rooms, app.state.room_store)
         app.state.source_hints = new_source_hints()
@@ -147,6 +151,8 @@ async def lifespan(app: FastAPI):
         try:
             yield
         finally:
+            app.state.chat_pusher.cancel()
+            app.state.chat_hub.close_all()
             if pusher is not None:
                 pusher.cancel()
             sweeper.cancel()
@@ -198,6 +204,7 @@ def create_app() -> FastAPI:
         avatars,
         friends,
         comments,
+        chats,
         invites,
         password_reset,
         anime,
