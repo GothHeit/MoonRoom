@@ -108,10 +108,14 @@ export function MessagesView({ selected, meId }: { selected?: string; meId: stri
   const chat = chats?.find((c) => c.id === selected);
   // A direct chat nobody has written in yet only shows while it is open.
   const listed = chats?.filter((c) => c.last || c.kind === "group" || c.id === selected) ?? [];
+  // Nothing to list and nothing to pick: one message for the whole page, not one per column.
+  const empty = !!chats && listed.length === 0;
 
   return (
     <div className="md:fixed md:inset-x-0 md:bottom-0 md:top-20 md:flex md:border-t md:border-line short:static short:block short:border-0">
-      <div className={`flex flex-col pt-16 md:w-[23.75rem] md:shrink-0 md:border-r md:border-line md:pt-0 short:w-auto short:border-0 short:pt-12`}>
+      <div
+        className={`flex flex-col pt-16 md:pt-0 short:w-auto short:border-0 short:pt-12 ${empty ? "md:flex-1" : "md:w-[23.75rem] md:shrink-0 md:border-r md:border-line"}`}
+      >
         <div className="flex items-center gap-3 px-4 pb-2 pt-4 md:px-6 md:pt-6">
           <h1 className="flex-1 text-4xl md:text-[2.5rem]">{t("title")}</h1>
           <button
@@ -119,12 +123,12 @@ export function MessagesView({ selected, meId }: { selected?: string; meId: stri
             onClick={() => setCreating(true)}
             aria-label={t("newChat")}
             title={t("newChat")}
-            className="press flex h-11 w-11 items-center justify-center rounded-full border border-line-strong hover:border-accent"
+            className={`press flex h-11 w-11 items-center justify-center rounded-full border border-line-strong hover:border-accent ${empty ? "md:hidden" : ""}`}
           >
             {icons.pen}
           </button>
         </div>
-        <div className="md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain">
+        <div className={`md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain ${empty ? "md:flex md:flex-col md:justify-center md:pb-28" : ""}`}>
           {failed && !chats && (
             <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
               <p className="text-muted">{t("loadFailed")}</p>
@@ -148,7 +152,7 @@ export function MessagesView({ selected, meId }: { selected?: string; meId: stri
           )}
           {chats && listed.length === 0 && (
             <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
-              <h2 className="text-3xl">{t("emptyTitle")}</h2>
+              <h2 className="text-3xl md:text-5xl">{t("emptyTitle")}</h2>
               <p className="text-muted">{t("emptyHint")}</p>
               <button type="button" onClick={() => setCreating(true)} className="press mt-2 min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent">
                 {t("newChat")}
@@ -158,7 +162,7 @@ export function MessagesView({ selected, meId }: { selected?: string; meId: stri
           {listed.length > 0 && <ChatList chats={listed} selected={selected} names={names} />}
         </div>
       </div>
-      <div className="hidden min-w-0 flex-1 md:flex md:flex-col short:hidden">
+      <div className={`hidden min-w-0 flex-1 md:flex-col short:hidden ${empty ? "" : "md:flex"}`}>
         {!chat && (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 px-10 text-center">
             <h2 className="text-4xl">{t("pick")}</h2>

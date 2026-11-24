@@ -38,6 +38,8 @@ export function MessageComposer({
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    // One line is a pill; once it grows it takes the card corner.
+    el.dataset.tall = String(el.scrollHeight > 48);
   }, [text]);
 
   async function submit(e?: FormEvent) {
@@ -80,7 +82,7 @@ export function MessageComposer({
         placeholder={placeholder}
         aria-invalid={tooLong || undefined}
         enterKeyHint="send"
-        className={`min-h-11 min-w-0 flex-1 resize-none rounded-[1.375rem] border bg-surface px-[1.125rem] py-[0.6rem] text-base leading-snug text-fg placeholder:text-muted focus:outline-none ${tooLong ? "border-danger" : "border-line-strong focus:border-accent"}`}
+        className={`min-h-11 min-w-0 flex-1 resize-none rounded-full border data-[tall=true]:rounded-ui bg-surface px-[1.125rem] py-[0.6rem] text-base leading-snug text-fg placeholder:text-muted focus:outline-none ${tooLong ? "border-danger" : "border-line-strong focus:border-accent"}`}
       />
       <button type="submit" disabled={!ready} aria-label={t("send")} className={`${round} bg-accent text-on-accent disabled:opacity-50`}>
         {icons.send}

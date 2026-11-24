@@ -12,10 +12,10 @@ vi.mock("@/i18n/navigation", () => ({
 
 const show = { kind: "anime", id: 52991, episode: 4, chapter: null, title: "Frieren", image: null, poster: null, hidden: false } as const;
 
-function renderCard(share: Parameters<typeof ShareCard>[0]["share"]) {
+function renderCard(share: Parameters<typeof ShareCard>[0]["share"], note?: string) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <ShareCard share={share} />
+      <ShareCard share={share} note={note} />
     </NextIntlClientProvider>,
   );
 }
@@ -25,6 +25,14 @@ describe("ShareCard", () => {
     renderCard(show);
     expect(screen.getByRole("link", { name: "Frieren" })).toHaveAttribute("href", "/anime/52991");
     expect(screen.getByRole("link", { name: "Play" })).toHaveAttribute("href", "/continue/52991/4");
+  });
+
+  it("carries the sender's note inside the card, with one main action", () => {
+    renderCard(show, "watch this tonight");
+    const note = screen.getByText("watch this tonight");
+    expect(screen.getByRole("link", { name: "Play" }).closest("div.rounded-ui")).toContainElement(note);
+    expect(screen.getByRole("link", { name: "Play" }).className).toContain("bg-accent");
+    expect(screen.getByRole("link", { name: "Details" }).className).not.toContain("bg-accent");
   });
 
   it("hides an adult title from someone who hides them: no name and no links", () => {

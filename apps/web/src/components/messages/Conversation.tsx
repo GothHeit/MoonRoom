@@ -47,6 +47,8 @@ export function Conversation({ chat, subscribe, onRead, onChanged }: Props) {
   const [picking, setPicking] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [actionsFor, setActionsFor] = useState<string | null>(null);
+  // The smallest phones have no room for "Message {name}" on one line.
+  const [narrow] = useState(() => typeof window.matchMedia === "function" && window.matchMedia("(max-width: 359px)").matches);
   const scroller = useRef<HTMLDivElement>(null);
   // Set before a change that should keep the view where it is (older messages added on top).
   const keep = useRef<{ height: number; top: number } | null>(null);
@@ -172,7 +174,7 @@ export function Conversation({ chat, subscribe, onRead, onChanged }: Props) {
   return (
     <section
       aria-label={name}
-      className="fixed inset-0 z-50 flex flex-col bg-bg pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:static md:z-auto md:min-h-0 md:flex-1 md:p-0 short:fixed short:inset-0 short:z-50"
+      className="fixed inset-0 z-50 flex flex-col bg-bg pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:relative md:z-auto md:min-h-0 md:flex-1 md:p-0 short:fixed short:inset-0 short:z-50"
     >
       <header className="flex min-h-[4.75rem] shrink-0 items-center gap-3 border-b border-line px-2 pt-[env(safe-area-inset-top)] md:px-6 md:pt-0 short:px-2 short:pt-0">
         <Link
@@ -260,14 +262,15 @@ export function Conversation({ chat, subscribe, onRead, onChanged }: Props) {
                 {newDay && <p className="kicker mb-2 mt-4 self-center first:mt-0">{dayLabel(at)}</p>}
                 <div className={`flex items-end gap-2.5 ${m.mine ? "justify-end" : ""} ${first && !newDay ? "mt-2" : ""}`}>
                   {showFace && (
-                    <span className="w-7 shrink-0">
+                    <span className="mb-5 w-7 shrink-0">
                       {last && <Avatar userId={m.user.id} username={m.user.username} avatar={m.user.avatar} size={28} />}
                     </span>
                   )}
                   <div className={`flex min-w-0 max-w-[82%] flex-col gap-1 md:max-w-[min(32.5rem,78%)] ${m.mine ? "items-end" : "items-start"}`}>
                     {showFace && first && <span className="px-1 text-xs font-bold text-soft">{m.user.username}</span>}
-                    {m.share && <ShareCard share={m.share} />}
+                    {m.share && <ShareCard share={m.share} note={m.body} mine={m.mine} />}
                     {m.body &&
+                      !m.share &&
                       (m.mine ? (
                         <button
                           type="button"
@@ -280,7 +283,7 @@ export function Conversation({ chat, subscribe, onRead, onChanged }: Props) {
                       ) : (
                         <p className={`max-w-full whitespace-pre-wrap break-words rounded-ui border px-3.5 py-2.5 text-[15px] leading-snug ${bubble}`}>{m.body}</p>
                       ))}
-                    {m.mine && !m.body && (
+                    {m.mine && m.share && (
                       <button type="button" onClick={() => setActionsFor(open ? null : m.id)} aria-expanded={open} className="px-1 text-xs text-muted hover:text-fg">
                         {icons.dots}
                         <span className="sr-only">{t("unsend")}</span>
@@ -313,7 +316,7 @@ export function Conversation({ chat, subscribe, onRead, onChanged }: Props) {
       {chat.can_send ? (
         <MessageComposer
           key={chat.id}
-          placeholder={group ? t("placeholderGroup") : t("placeholder", { name })}
+          placeholder={narrow ? t("label") : group ? t("placeholderGroup") : t("placeholder", { name })}
           onSend={(text) => send(text)}
           onShare={() => setPicking(true)}
         />

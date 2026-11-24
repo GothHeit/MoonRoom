@@ -123,9 +123,40 @@ function SendSheet({ kind, id, title, poster, part, onClose }: Props & { onClose
     <Sheet
       title={t("sendTo")}
       onClose={onClose}
+      lead={
+        <div className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-5 short:items-start short:border-b-0">
+          <span className={`relative block aspect-[2/3] w-11 shrink-0 overflow-hidden rounded-ui short:w-16 ${placeholderFor(id)}`}>
+            {poster && (
+              // eslint-disable-next-line @next/next/no-img-element -- remote catalog art
+              <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-xl leading-tight short:line-clamp-2 short:whitespace-normal">{title}</p>
+            <Suspense fallback={null}>
+              <PartChoice kind={kind} title={title} part={part} whole={whole} onChoose={(value, n) => (setWhole(value), setChosen(n))} />
+            </Suspense>
+          </div>
+        </div>
+      }
       footer={
         !empty && (
           <>
+            {friends && (
+              <>
+                <label htmlFor={noteId} className="sr-only">
+                  {t("note")}
+                </label>
+                <input
+                  id={noteId}
+                  value={note}
+                  maxLength={MESSAGE_MAX}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder={t("note")}
+                  className="mb-3 min-h-11 w-full rounded-ui border border-line-strong bg-bg px-4 py-2 text-base text-fg placeholder:text-muted focus:border-accent focus:outline-none"
+                />
+              </>
+            )}
             {error && (
               <p role="alert" className="mb-2 text-sm text-danger">
                 {error}
@@ -138,20 +169,6 @@ function SendSheet({ kind, id, title, poster, part, onClose }: Props & { onClose
         )
       }
     >
-      <div className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-5">
-        <span className={`relative block aspect-[2/3] w-11 shrink-0 overflow-hidden rounded-ui ${placeholderFor(id)}`}>
-          {poster && (
-            // eslint-disable-next-line @next/next/no-img-element -- remote catalog art
-            <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover" />
-          )}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-xl leading-tight">{title}</p>
-          <Suspense fallback={null}>
-            <PartChoice kind={kind} title={title} part={part} whole={whole} onChoose={(value, n) => (setWhole(value), setChosen(n))} />
-          </Suspense>
-        </div>
-      </div>
       {failed && <p className="px-5 py-6 text-center text-sm text-muted">{t("loadFailed")}</p>}
       {friends === null && !failed && (
         <div aria-hidden="true" className="space-y-3 px-5 py-4">
@@ -164,24 +181,7 @@ function SendSheet({ kind, id, title, poster, part, onClose }: Props & { onClose
         </div>
       )}
       {empty && <p className="px-5 py-6 text-center text-sm text-muted">{t("noFriends")}</p>}
-      {friends && !empty && (
-        <>
-          <PickList friends={friends} groups={groups} selected={selected} onToggle={toggle} />
-          <div className="px-4 pb-1 pt-3 sm:px-5">
-            <label htmlFor={noteId} className="sr-only">
-              {t("note")}
-            </label>
-            <input
-              id={noteId}
-              value={note}
-              maxLength={MESSAGE_MAX}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={t("note")}
-              className="min-h-11 w-full rounded-ui border border-line-strong bg-bg px-4 py-2 text-base text-fg placeholder:text-muted focus:border-accent focus:outline-none"
-            />
-          </div>
-        </>
-      )}
+      {friends && !empty && <PickList friends={friends} groups={groups} selected={selected} onToggle={toggle} />}
     </Sheet>
   );
 }

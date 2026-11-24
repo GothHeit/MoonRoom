@@ -22,7 +22,9 @@ export function ChatMenu({ chat, name, onChanged }: { chat: ChatOut; name: strin
   const router = useRouter();
   const root = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const presence = usePresence(open);
+  // Phones get the options as a bottom sheet, like every other menu there; decided on opening.
+  const [phone, setPhone] = useState(false);
+  const presence = usePresence(open && !phone);
   const [dialog, setDialog] = useState<Dialog>(null);
   const group = chat.kind === "group";
 
@@ -44,7 +46,27 @@ export function ChatMenu({ chat, name, onChanged }: { chat: ChatOut; name: strin
     onChanged();
   }
 
-  const item = "press flex min-h-11 w-full items-center px-4 text-left text-sm font-medium hover:bg-line/50";
+  const item = "press flex min-h-11 w-full items-center text-left font-medium hover:bg-line/50";
+  const items = (size: string) => (
+    <>
+      <button type="button" role="menuitem" onClick={() => void mute()} className={`${item} ${size}`}>
+        {chat.muted ? t("unmute") : t("mute")}
+      </button>
+      {group && (
+        <>
+          <button type="button" role="menuitem" onClick={() => (setOpen(false), setDialog("rename"))} className={`${item} ${size}`}>
+            {t("rename")}
+          </button>
+          <button type="button" role="menuitem" onClick={() => (setOpen(false), setDialog("add"))} className={`${item} ${size}`}>
+            {t("addPeople")}
+          </button>
+          <button type="button" role="menuitem" onClick={() => (setOpen(false), setDialog("leave"))} className={`${item} ${size} text-danger`}>
+            {t("leave")}
+          </button>
+        </>
+      )}
+    </>
+  );
 
   return (
     <div ref={root} className="relative shrink-0">
@@ -53,7 +75,10 @@ export function ChatMenu({ chat, name, onChanged }: { chat: ChatOut; name: strin
         aria-label={t("options")}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setPhone(typeof window.matchMedia === "function" && window.matchMedia("(max-width: 639px)").matches);
+          setOpen((v) => !v);
+        }}
         className="press flex h-11 w-11 items-center justify-center rounded-full text-muted hover:text-fg"
       >
         {icons.dots}
@@ -64,23 +89,15 @@ export function ChatMenu({ chat, name, onChanged }: { chat: ChatOut; name: strin
           data-closing={presence.closing || undefined}
           className="pop-in absolute right-0 top-full z-20 mt-1 w-56 origin-top-right overflow-hidden rounded-ui border border-line-strong bg-surface py-1"
         >
-          <button type="button" role="menuitem" onClick={() => void mute()} className={item}>
-            {chat.muted ? t("unmute") : t("mute")}
-          </button>
-          {group && (
-            <>
-              <button type="button" role="menuitem" onClick={() => (setOpen(false), setDialog("rename"))} className={item}>
-                {t("rename")}
-              </button>
-              <button type="button" role="menuitem" onClick={() => (setOpen(false), setDialog("add"))} className={item}>
-                {t("addPeople")}
-              </button>
-              <button type="button" role="menuitem" onClick={() => (setOpen(false), setDialog("leave"))} className={`${item} text-danger`}>
-                {t("leave")}
-              </button>
-            </>
-          )}
+          {items("px-4 text-sm")}
         </div>
+      )}
+      {open && phone && (
+        <Sheet title={name} onClose={() => setOpen(false)}>
+          <div role="menu" className="pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+            {items("min-h-[3.25rem] px-5 text-base")}
+          </div>
+        </Sheet>
       )}
       {dialog === "rename" && <Rename chat={chat} onClose={() => setDialog(null)} onDone={onChanged} />}
       {dialog === "add" && <AddPeople chat={chat} onClose={() => setDialog(null)} onDone={onChanged} />}
