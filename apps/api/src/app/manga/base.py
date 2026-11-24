@@ -6,7 +6,7 @@ The first implementation is the public MangaDex API; scraped sites would be othe
 and behind flags like the video ones.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 
@@ -35,6 +35,17 @@ class ChapterList:
     languages: list[str]
     # Chapters in reading order (first chapter first), of one language.
     chapters: list[Chapter]
+
+
+def trust_numbers(listed: "ChapterList") -> "ChapterList":
+    """Chapter numbers are what progress is filed under, so they must tell chapters apart. A
+    source whose labels were read wrong (every chapter "2") is renumbered by position instead
+    of showing a list nobody can pick from. Sound lists pass through untouched."""
+    numbered = [c.number for c in listed.chapters if c.number]
+    if len(numbered) < 3 or len(set(numbered)) * 2 >= len(numbered):
+        return listed
+    chapters = [replace(c, number=str(i)) for i, c in enumerate(listed.chapters, 1)]
+    return replace(listed, chapters=chapters)
 
 
 @dataclass(frozen=True)

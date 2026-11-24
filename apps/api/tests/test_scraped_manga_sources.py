@@ -372,3 +372,59 @@ def test_sources_load_by_name():
     assert list(load_manga_sources(names)) == names
     with pytest.raises(ValueError):
         load_manga_sources(["nope"])
+
+
+PILL_GROUPS = """
+<a href="/chapters/1-20002000/berserk-chapter-2" title="x">Group 2 Chapter 2</a>
+<a href="/chapters/1-20001000/berserk-chapter-1" title="x">Group 2 Chapter 1</a>
+<a href="/chapters/1-10002000/berserk-chapter-2" title="x">Chapter 2</a>
+<a href="/chapters/1-10001000/berserk-chapter-1" title="x">Chapter 1</a>
+<a href="/chapters/1-10003000/berserk-chapter-3" title="x">Chapter 3</a>
+"""
+BERSERK = {"id": 2, "title": "Berserk", "alternative_titles": {}}
+
+
+@respx.mock
+async def test_mangapill_reads_the_number_after_the_word_chapter_once_per_number(pill):
+    respx.get(f"{PILL}/search").mock(
+        return_value=httpx.Response(
+            200,
+            text='<a href="/manga/1/berserk" class="mb-2">'
+            '<div class="mt-3 font-black leading-tight">Berserk</div></a>',
+        )
+    )
+    respx.get(f"{PILL}/manga/1/x").mock(return_value=httpx.Response(200, text=PILL_GROUPS))
+    listed = await pill.chapters(BERSERK, None)
+    assert listed is not None
+    assert [c.number for c in listed.chapters] == ["1", "2", "3"]
+    # The first listed copy of a chapter stays: the newer group's.
+    assert [c.id for c in listed.chapters][:2] == ["1-20001000", "1-20002000"]
+
+
+def test_chapter_number_prefers_the_number_after_chapter():
+    from app.manga.scrape import chapter_number
+
+    assert chapter_number("Group 2 Chapter 386") == "386"
+    assert chapter_number("Vol.3 Ch.20.5") == "20.5"
+    assert chapter_number("Capítulo 7") == "7"
+    assert chapter_number("Chapter 12") == "12"
+    assert chapter_number("Special 4") == "4"
+    assert chapter_number("Oneshot") == ""
+
+
+def test_trust_numbers_renumbers_by_position_only_when_labels_were_misread():
+    from app.manga.base import Chapter, ChapterList, trust_numbers
+
+    def listed(numbers):
+        chapters = [
+            Chapter(id=f"c{i}", number=n, volume=None, title=None, lang="en")
+            for i, n in enumerate(numbers)
+        ]
+        return ChapterList("1", "T", ["en"], chapters)
+
+    broken = trust_numbers(listed(["2", "2", "2", "11", "2", "2"]))
+    assert [c.number for c in broken.chapters] == ["1", "2", "3", "4", "5", "6"]
+    sound = listed(["1", "2", "2.5", "3"])
+    assert trust_numbers(sound) is sound
+    short = listed(["2", "2"])
+    assert trust_numbers(short) is short
