@@ -2,7 +2,7 @@
   "home": {
     "play": "Assistir agora",
     "episode": "Episódio {n}",
-    "episodeShort": "Ep {n}",
+    "episodeShort": "Ep. {n}",
     "remove": "Remover {title} de Continuar assistindo",
     "fromMal": "Do MAL",
     "score": "Nota {score}",

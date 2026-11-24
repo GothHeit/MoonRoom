@@ -77,7 +77,7 @@ function Footer({ comment, actions, onReply }: { comment: CommentOut; actions: A
 
   return (
     <div>
-      <div className="-ml-1 mt-1.5 flex flex-wrap items-center gap-1.5">
+      <div className="-ml-1 mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-2">
         {(comment.reactions ?? []).map((r) => {
           const emoji = REACTIONS.find((x) => x.kind === r.kind)?.emoji;
           return (
@@ -87,7 +87,7 @@ function Footer({ comment, actions, onReply }: { comment: CommentOut; actions: A
               aria-pressed={r.mine}
               aria-label={t("reactionCount", { reaction: t(`reactions.${r.kind}`), count: r.count })}
               onClick={() => void actions.react(comment, r.kind)}
-              className={`press inline-flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[13px] font-bold tabular-nums ${
+              className={`press relative inline-flex h-9 min-w-11 after:absolute after:inset-x-0 after:-inset-y-[5px] items-center justify-center gap-1.5 rounded-full border px-2.5 text-[13px] font-bold tabular-nums ${
                 r.mine ? "border-accent bg-line text-accent" : "border-line text-soft hover:border-line-strong"
               }`}
             >
@@ -101,7 +101,7 @@ function Footer({ comment, actions, onReply }: { comment: CommentOut; actions: A
           aria-label={t("react")}
           aria-expanded={picking}
           onClick={() => setPicking((v) => !v)}
-          className="press inline-flex h-9 w-11 items-center justify-center rounded-full border border-line text-muted hover:border-line-strong hover:text-fg"
+          className="press relative inline-flex h-9 w-11 after:absolute after:inset-x-0 after:-inset-y-[5px] items-center justify-center rounded-full border border-line text-muted hover:border-line-strong hover:text-fg"
         >
           {icons.smile}
         </button>

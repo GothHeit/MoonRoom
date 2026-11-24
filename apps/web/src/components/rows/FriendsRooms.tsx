@@ -8,6 +8,8 @@ import { posterOf } from "@/lib/catalog";
 import type { FriendRoomOut } from "@/lib/friends";
 
 const WIDE = "w-64 sm:w-80";
+/** Faces and names on a card; the rest of the room is counted after them. */
+const SHOWN = 3;
 
 /** Rooms friends have open right now, one tap from joining. Renders nothing when there are none. */
 export async function FriendsRooms({ rooms }: { rooms: FriendRoomOut[] }) {
@@ -18,8 +20,10 @@ export async function FriendsRooms({ rooms }: { rooms: FriendRoomOut[] }) {
       <Row title={t("rows.friendsRooms")} itemClassName={WIDE}>
         {rooms.map((room) => {
           const image = posterOf(room.anime);
-          const names = room.people.map((p) => p.username);
-          const who = room.watching > names.length ? t("friendsRoom.andMore", { names: names.join(", "), count: room.watching - names.length }) : names.join(", ");
+          const people = room.people.slice(0, SHOWN);
+          const names = people.map((p) => p.username).join(", ");
+          const more = room.watching - people.length;
+          const who = more > 0 ? t("friendsRoom.andMore", { names, count: more }) : names;
           return (
             <Link key={room.code} href={`/room/${room.code}`} className="group block w-full" aria-label={t("friendsRoom.join", { title: room.anime.title, names: who })}>
               <div
@@ -37,8 +41,9 @@ export async function FriendsRooms({ rooms }: { rooms: FriendRoomOut[] }) {
               </p>
               <div className="flex min-h-11 items-center gap-2.5">
                 <span className="flex shrink-0">
-                  {room.people.map((p, i) => (
-                    <span key={p.id} className={`rounded-full border-2 border-bg ${i > 0 ? "-ml-2" : ""}`}>
+                  {people.map((p, i) => (
+                    // The narrow phone card keeps two faces so the names have room.
+                    <span key={p.id} className={`rounded-full border-2 border-bg ${i > 0 ? "-ml-2" : ""} ${i > 1 ? "hidden sm:block" : ""}`}>
                       <Avatar userId={p.id} username={p.username} avatar={p.avatar} size={28} />
                     </span>
                   ))}

@@ -22,7 +22,7 @@ export function CommentsLink({ kind, id, total }: { kind: TitleKind; id: number;
   if (count < 1) return null;
   return (
     <li>
-      <a href={`#${COMMENTS_ANCHOR}`} className="inline-flex items-center gap-1.5 text-accent hover:underline">
+      <a href={`#${COMMENTS_ANCHOR}`} className="relative inline-flex items-center gap-1.5 text-accent after:absolute after:-inset-x-2 after:-inset-y-3 hover:underline">
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12Z" />
         </svg>

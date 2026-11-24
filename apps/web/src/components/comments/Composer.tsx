@@ -71,7 +71,7 @@ export function Composer({
         maxLength={COMMENT_MAX + 200}
         placeholder={placeholder ?? t("placeholder")}
         autoFocus={autoFocus}
-        className={`block w-full resize-none bg-transparent text-base leading-normal text-fg outline-none placeholder:text-muted ${rows > 1 ? "min-h-[4.5rem]" : "min-h-8"}`}
+        className={`block w-full resize-none bg-transparent text-base leading-normal text-fg outline-none! placeholder:text-muted ${rows > 1 ? "min-h-[4.5rem]" : "min-h-8"}`}
       />
       <div className="mt-2 flex flex-wrap items-center gap-2.5">
         {spoilerSwitch && (
