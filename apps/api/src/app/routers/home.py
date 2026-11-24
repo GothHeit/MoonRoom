@@ -130,21 +130,27 @@ def todays_genres(today: date, count: int = GENRE_ROWS) -> list[int]:
     return [GENRE_POOL[(start + i) % len(GENRE_POOL)] for i in range(count)]
 
 
-async def _genre_rows(mal: MalClient, allow_nsfw: bool) -> list[HomeRow]:
-    """Most-followed titles of a few genres, drawn from the cached ranking pool."""
+async def _genre_pools(mal: MalClient, allow_nsfw: bool) -> list[tuple[GenreOut, list[dict]]]:
+    """Today's genres, each with its most-followed titles from the cached ranking pool."""
     pool = await mal.ranking_pool(allow_nsfw)
-    rows = []
+    pools = []
     for genre_id in todays_genres(date.today()):
         nodes = [n for n in pool if any(g.get("id") == genre_id for g in n.get("genres") or [])]
         info = GENRE_IDS[genre_id]
-        if len(nodes) >= MIN_ROW:
-            rows.append(
-                HomeRow(
-                    id="genre",
-                    genre=GenreOut(id=info.id, name=info.name, kind=info.kind, nsfw=info.nsfw),
-                    items=_items(nodes),
-                )
-            )
+        pools.append((GenreOut(id=info.id, name=info.name, kind=info.kind, nsfw=info.nsfw), nodes))
+    return pools
+
+
+def _genre_rows(pools: list[tuple[GenreOut, list[dict]]], above: list[HomeRow]) -> list[HomeRow]:
+    """Genre rows without the titles a row above already shows: the page doesn't repeat itself."""
+    shown = {item.anime.id for row in above for item in row.items}
+    rows = []
+    for genre, nodes in pools:
+        fresh = [n for n in nodes if n["id"] not in shown]
+        if len(fresh) >= MIN_ROW:
+            row = HomeRow(id="genre", genre=genre, items=_items(fresh))
+            shown.update(item.anime.id for item in row.items)
+            rows.append(row)
     return rows
 
 
@@ -312,7 +318,7 @@ async def home(
     )
     friends_task = start(_friends_popular_row(mal, friend_ids, user.show_nsfw))
     top_task = start(soft(mal.top(user.show_nsfw), "top"))
-    genre_task = start(soft(_genre_rows(mal, user.show_nsfw), "genre rows"))
+    genre_task = start(soft(_genre_pools(mal, user.show_nsfw), "genre rows"))
     similar_task = start(soft(_similar_row(mal, progress, user.show_nsfw), "similar row"))
 
     async def build_heroes() -> list[HomeHero]:
@@ -340,7 +346,7 @@ async def home(
         mal_rows,
         friends_popular,
         top,
-        genre_rows,
+        genre_pools,
         similar,
     ) = await asyncio.gather(
         seasonal_task,
@@ -367,9 +373,6 @@ async def home(
         HomeRow(id="seasonal", items=_items(seasonal_nodes)),
         HomeRow(id="friends_popular", items=friends_popular),
         HomeRow(id="top", items=_items(top_nodes)),
-        *(genre_rows or []),
     ]
-    return HomeOut(
-        heroes=heroes,
-        rows=[r for r in rows if r.items],
-    )
+    rows = [r for r in rows if r.items]
+    return HomeOut(heroes=heroes, rows=[*rows, *_genre_rows(genre_pools or [], rows)])

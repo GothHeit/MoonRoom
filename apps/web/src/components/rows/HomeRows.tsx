@@ -7,7 +7,7 @@ import { genreName } from "@/lib/genres";
 import { animeHref, captionOf, watchHref, posterOf, progressFraction, type HomeOut } from "@/lib/catalog";
 
 const WIDE = "w-64 sm:w-80";
-// The ranked row: a big serif numeral leans on each poster.
+// The ranked row: a big serif numeral stands beside each poster.
 const RANKED = "w-auto";
 
 /** The rows under the hero. The API already leaves out empty ones. */
@@ -44,8 +44,9 @@ export async function HomeRows({ rows }: { rows: HomeOut["rows"] }) {
               />
             ) : row.id === "top" ? (
               <div key={anime.id} className="flex items-start">
-                {/* As tall as the poster, so the numeral sits on its bottom edge whatever the caption. */}
-                <span aria-hidden="true" className="mr-1 flex h-48 items-end font-display text-[6.5rem] leading-[0.75] tracking-[-0.04em] text-numeral select-none sm:h-60">
+                {/* As tall as the poster, so the numeral sits on its bottom edge whatever the caption. It keeps a
+                    column of its own: the poster starts where the numeral ends and never covers it. */}
+                <span aria-hidden="true" className="mr-2 flex h-48 items-end font-display text-[6.5rem] leading-[0.75] text-numeral select-none sm:mr-3 sm:h-60 sm:text-[8.5rem]">
                   {i + 1}
                 </span>
                 <div className="relative w-32 sm:w-40">

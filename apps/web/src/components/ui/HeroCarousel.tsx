@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
+import { PlayerIcon } from "@/components/player/icons";
+
 import { ButtonLink } from "./Button";
 import { HeroSplit } from "./HeroSplit";
 
@@ -23,11 +25,13 @@ export type HeroSlide = {
 const INTERVAL_MS = 8000;
 
 /** Flat banner that rotates through a few titles: kicker, big serif title and a pill, beside the art.
- * Rotation pauses on hover and focus and never starts for people who prefer reduced motion. */
+ * Rotation pauses on hover and focus, stops with the button beside the dots (the only way on a touch
+ * screen) and never starts for people who prefer reduced motion. */
 export function HeroCarousel({ slides, cta }: { slides: HeroSlide[]; cta: string }) {
   const t = useTranslations("home");
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [stopped, setStopped] = useState(false);
   const [reduced, setReduced] = useState(true);
   // Slides whose picture is in the page: the ones shown so far plus the one coming next, so the
   // banner downloads one picture first and the rest only as it rotates.
@@ -50,10 +54,10 @@ export function HeroCarousel({ slides, cta }: { slides: HeroSlide[]; cta: string
   }, []);
 
   useEffect(() => {
-    if (slides.length < 2 || paused || reduced) return;
+    if (slides.length < 2 || paused || stopped || reduced) return;
     const timer = setTimeout(() => setIndex((i) => (i + 1) % slides.length), INTERVAL_MS);
     return () => clearTimeout(timer);
-  }, [index, slides.length, paused, reduced]);
+  }, [index, slides.length, paused, stopped, reduced]);
 
   // Every slide carries its own copy beside its pill; only the visible slide's copy can be reached.
   const dots = slides.length > 1 && (
@@ -73,9 +77,19 @@ export function HeroCarousel({ slides, cta }: { slides: HeroSlide[]; cta: string
           />
         </button>
       ))}
-      <span aria-hidden className="ml-2 text-xs font-medium tabular-nums text-muted lg:text-sm">
+      <span aria-hidden className="ml-2 whitespace-nowrap text-xs font-medium tabular-nums text-muted lg:text-sm short:hidden">
         {index + 1} / {slides.length}
       </span>
+      {!reduced && (
+        <button
+          type="button"
+          aria-label={t(stopped ? "resumeSlides" : "pauseSlides")}
+          onClick={() => setStopped((s) => !s)}
+          className="press ml-1 flex h-8 w-8 items-center justify-center rounded-full text-muted hover:text-fg pointer-coarse:h-11 pointer-coarse:w-11 [&>svg]:h-4 [&>svg]:w-4"
+        >
+          <PlayerIcon name={stopped ? "play" : "pause"} />
+        </button>
+      )}
     </div>
   );
 
@@ -95,27 +109,28 @@ export function HeroCarousel({ slides, cta }: { slides: HeroSlide[]; cta: string
         // Long romaji titles step down a size so they stay within three or four lines on a phone.
         // Beside the art the text column is narrow, so the sizes grow late, and keep growing on wide screens
         // so the column stays filled.
+        // On a phone held sideways the title stays small and short, so the pill fits the first screen.
         const size =
           slide.title.length > 28
-            ? "text-4xl md:text-5xl xl:text-7xl 2xl:text-8xl min-[150rem]:text-9xl"
-            : "text-5xl md:text-6xl xl:text-8xl 2xl:text-9xl";
+            ? "text-4xl md:text-5xl xl:text-7xl 2xl:text-8xl min-[150rem]:text-9xl short:line-clamp-2 short:text-3xl"
+            : "text-5xl md:text-6xl xl:text-8xl 2xl:text-9xl short:line-clamp-2 short:text-4xl";
         // Centered beside the art, as one block from the kicker down to the pill and the dots.
         const text = (
           <div className="min-w-0 2xl:max-w-3xl min-[150rem]:max-w-4xl">
             <p className="kicker 2xl:text-sm">{t("featured")}</p>
             {active ? (
-              <h1 className={`mt-4 break-words leading-[0.95] tracking-[-0.02em] ${size}`}>{slide.title}</h1>
+              <h1 className={`mt-4 short:mt-2 break-words leading-[0.95] tracking-[-0.02em] ${size}`}>{slide.title}</h1>
             ) : (
-              <p className={`mt-4 break-words font-display leading-[0.95] tracking-[-0.02em] ${size}`}>{slide.title}</p>
+              <p className={`mt-4 short:mt-2 break-words font-display leading-[0.95] tracking-[-0.02em] ${size}`}>{slide.title}</p>
             )}
-            {slide.meta && <p className="mt-5 text-sm font-medium text-muted lg:text-base 2xl:text-lg min-[150rem]:text-xl">{slide.meta}</p>}
+            {slide.meta && <p className="mt-5 text-sm font-medium text-muted lg:text-base 2xl:text-lg min-[150rem]:text-xl short:mt-3">{slide.meta}</p>}
             {slide.synopsis && (
-              <p className="mt-3 line-clamp-3 max-w-lg leading-relaxed text-soft lg:text-lg 2xl:max-w-2xl 2xl:text-xl min-[150rem]:max-w-3xl min-[150rem]:text-2xl">
+              <p className="mt-3 line-clamp-3 max-w-lg leading-relaxed text-soft lg:text-lg 2xl:max-w-2xl 2xl:text-xl min-[150rem]:max-w-3xl min-[150rem]:text-2xl short:hidden">
                 {slide.synopsis}
               </p>
             )}
-            {slide.synopsis && slide.synopsisNote && <p className="mt-1 text-xs text-muted">{slide.synopsisNote}</p>}
-            <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-4 2xl:mt-9">
+            {slide.synopsis && slide.synopsisNote && <p className="mt-1 text-xs text-muted short:hidden">{slide.synopsisNote}</p>}
+            <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-4 2xl:mt-9 short:mt-4 short:gap-y-1">
               <ButtonLink href={slide.href} className="px-6 lg:min-h-12 lg:px-8 lg:text-base 2xl:min-h-14 2xl:px-10 2xl:text-lg">
                 {cta}
               </ButtonLink>
@@ -138,6 +153,7 @@ export function HeroCarousel({ slides, cta }: { slides: HeroSlide[]; cta: string
               art={loaded.has(i) || active ? slide.wideArt : null}
               poster={loaded.has(i) || active ? slide.image : null}
               eager={i === 0}
+              shortSplit
             >
               {text}
             </HeroSplit>

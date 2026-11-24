@@ -91,11 +91,12 @@ export function TvRoomCard({ href, title, image, episode, watching, who, label, 
   );
 }
 
-/** A poster leaning on a big serif rank numeral, for the top-ranked row. */
+/** A poster beside a big serif rank numeral, for the top-ranked row. The gap leaves room for the
+ * focused poster to grow and show its ring without touching the numeral. */
 export function TvRankedCard({ rank, ...poster }: Poster & { rank: number }) {
   return (
     <div className="flex shrink-0 items-start">
-      <span aria-hidden="true" className="mr-2 flex h-[22.5rem] items-end font-display text-[11rem] leading-[0.75] tracking-[-0.04em] text-numeral select-none">
+      <span aria-hidden="true" className="mr-7 flex h-[22.5rem] items-end font-display text-[13rem] leading-[0.75] text-numeral select-none">
         {rank}
       </span>
       <TvPosterCard {...poster} />
