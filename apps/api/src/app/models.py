@@ -267,7 +267,7 @@ class Notification(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    # friend_request, friend_accepted, room_invite, new_episode or new_chapter.
+    # friend_request, friend_accepted, room_invite, new_episode, new_chapter or comment_reply.
     kind: Mapped[str] = mapped_column(String(24))
     actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     anime_id: Mapped[int | None]
@@ -276,6 +276,10 @@ class Notification(Base):
     episode: Mapped[int | None]
     title: Mapped[str | None] = mapped_column(String(300))
     room_code: Mapped[str | None] = mapped_column(String(16))
+    # For a comment_reply: the chapter (manga), the comment replied to and the reply's start.
+    chapter: Mapped[str | None] = mapped_column(String(16))
+    comment_id: Mapped[uuid.UUID | None]
+    excerpt: Mapped[str | None] = mapped_column(String(160))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     read_at: Mapped[datetime | None]
     # When it was handed to the phone-push sender (or skipped); None means not looked at yet.
@@ -403,8 +407,15 @@ class TitleComment(Base):
         CheckConstraint(
             "(anime_id IS NULL) <> (manga_id IS NULL)", name="ck_title_comments_one_title"
         ),
+        CheckConstraint(
+            "episode IS NULL OR anime_id IS NOT NULL", name="ck_title_comments_episode_anime"
+        ),
+        CheckConstraint(
+            "chapter IS NULL OR manga_id IS NOT NULL", name="ck_title_comments_chapter_manga"
+        ),
         Index("ix_title_comments_anime_created", "anime_id", "created_at"),
         Index("ix_title_comments_manga_created", "manga_id", "created_at"),
+        Index("ix_title_comments_parent", "parent_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -413,7 +424,31 @@ class TitleComment(Base):
     )
     anime_id: Mapped[int | None]
     manga_id: Mapped[int | None]
+    # Set for a comment on one episode or chapter; both None for one on the whole title.
+    episode: Mapped[int | None]
+    chapter: Mapped[str | None] = mapped_column(String(16))
+    # A reply points at the comment it answers and copies its title, episode and chapter.
+    # Replies go one level deep.
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("title_comments.id", ondelete="CASCADE")
+    )
     body: Mapped[str] = mapped_column(String(1000))
     spoiler: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     edited_at: Mapped[datetime | None]
+
+
+class CommentReaction(Base):
+    """One person's reaction to a comment. Someone can leave several different ones."""
+
+    __tablename__ = "comment_reactions"
+
+    comment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("title_comments.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    # heart, laugh, wow, cry, fire or clap.
+    kind: Mapped[str] = mapped_column(String(8), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)

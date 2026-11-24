@@ -15,9 +15,11 @@ type Actions = {
 };
 
 /** The keyboard shortcuts of the reader: arrows and Space page, Home/End jump, Escape leaves, H hides the bars. */
-export function useReaderKeys(direction: Direction, enabled: boolean, actions: Actions) {
+export function useReaderKeys(direction: Direction, enabled: boolean, actions: Actions, active = true) {
   const { step, first, last, leave, toggleControls } = actions;
   useEffect(() => {
+    // Off altogether while a panel over the reader takes the keyboard.
+    if (!active) return;
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const tag = (e.target as HTMLElement).tagName;
@@ -41,5 +43,5 @@ export function useReaderKeys(direction: Direction, enabled: boolean, actions: A
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [direction, enabled, step, first, last, leave, toggleControls]);
+  }, [direction, enabled, step, first, last, leave, toggleControls, active]);
 }

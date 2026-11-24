@@ -19,11 +19,13 @@ export type PlayerKeyActions = {
   poke: () => void;
 };
 
-/** The keyboard shortcuts of the player. */
-export function usePlayerKeys(actions: PlayerKeyActions, settingsOpen: boolean) {
+/** The keyboard shortcuts of the player. Off while `enabled` is false, e.g. while a panel over
+ * the player takes the keyboard. */
+export function usePlayerKeys(actions: PlayerKeyActions, settingsOpen: boolean, enabled = true) {
   const { togglePlay, seekBy, changeVolume, toggleFullscreen, toggleMute, goNext, skipNow, closeSettings, poke } =
     actions;
   useEffect(() => {
+    if (!enabled) return;
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target as HTMLElement;
@@ -77,5 +79,5 @@ export function usePlayerKeys(actions: PlayerKeyActions, settingsOpen: boolean) 
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [togglePlay, seekBy, changeVolume, toggleFullscreen, toggleMute, goNext, skipNow, closeSettings, settingsOpen, poke]);
+  }, [togglePlay, seekBy, changeVolume, toggleFullscreen, toggleMute, goNext, skipNow, closeSettings, settingsOpen, poke, enabled]);
 }

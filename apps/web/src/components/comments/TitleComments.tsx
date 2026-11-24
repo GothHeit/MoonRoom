@@ -6,14 +6,26 @@ import { CommentsLink } from "./CommentsLink";
 import { CommentsSection } from "./CommentsSection";
 import { firstComments } from "./data";
 import { FriendsOnTitle } from "./FriendsOnTitle";
+import { OpenFromLink } from "./OpenFromLink";
 
-type Props = { kind: TitleKind; id: number; /** Last episode or chapter, to tell "finished it" apart. */ last?: number | null };
+type Props = {
+  kind: TitleKind;
+  id: number;
+  /** The title's name, for an episode's or chapter's comments opened from a link. */
+  title: string;
+  /** Last episode or chapter, to tell "finished it" apart. */
+  last?: number | null;
+};
 
 /** The comments section at the bottom of a title page, with the friends' progress line on top. */
-export async function TitleComments({ kind, id, last }: Props) {
+export async function TitleComments({ kind, id, title, last }: Props) {
   const page = await firstComments(kind, id);
   return (
-    <CommentsSection
+    <>
+      <Suspense fallback={null}>
+        <OpenFromLink kind={kind} id={id} title={title} />
+      </Suspense>
+      <CommentsSection
       kind={kind}
       id={id}
       initial={page}
@@ -22,7 +34,8 @@ export async function TitleComments({ kind, id, last }: Props) {
           <FriendsOnTitle kind={kind} id={id} last={last} />
         </Suspense>
       }
-    />
+      />
+    </>
   );
 }
 

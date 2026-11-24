@@ -292,8 +292,9 @@ ACTION_RULES: dict[str, tuple[int, float]] = {
     "push_test": (10, 600),
     "push_subscribe": (30, 600),
     "room_chat": (40, 60),
-    # Posting or editing a title comment.
+    # Posting, editing or replying to a comment, and reacting to one.
     "comment": (30, 600),
+    "comment_reaction": (120, 600),
     "room_reaction": (60, 60),
     "room_position": (30, 60),
 }

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
+import { commentHref } from "@/lib/comments";
 import { profileHref } from "@/lib/friends";
 import { usePresence } from "@/lib/use-presence";
 import type { components } from "@app/api-client";
@@ -26,6 +27,8 @@ function hrefOf(item: Item) {
       return item.room_active && item.room_code ? `/room/${item.room_code}` : null;
     case "new_chapter":
       return item.manga_id ? `/manga/${item.manga_id}` : null;
+    case "comment_reply":
+      return item.anime_id || item.manga_id ? commentHref(item) : null;
     default:
       return item.anime_id ? `/anime/${item.anime_id}` : null;
   }
@@ -35,6 +38,7 @@ function hrefOf(item: Item) {
  * while the tab is visible. */
 export function NotificationBell() {
   const t = useTranslations("notifications");
+  const tc = useTranslations("comments");
   const format = useFormatter();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -115,7 +119,15 @@ export function NotificationBell() {
 
   function text(item: Item) {
     const name = item.actor?.username ?? "";
-    return t(item.kind as "friend_request", { name, title: item.title ?? "" });
+    return t(item.kind as "friend_request", { name, title: place(item) });
+  }
+
+  /** "Frieren · Ep 5" for a reply on an episode, the title alone otherwise. */
+  function place(item: Item) {
+    const title = item.title ?? "";
+    if (item.kind !== "comment_reply") return title;
+    const part = item.episode != null ? tc("episode", { n: item.episode }) : item.chapter != null ? tc("chapter", { n: item.chapter }) : null;
+    return [title, part].filter(Boolean).join(" · ") || tc("heading");
   }
 
   function detail(item: Item) {
@@ -124,6 +136,7 @@ export function NotificationBell() {
     }
     if (item.kind === "new_episode") return t("episode", { episode: item.episode ?? 0 });
     if (item.kind === "new_chapter") return t("chapter", { chapter: item.episode ?? 0 });
+    if (item.kind === "comment_reply" && item.excerpt) return `“${item.excerpt}”`;
     return null;
   }
 

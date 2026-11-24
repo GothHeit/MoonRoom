@@ -17,6 +17,9 @@ import {
 import { DroppedPrompt } from "@/components/player/DroppedPrompt";
 import { useDroppedPrompt } from "@/components/player/useDroppedPrompt";
 
+import { CommentsPanel } from "@/components/comments/CommentsPanel";
+import { usePartSummary } from "@/components/comments/usePartSummary";
+
 import { EndCard } from "./EndCard";
 import { clampPage, type Zone } from "./navigation";
 import { PagedView } from "./PagedView";
@@ -61,6 +64,8 @@ export function Reader({ mangaId, source, title, mediaType, chapter, previous, n
   const ended = count > 0 && index >= count;
   const [shown, setShown] = useState(true);
   const [bars, setBars] = useState({ top: 0, bottom: 0 });
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const tc = useTranslations("comments");
 
   useEffect(() => {
     const timer = setTimeout(() => setShown(false), AUTO_HIDE_MS);
@@ -103,7 +108,14 @@ export function Reader({ mangaId, source, title, mediaType, chapter, previous, n
   const last = useCallback(() => goTo(count - 1), [goTo, count]);
   const onZone = useCallback((zone: Zone) => (zone === "toggle" ? toggle() : step(zone === "forward" ? 1 : -1)), [toggle, step]);
 
-  useReaderKeys(settings.direction, settings.mode === "page", { step, first, last, leave, toggleControls: toggle });
+  useReaderKeys(settings.direction, settings.mode === "page", { step, first, last, leave, toggleControls: toggle }, !commentsOpen);
+
+  // Asked again once the chapter is finished, when its comments open for the reader.
+  const commentScope = { kind: "chapter", mangaId, chapter: progressKey(chapter) } as const;
+  const commentSummary = usePartSummary(commentScope, finished);
+  const part = tc("chapter", { n: chapter.number || progressKey(chapter) });
+  const openComments = useCallback(() => setCommentsOpen(true), []);
+  const closeComments = useCallback(() => setCommentsOpen(false), []);
 
   // The neighbours are on the track already; the two pages after them are fetched ahead too,
   // so a run of quick turns never waits.
@@ -119,7 +131,13 @@ export function Reader({ mangaId, source, title, mediaType, chapter, previous, n
 
   const chapterHref = (target: Chapter) => readHref(source, mangaId, target.id, lang);
   const end = (
-    <EndCard title={title} next={next} nextHref={next ? chapterHref(next) : null} titleHref={mangaHref(mangaId)}>
+    <EndCard
+      title={title}
+      next={next}
+      nextHref={next ? chapterHref(next) : null}
+      titleHref={mangaHref(mangaId)}
+      comments={commentSummary ? { summary: commentSummary, part, onOpen: openComments } : null}
+    >
       {dropped.asking && <DroppedPrompt namespace="reader" inline onAccept={dropped.accept} onDismiss={dropped.dismiss} />}
     </EndCard>
   );
@@ -167,7 +185,14 @@ export function Reader({ mangaId, source, title, mediaType, chapter, previous, n
         onHeights={onHeights}
         hideLabel={t("hideControls")}
         showLabel={t("showControls")}
+        comments={{ fresh: (commentSummary?.total ?? 0) > 0, label: tc((commentSummary?.total ?? 0) > 0 ? "buttonNew" : "button"), onOpen: openComments }}
       />
+      {commentsOpen && (
+        // Taps inside the panel stay there, instead of turning pages or toggling the bars.
+        <div onClick={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()} role="presentation" className="select-text">
+          <CommentsPanel scope={commentScope} title={title} onClose={closeComments} />
+        </div>
+      )}
     </div>
   );
 }

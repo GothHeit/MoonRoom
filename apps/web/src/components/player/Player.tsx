@@ -11,6 +11,8 @@ import { AUTO_SOURCE } from "@/lib/pick-stream";
 import { warmPlayback } from "@/lib/warm-playback";
 import { watchHref, type Lang, type StreamChoice } from "@/lib/watch-target";
 
+import { CommentsPanel } from "@/components/comments/CommentsPanel";
+import { usePartSummary } from "@/components/comments/usePartSummary";
 import { RoomNotices } from "@/components/room/RoomNotices";
 import { useRoomSync, type RoomBinding } from "@/components/room/useRoomSync";
 
@@ -100,7 +102,13 @@ export function Player(props: Props) {
   const [active, setActive] = useState(true);
   const [ended, setEnded] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const autoNext = useAutoNext();
+  // A room has its own chat, so its viewers get no comments button. Asked again once the
+  // episode ends, when its comments open for the viewer.
+  const commentScope = room ? null : ({ kind: "episode", animeId, episode } as const);
+  const commentSummary = usePartSummary(commentScope, ended);
+  const tc = useTranslations("comments");
 
   const playbackRetry = playback.retry;
   const retry = useCallback(() => {
@@ -225,7 +233,17 @@ export function Player(props: Props) {
   usePlayerKeys(
     { togglePlay, seekBy, changeVolume, toggleFullscreen, toggleMute, goNext, skipNow, closeSettings, poke },
     settingsOpen,
+    !commentsOpen,
   );
+
+  // Reading comments pauses the episode, and stops the countdown to the next one.
+  const openComments = useCallback(() => {
+    video.current?.pause();
+    setCountdown(null);
+    setSettingsOpen(false);
+    setCommentsOpen(true);
+  }, []);
+  const closeComments = useCallback(() => setCommentsOpen(false), []);
 
   function switchStream(to: StreamChoice) {
     setSettingsOpen(false);
@@ -425,6 +443,11 @@ export function Player(props: Props) {
               v.muted = v.volume === 0;
             }}
             onToggleSettings={() => setSettingsOpen((o) => !o)}
+            comments={
+              commentScope
+                ? { open: commentsOpen, fresh: (commentSummary?.total ?? 0) > 0, onToggle: () => (commentsOpen ? closeComments() : openComments()) }
+                : null
+            }
             onNext={goNext}
             onToggleFullscreen={toggleFullscreen}
           />
@@ -509,8 +532,11 @@ export function Player(props: Props) {
           backHref={backHref}
           onPlayNext={goNext}
           onCancelCountdown={() => setCountdown(null)}
+          comments={commentSummary ? { summary: commentSummary, part: tc("episode", { n: episode }), onOpen: openComments } : null}
         />
       )}
+
+      {commentsOpen && commentScope && <CommentsPanel scope={commentScope} title={title} onClose={closeComments} />}
     </div>
   );
 }

@@ -12,6 +12,7 @@
     "room_invite": "{name} invited you to watch together",
     "new_episode": "New episode of {title}",
     "new_chapter": "New chapter of {title}",
+    "comment_reply": "{name} replied to your comment on {title}",
     "roomWhat": "{title}, episode {episode}",
     "roomEnded": "This room has closed.",
     "episode": "Episode {episode}",
@@ -25,7 +26,8 @@
       "new_episode": "New episodes of shows you're watching",
       "new_chapter": "New chapters of manga you're reading",
       "saved": "Saved.",
-      "saveFailed": "Couldn't save your choice."
+      "saveFailed": "Couldn't save your choice.",
+      "comment_reply": "Replies to your comments"
     },
     "push": {
       "title": "Phone notifications",

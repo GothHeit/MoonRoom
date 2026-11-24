@@ -35,6 +35,38 @@
       "onChapter": "<b>{name}</b> está no cap. {chapter}",
       "finished": "<b>{name}</b> terminou",
       "more": "{count, plural, one {+# amigo} other {+# amigos}}"
-    }
+    },
+    "react": "Reagir",
+    "reactionCount": "{reaction}, {count}",
+    "reactions": {
+      "heart": "Amei",
+      "laugh": "Engraçado",
+      "wow": "Uau",
+      "cry": "Triste",
+      "fire": "Fogo",
+      "clap": "Aplausos"
+    },
+    "reply": "Responder",
+    "replyLabel": "Escreva uma resposta",
+    "replyPlaceholder": "Escreva uma resposta…",
+    "replyingTo": "Respondendo a <b>{name}</b>",
+    "moreReplies": "{count, plural, one {Ver mais # resposta} other {Ver mais # respostas}}",
+    "deleteWithReplies": "Ele some para você e seus amigos, junto com as respostas.",
+    "close": "Fechar comentários",
+    "episode": "Ep. {n}",
+    "chapter": "Cap. {n}",
+    "panelLabel": "Comentários do {part}",
+    "lockedEpisode": "Termine o episódio primeiro",
+    "lockedChapter": "Termine o capítulo primeiro",
+    "lockedBody": "{names} {count, plural, one {deixou um comentário} other {deixaram # comentários}}. Eles abrem quando você terminar, assim nada vira spoiler.",
+    "lockedEmpty": "Ainda sem comentários. Você pode escrever um quando terminar.",
+    "finishedOnlyEpisode": "Só amigos que terminaram este episódio veem isto.",
+    "finishedOnlyChapter": "Só amigos que leram este capítulo veem isto.",
+    "placeholderEpisode": "Conte o que achou deste episódio…",
+    "placeholderChapter": "Conte o que achou deste capítulo…",
+    "button": "Comentários",
+    "buttonNew": "Comentários, amigos comentaram",
+    "friendLine": "{count, plural, one {# comentário de amigo} other {# comentários de amigos}} no {part}",
+    "read": "Ler"
   }
 }

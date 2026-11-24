@@ -23,6 +23,9 @@ type Props = {
   hasNext: boolean;
   /** Present only where AirPlay exists and a link for the receiver is ready. */
   airPlay?: { active: boolean; open: () => void } | null;
+  /** The episode's comments button; absent where there is none (in a room). `fresh` marks
+   * that friends commented. */
+  comments?: { open: boolean; fresh: boolean; onToggle: () => void } | null;
   onSeekTo: (seconds: number) => void;
   onTogglePlay: () => void;
   onSeekBy: (delta: number) => void;
@@ -35,8 +38,9 @@ type Props = {
 
 /** The seek bar and the buttons under it. */
 export function ControlBar(props: Props) {
-  const { current, duration, playing, muted, volume, fullscreen, settingsOpen, hasNext, airPlay } = props;
+  const { current, duration, playing, muted, volume, fullscreen, settingsOpen, hasNext, airPlay, comments } = props;
   const t = useTranslations("player");
+  const tc = useTranslations("comments");
   // Until the stream says how long it is, "0:00 / 0:00" reads as frozen: keep the row's
   // space so nothing moves, but show it only once the length is known.
   const known = Number.isFinite(duration) && duration > 0;
@@ -61,7 +65,9 @@ export function ControlBar(props: Props) {
         />
         <span>{formatTime(duration)}</span>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-1 sm:gap-2">
+      {/* Phones get no gaps and no mute button (the phone's own buttons do that), so every
+          control fits on one row, AirPlay and comments included. */}
+      <div className="mt-2 flex flex-wrap items-center gap-0 sm:gap-2">
         <button type="button" onClick={props.onTogglePlay} aria-label={playing ? t("pause") : t("play")} className={iconButton}>
           <PlayerIcon name={playing ? "pause" : "play"} />
         </button>
@@ -75,7 +81,7 @@ export function ControlBar(props: Props) {
           type="button"
           onClick={props.onToggleMute}
           aria-label={muted ? t("unmute") : t("mute")}
-          className={iconButton}
+          className={`${iconButton} max-sm:hidden`}
         >
           <PlayerIcon name={muted || volume === 0 ? "muted" : "volume"} />
         </button>
@@ -90,6 +96,18 @@ export function ControlBar(props: Props) {
           className="hidden w-24 cursor-pointer accent-accent sm:block"
         />
         <span className="flex-1" />
+        {comments && (
+          <button
+            type="button"
+            onClick={comments.onToggle}
+            aria-label={comments.fresh ? tc("buttonNew") : tc("button")}
+            aria-expanded={comments.open}
+            className={`${iconButton} relative`}
+          >
+            <PlayerIcon name="chat" />
+            {comments.fresh && <span aria-hidden="true" className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" />}
+          </button>
+        )}
         {airPlay && (
           <button
             type="button"

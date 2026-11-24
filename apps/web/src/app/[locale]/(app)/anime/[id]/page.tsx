@@ -170,7 +170,7 @@ export default async function TitlePage({ params }: PageProps<"/[locale]/anime/[
           </Row>
         )}
         <Suspense fallback={null}>
-          <TitleComments kind="anime" id={id} last={anime.num_episodes} />
+          <TitleComments kind="anime" id={id} title={anime.title} last={anime.num_episodes} />
         </Suspense>
       </div>
     </>

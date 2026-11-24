@@ -35,6 +35,38 @@
       "onChapter": "<b>{name}</b> is on ch. {chapter}",
       "finished": "<b>{name}</b> finished it",
       "more": "+{count} more"
-    }
+    },
+    "react": "Add a reaction",
+    "reactionCount": "{reaction}, {count}",
+    "reactions": {
+      "heart": "Love",
+      "laugh": "Funny",
+      "wow": "Wow",
+      "cry": "Sad",
+      "fire": "Fire",
+      "clap": "Applause"
+    },
+    "reply": "Reply",
+    "replyLabel": "Write a reply",
+    "replyPlaceholder": "Write a reply…",
+    "replyingTo": "Replying to <b>{name}</b>",
+    "moreReplies": "{count, plural, one {View # more reply} other {View # more replies}}",
+    "deleteWithReplies": "It will be gone for you and your friends, with the replies under it.",
+    "close": "Close comments",
+    "episode": "Ep {n}",
+    "chapter": "Ch. {n}",
+    "panelLabel": "Comments on {part}",
+    "lockedEpisode": "Finish the episode first",
+    "lockedChapter": "Finish the chapter first",
+    "lockedBody": "{names} {count, plural, one {left a comment} other {left # comments}}. They open when you finish it, so nothing gets spoiled.",
+    "lockedEmpty": "No comments yet. You can write one when you finish it.",
+    "finishedOnlyEpisode": "Only friends who finished this episode see these.",
+    "finishedOnlyChapter": "Only friends who read this chapter see these.",
+    "placeholderEpisode": "Share what you thought about this episode…",
+    "placeholderChapter": "Share what you thought about this chapter…",
+    "button": "Comments",
+    "buttonNew": "Comments, friends commented",
+    "friendLine": "{count, plural, one {# friend comment} other {# friend comments}} on {part}",
+    "read": "Read"
   }
 }

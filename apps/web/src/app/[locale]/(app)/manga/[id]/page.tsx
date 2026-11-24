@@ -172,7 +172,7 @@ export default async function MangaPage({ params, searchParams }: Params) {
           </Row>
         )}
         <Suspense fallback={null}>
-          <TitleComments kind="manga" id={id} last={manga.num_chapters} />
+          <TitleComments kind="manga" id={id} title={manga.title} last={manga.num_chapters} />
         </Suspense>
       </div>
     </>

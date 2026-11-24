@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
+from urllib.parse import quote
 
 import httpx
 from sqlalchemy import delete, select, update
@@ -50,7 +51,13 @@ _TEXT: dict[str, dict[str, tuple[str | None, str]]] = {
         "en": ("{title}", "Chapter {episode} is out"),
         "pt": ("{title}", "O capítulo {episode} saiu"),
     },
+    "comment_reply": {
+        "en": ("{name} replied to you", "{place}: “{excerpt}”"),
+        "pt": ("{name} respondeu você", "{place}: “{excerpt}”"),
+    },
 }
+# Where a comment was: "Frieren · Ep 5", "Frieren · Ch. 112", or the title alone.
+_PART = {"en": ("Ep {n}", "Ch. {n}"), "pt": ("Ep. {n}", "Cap. {n}")}
 _TEST = {
     "en": (
         "Notifications are on",
@@ -81,8 +88,39 @@ def _path(n: Notification) -> str:
             return f"/room/{n.room_code}" if n.room_code else "/"
         case "new_chapter":
             return f"/manga/{n.manga_id}" if n.manga_id else "/"
+        case "comment_reply":
+            return comment_path(n)
         case _:
             return f"/anime/{n.anime_id}" if n.anime_id else "/"
+
+
+def comment_path(n: Notification) -> str:
+    """The title page, opened on the comment that got the reply (the web does the same)."""
+    query = f"?comment={n.comment_id}" if n.comment_id else ""
+    if n.anime_id:
+        part = f"&ep={n.episode}" if query and n.episode is not None else ""
+        return f"/anime/{n.anime_id}{query}{part}"
+    if n.manga_id:
+        part = f"&ch={quote(n.chapter, safe='')}" if query and n.chapter is not None else ""
+        return f"/manga/{n.manga_id}{query}{part}"
+    return "/"
+
+
+def _place(n: Notification, lang: str) -> str:
+    ep, ch = _PART[lang]
+    part = (
+        ep.format(n=n.episode)
+        if n.episode is not None
+        else ch.format(n=n.chapter)
+        if n.chapter is not None
+        else None
+    )
+    name = n.title or ""
+    return " · ".join(p for p in (name, part) if p)
+
+
+def _subject(n: Notification) -> object:
+    return n.comment_id or n.anime_id or n.manga_id or n.room_code or n.actor_id or ""
 
 
 def compose(n: Notification, actor: str, locale: str, app_name: str) -> Message | None:
@@ -96,13 +134,15 @@ def compose(n: Notification, actor: str, locale: str, app_name: str) -> Message 
         "name": actor,
         "title": n.title or "",
         "episode": n.episode if n.episode is not None else "",
+        "place": _place(n, lang),
+        "excerpt": n.excerpt or "",
     }
     return Message(
         title=(title or app_name).format(**values),
         body=body.format(**values),
         url=f"/{lang}{_path(n)}",
         # A newer message of the same kind about the same thing replaces the earlier one.
-        tag=f"{n.kind}:{n.anime_id or n.manga_id or n.room_code or n.actor_id or ''}",
+        tag=f"{n.kind}:{_subject(n)}",
     )
 
 

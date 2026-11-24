@@ -25,6 +25,8 @@ type Props = {
   onHeights: (top: number, bottom: number) => void;
   hideLabel: string;
   showLabel: string;
+  /** Opens the chapter's comments; `fresh` marks that friends commented. */
+  comments?: { fresh: boolean; label: string; onOpen: () => void } | null;
 };
 
 const bar = "absolute inset-x-0 z-10 flex items-center gap-3 border-line bg-bg px-3 transition-transform duration-200 sm:px-5";
@@ -41,7 +43,7 @@ function Chevron({ left }: { left?: boolean }) {
 }
 
 /** The flat bars above and below the pages: where you are, the page slider, the mode and the chapter links. */
-export function ReaderBars({ shown, title, titleHref, chapter, page, count, mode, direction, previousHref, nextHref, onPage, onMode, onDirection, onToggle, onHeights, hideLabel, showLabel }: Props) {
+export function ReaderBars({ shown, title, titleHref, chapter, page, count, mode, direction, previousHref, nextHref, onPage, onMode, onDirection, onToggle, onHeights, hideLabel, showLabel, comments }: Props) {
   const t = useTranslations("reader");
   const label = chapter.number ? t("chapter", { n: chapter.number }) : t("oneShot");
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
@@ -78,6 +80,14 @@ export function ReaderBars({ shown, title, titleHref, chapter, page, count, mode
         <p className="shrink-0 text-sm tabular-nums text-muted">
           {page + 1} / {count}
         </p>
+        {comments && (
+          <button type="button" onClick={comments.onOpen} aria-label={comments.label} className={`${icon} relative`} tabIndex={shown ? 0 : -1}>
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 5h16v11H9l-5 4z" />
+            </svg>
+            {comments.fresh && <span aria-hidden="true" className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" />}
+          </button>
+        )}
         <button type="button" onClick={onToggle} aria-label={hideLabel} className={`${icon} hidden md:flex`} tabIndex={shown ? 0 : -1}>
           <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M6 6l12 12M18 6L6 18" />

@@ -903,6 +903,22 @@
             "title": "Mine",
             "type": "boolean"
           },
+          "reactions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReactionCount"
+            },
+            "title": "Reactions",
+            "type": "array"
+          },
+          "replies": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CommentOut"
+            },
+            "title": "Replies",
+            "type": "array"
+          },
           "spoiler": {
             "title": "Spoiler",
             "type": "boolean"
@@ -2950,6 +2966,28 @@
             ],
             "title": "Anime Id"
           },
+          "chapter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter"
+          },
+          "comment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2965,6 +3003,17 @@
               }
             ],
             "title": "Episode"
+          },
+          "excerpt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excerpt"
           },
           "id": {
             "title": "Id",
@@ -3113,6 +3162,53 @@
           "pages"
         ],
         "title": "PagesOut",
+        "type": "object"
+      },
+      "PartComments": {
+        "description": "Comments on one episode or chapter. While the viewer hasn't finished it they are locked:\n`items` is empty and only how many there are and who wrote some are told.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CommentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/UserSummary"
+            },
+            "title": "People",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "next",
+          "locked",
+          "people"
+        ],
+        "title": "PartComments",
         "type": "object"
       },
       "PasswordIn": {
@@ -4016,6 +4112,37 @@
         "title": "PushConfig",
         "type": "object"
       },
+      "ReactionCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "heart",
+              "laugh",
+              "wow",
+              "cry",
+              "fire",
+              "clap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "mine": {
+            "title": "Mine",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "count",
+          "mine"
+        ],
+        "title": "ReactionCount",
+        "type": "object"
+      },
       "ReactionIn": {
         "properties": {
           "emoji": {
@@ -4140,6 +4267,20 @@
           "manga"
         ],
         "title": "RelatedManga",
+        "type": "object"
+      },
+      "ReplyIn": {
+        "properties": {
+          "body": {
+            "maxLength": 2000,
+            "title": "Body",
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "ReplyIn",
         "type": "object"
       },
       "RequestIn": {
@@ -5532,7 +5673,7 @@
     },
     "/anime/{anime_id}/comments": {
       "get": {
-        "description": "Newest first. Only comments by you and your friends.",
+        "description": "Comments on the whole title, newest first. Only comments by you and your friends.",
         "operationId": "anime_comments_anime__anime_id__comments_get",
         "parameters": [
           {
@@ -5661,6 +5802,164 @@
           }
         ],
         "summary": "Comment On Anime",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/anime/{anime_id}/episodes/{episode}/comments": {
+      "get": {
+        "description": "Comments on one episode, newest first, readable once you've finished it.",
+        "operationId": "episode_comments_anime__anime_id__episodes__episode__comments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "anime_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Anime Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "maximum": 10000,
+              "minimum": 1,
+              "title": "Episode",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartComments"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Episode Comments",
+        "tags": [
+          "comments"
+        ]
+      },
+      "post": {
+        "operationId": "comment_on_episode_anime__anime_id__episodes__episode__comments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "anime_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Anime Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "maximum": 10000,
+              "minimum": 1,
+              "title": "Episode",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Comment On Episode",
         "tags": [
           "comments"
         ]
@@ -6482,6 +6781,7 @@
     },
     "/comments/{comment_id}": {
       "delete": {
+        "description": "Deletes your own comment, with the replies under it.",
         "operationId": "delete_comment_comments__comment_id__delete",
         "parameters": [
           {
@@ -6573,6 +6873,202 @@
           }
         ],
         "summary": "Edit Comment",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/comments/{comment_id}/reactions/{kind}": {
+      "delete": {
+        "operationId": "unreact_comments__comment_id__reactions__kind__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Comment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "heart",
+                "laugh",
+                "wow",
+                "cry",
+                "fire",
+                "clap"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReactionCount"
+                  },
+                  "title": "Response Unreact Comments  Comment Id  Reactions  Kind  Delete",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unreact",
+        "tags": [
+          "comments"
+        ]
+      },
+      "put": {
+        "description": "Leaves a reaction. Leaving the same one twice changes nothing.",
+        "operationId": "react_comments__comment_id__reactions__kind__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Comment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "heart",
+                "laugh",
+                "wow",
+                "cry",
+                "fire",
+                "clap"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReactionCount"
+                  },
+                  "title": "Response React Comments  Comment Id  Reactions  Kind  Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "React",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/comments/{comment_id}/replies": {
+      "post": {
+        "description": "Answers a comment. A reply to a reply goes under the same comment.",
+        "operationId": "reply_comments__comment_id__replies_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Comment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reply",
         "tags": [
           "comments"
         ]
@@ -7459,9 +7955,169 @@
         ]
       }
     },
+    "/manga/{manga_id}/chapters/{chapter}/comments": {
+      "get": {
+        "description": "Comments on one chapter, newest first, readable once you've finished it.",
+        "operationId": "chapter_comments_manga__manga_id__chapters__chapter__comments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "chapter",
+            "required": true,
+            "schema": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[^\\x00/]+$",
+              "title": "Chapter",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartComments"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Chapter Comments",
+        "tags": [
+          "comments"
+        ]
+      },
+      "post": {
+        "operationId": "comment_on_chapter_manga__manga_id__chapters__chapter__comments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manga_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Manga Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "chapter",
+            "required": true,
+            "schema": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[^\\x00/]+$",
+              "title": "Chapter",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Comment On Chapter",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
     "/manga/{manga_id}/comments": {
       "get": {
-        "description": "Newest first. Only comments by you and your friends.",
+        "description": "Comments on the whole title, newest first. Only comments by you and your friends.",
         "operationId": "manga_comments_manga__manga_id__comments_get",
         "parameters": [
           {

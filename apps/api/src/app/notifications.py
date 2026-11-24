@@ -24,7 +24,14 @@ from app.sources.base import VideoSource
 
 log = logging.getLogger(__name__)
 
-KINDS = ("friend_request", "friend_accepted", "room_invite", "new_episode", "new_chapter")
+KINDS = (
+    "friend_request",
+    "friend_accepted",
+    "room_invite",
+    "new_episode",
+    "new_chapter",
+    "comment_reply",
+)
 RETENTION = timedelta(days=30)
 
 # Only titles someone watched lately are checked for new episodes.
@@ -45,6 +52,9 @@ async def notify(
     episode: int | None = None,
     title: str | None = None,
     room_code: str | None = None,
+    chapter: str | None = None,
+    comment_id: uuid.UUID | None = None,
+    excerpt: str | None = None,
 ) -> None:
     """Adds a notification to the session (the caller commits), unless the user muted the kind.
 
@@ -52,7 +62,7 @@ async def notify(
     several episodes leaves one entry."""
     if await session.get(NotificationMute, (user_id, kind)) is not None:
         return
-    await _forget(session, user_id, kind, actor_id, anime_id, room_code, manga_id)
+    await _forget(session, user_id, kind, actor_id, anime_id, room_code, manga_id, comment_id)
     session.add(
         Notification(
             user_id=user_id,
@@ -63,6 +73,9 @@ async def notify(
             episode=episode,
             title=title,
             room_code=room_code,
+            chapter=chapter,
+            comment_id=comment_id,
+            excerpt=excerpt,
         )
     )
 
@@ -75,6 +88,7 @@ async def _forget(
     anime_id: int | None,
     room_code: str | None,
     manga_id: int | None = None,
+    comment_id: uuid.UUID | None = None,
 ) -> None:
     await session.execute(
         delete(Notification).where(
@@ -84,6 +98,7 @@ async def _forget(
             Notification.anime_id.is_not_distinct_from(anime_id),
             Notification.manga_id.is_not_distinct_from(manga_id),
             Notification.room_code.is_not_distinct_from(room_code),
+            Notification.comment_id.is_not_distinct_from(comment_id),
         )
     )
 

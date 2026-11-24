@@ -12,6 +12,7 @@
     "room_invite": "{name} convidou você para assistir junto",
     "new_episode": "Novo episódio de {title}",
     "new_chapter": "Novo capítulo de {title}",
+    "comment_reply": "{name} respondeu seu comentário em {title}",
     "roomWhat": "{title}, episódio {episode}",
     "roomEnded": "Esta sala foi encerrada.",
     "episode": "Episódio {episode}",
@@ -25,7 +26,8 @@
       "new_episode": "Novos episódios do que você está assistindo",
       "new_chapter": "Novos capítulos dos mangás que você está lendo",
       "saved": "Salvo.",
-      "saveFailed": "Não deu para salvar sua escolha."
+      "saveFailed": "Não deu para salvar sua escolha.",
+      "comment_reply": "Respostas aos seus comentários"
     },
     "push": {
       "title": "Notificações no celular",

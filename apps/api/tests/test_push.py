@@ -1,5 +1,6 @@
 import json
 import struct
+import uuid
 from datetime import timedelta
 
 import httpx
@@ -245,6 +246,37 @@ async def test_a_new_manga_chapter_is_pushed_with_a_link_to_the_manga(client, se
         "body": "Chapter 12 is out",
         "url": "/en/manga/13",
         "tag": "new_chapter:13",
+    }
+
+
+@respx.mock
+async def test_a_reply_is_pushed_with_where_it_was_and_how_it_starts(client, session, vapid, http):
+    user, ana = await make_user(session, "ana")
+    bob_user, _ = await make_user(session, "bob")
+    device = Device()
+    await client.put("/push/subscription", json=device.subscription, headers=ana)
+    route = respx.post(ENDPOINT).mock(return_value=httpx.Response(201))
+    comment = uuid.uuid4()
+    session.add(
+        Notification(
+            user_id=user.id,
+            kind="comment_reply",
+            actor_id=bob_user.id,
+            manga_id=13,
+            chapter="112.5",
+            comment_id=comment,
+            excerpt="Same, I paused it",
+            title="Berserk",
+        )
+    )
+    await session.commit()
+
+    await push.push_pending(http, get_settings())
+    assert device.read(route.calls[0].request.content) == {
+        "title": "bob respondeu você",
+        "body": "Berserk · Cap. 112.5: “Same, I paused it”",
+        "url": f"/pt/manga/13?comment={comment}&ch=112.5",
+        "tag": f"comment_reply:{comment}",
     }
 
 

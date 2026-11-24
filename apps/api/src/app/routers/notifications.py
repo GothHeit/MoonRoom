@@ -31,6 +31,10 @@ class NotificationOut(BaseModel):
     episode: int | None
     title: str | None
     room_code: str | None
+    # For a comment_reply: the chapter, the comment replied to, and how the reply starts.
+    chapter: str | None = None
+    comment_id: str | None = None
+    excerpt: str | None = None
     # For room invites: whether the room is still open to join.
     room_active: bool | None
 
@@ -95,6 +99,9 @@ async def list_notifications(
                 episode=r.episode,
                 title=r.title,
                 room_code=r.room_code,
+                chapter=r.chapter,
+                comment_id=str(r.comment_id) if r.comment_id else None,
+                excerpt=r.excerpt,
                 room_active=room_open(r.room_code)
                 if r.kind == "room_invite" and r.room_code
                 else None,
