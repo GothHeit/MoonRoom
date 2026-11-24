@@ -2046,7 +2046,8 @@ export interface paths {
         };
         /**
          * Friends Rooms
-         * @description Open rooms hosted by friends who share what they watch. Declared before /{code}.
+         * @description Open rooms hosted by friends. Switching "open to friends" on is the host's consent, so a
+         *     host who hides their activity is listed too. Declared before /{code}.
          */
         get: operations["friends_rooms_watch_rooms_friends_get"];
         put?: never;

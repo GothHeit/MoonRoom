@@ -27,6 +27,8 @@ log = logging.getLogger(__name__)
 
 # Events a slow stream may hold before it is told to load everything again instead.
 QUEUE_SIZE = 200
+# Streams one user may keep open (tabs, devices); opening another closes the oldest.
+MAX_STREAMS = 6
 PUSH_DELAY_SECONDS = 4.0
 EXCERPT = 140
 
@@ -35,18 +37,25 @@ Event = tuple[str, dict[str, Any]]
 
 class ChatHub:
     def __init__(self) -> None:
-        self._streams: dict[uuid.UUID, set[asyncio.Queue[Event | None]]] = {}
+        self._streams: dict[uuid.UUID, list[asyncio.Queue[Event | None]]] = {}
 
     def subscribe(self, user_id: uuid.UUID) -> asyncio.Queue[Event | None]:
         queue: asyncio.Queue[Event | None] = asyncio.Queue(QUEUE_SIZE)
-        self._streams.setdefault(user_id, set()).add(queue)
+        streams = self._streams.setdefault(user_id, [])
+        while len(streams) >= MAX_STREAMS:
+            old = streams.pop(0)
+            while not old.empty():
+                old.get_nowait()
+            old.put_nowait(None)
+        streams.append(queue)
         return queue
 
     def unsubscribe(self, user_id: uuid.UUID, queue: asyncio.Queue[Event | None]) -> None:
         streams = self._streams.get(user_id)
         if streams is None:
             return
-        streams.discard(queue)
+        if queue in streams:
+            streams.remove(queue)
         if not streams:
             del self._streams[user_id]
 

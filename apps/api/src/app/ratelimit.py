@@ -298,6 +298,8 @@ ACTION_RULES: dict[str, tuple[int, float]] = {
     # Messages and shares sent, and chats opened or groups made.
     "chat_message": (60, 60),
     "chat_create": (30, 600),
+    # Taking a message back, muting a chat and marking one read (done on every open chat).
+    "chat_manage": (120, 60),
     "room_reaction": (60, 60),
     "room_position": (30, 60),
 }

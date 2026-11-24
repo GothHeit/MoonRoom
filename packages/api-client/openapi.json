@@ -11863,7 +11863,7 @@
     },
     "/watch/rooms/friends": {
       "get": {
-        "description": "Open rooms hosted by friends who share what they watch. Declared before /{code}.",
+        "description": "Open rooms hosted by friends. Switching \"open to friends\" on is the host's consent, so a\nhost who hides their activity is listed too. Declared before /{code}.",
         "operationId": "friends_rooms_watch_rooms_friends_get",
         "responses": {
           "200": {

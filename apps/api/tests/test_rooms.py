@@ -734,3 +734,19 @@ async def test_the_host_is_listed_first_and_never_sees_their_own_room(client, se
     room.leave(host.id, host_queue)
     assert host.id not in room.members
     assert (await client.get("/watch/rooms/friends", headers=host_headers)).json() == []
+
+
+async def test_an_open_room_is_listed_even_when_the_host_hides_their_activity(client, session):
+    from tests.test_friends import befriend
+
+    host, host_headers = await make_user(session, "kafka")
+    _, guest_headers = await make_user(session, "friend")
+    await befriend(client, host_headers, guest_headers, "friend")
+    app.state.sources = {"zoko": object()}
+    await client.patch("/me", json={"share_activity": False}, headers=host_headers)
+    created = await client.post(
+        "/watch/rooms", json={"source": "zoko", "anime_id": 21, "episode": 1}, headers=host_headers
+    )
+    app.state.rooms.get(created.json()["code"]).join(host.id, "kafka")
+    listed = (await client.get("/watch/rooms/friends", headers=guest_headers)).json()
+    assert [r["host"]["username"] for r in listed] == ["kafka"]

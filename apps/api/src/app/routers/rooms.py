@@ -2,7 +2,8 @@ import asyncio
 import json
 import time
 import uuid
-from typing import Annotated, Literal
+from collections.abc import AsyncIterator, Callable
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -10,13 +11,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from app import db, pin
-from app.deps import CurrentUser, Session, bearer_identity, throttle
+from app.deps import CurrentUser, Session, bearer_identity, session_check, throttle
 from app.errors import ApiError
 from app.mal.client import is_safe
 from app.models import User
 from app.notifications import notify
 from app.rooms import REACTIONS, Room, Rooms
-from app.routers.friends import UserSummary, _cards, friend_ids, sharing_friend_ids, summaries
+from app.routers.friends import UserSummary, _cards, friend_ids, summaries
 from app.schemas import AnimeCard
 
 router = APIRouter(prefix="/watch/rooms", tags=["rooms"])
@@ -171,8 +172,9 @@ async def clock():
 
 @router.get("/friends", response_model=list[FriendRoomOut])
 async def friends_rooms(request: Request, user: CurrentUser, session: Session):
-    """Open rooms hosted by friends who share what they watch. Declared before /{code}."""
-    sharing = set(await sharing_friend_ids(session, user.id))
+    """Open rooms hosted by friends. Switching "open to friends" on is the host's consent, so a
+    host who hides their activity is listed too. Declared before /{code}."""
+    sharing = set(await friend_ids(session, user.id))
     rooms: Rooms = request.app.state.rooms
     found = [
         r
@@ -298,6 +300,7 @@ async def _stream_user(
     # response lasts as long as the viewer stays in the room.
     async with db.new_session() as session:
         user_id, sid = await bearer_identity(request, session, credentials)
+        request.state.stream_sid = sid
         user = await session.get(User, user_id)
         if user is not None and await pin.is_locked(session, user, sid):
             raise ApiError(403, "pin_required", "Enter the PIN to use this TV")
@@ -308,6 +311,33 @@ async def _stream_user(
 
 def _frame(kind: str, data: dict) -> str:
     return f"event: {kind}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+async def live_frames(
+    request: Request,
+    user_id: uuid.UUID,
+    queue: "asyncio.Queue[Any]",
+    tick: Callable[[], dict],
+    keepalive: float = KEEPALIVE_SECONDS,
+) -> AsyncIterator[str]:
+    """The frames of an event stream, until the viewer's login session is signed out.
+
+    The session is checked when the stream opens and again before every frame, so a password
+    change, a reset link or "sign out" stops what a device still receives. The check is answered
+    from a short cache, so most frames cost no query."""
+    sid: uuid.UUID = request.state.stream_sid
+    yield "retry: 3000\n\n"
+    while True:
+        try:
+            item = await asyncio.wait_for(queue.get(), keepalive)
+        except TimeoutError:
+            item = ("tick", tick())
+        if item is None:
+            return
+        async with db.new_session() as session:
+            if not await session_check(request).is_open(session, user_id, sid):
+                return
+        yield _frame(*item)
 
 
 @router.get("/{code}/events", response_class=StreamingResponse)
@@ -322,16 +352,13 @@ async def events(code: str, request: Request, user: Annotated[User, Depends(_str
     async def stream():
         queue = room.join(user.id, user.username)
         try:
-            yield "retry: 3000\n\n"
-            while True:
-                try:
-                    item = await asyncio.wait_for(queue.get(), KEEPALIVE_SECONDS)
-                except TimeoutError:
-                    yield _frame("tick", {"version": room.version, "revision": room.revision})
-                    continue
-                if item is None:
-                    return
-                yield _frame(*item)
+            async for frame in live_frames(
+                request,
+                user.id,
+                queue,
+                lambda: {"version": room.version, "revision": room.revision},
+            ):
+                yield frame
         finally:
             room.leave(user.id, queue)
 

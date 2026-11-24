@@ -279,6 +279,10 @@ class Notification(Base):
     # For a comment_reply: the chapter (manga), the comment replied to and the reply's start.
     chapter: Mapped[str | None] = mapped_column(String(16))
     comment_id: Mapped[uuid.UUID | None]
+    # The reply itself: deleting it (or its comment) takes the notice with it.
+    reply_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("title_comments.id", ondelete="CASCADE"), index=True
+    )
     excerpt: Mapped[str | None] = mapped_column(String(160))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     read_at: Mapped[datetime | None]

@@ -54,6 +54,7 @@ async def notify(
     room_code: str | None = None,
     chapter: str | None = None,
     comment_id: uuid.UUID | None = None,
+    reply_id: uuid.UUID | None = None,
     excerpt: str | None = None,
 ) -> None:
     """Adds a notification to the session (the caller commits), unless the user muted the kind.
@@ -75,6 +76,7 @@ async def notify(
             room_code=room_code,
             chapter=chapter,
             comment_id=comment_id,
+            reply_id=reply_id,
             excerpt=excerpt,
         )
     )
@@ -115,7 +117,9 @@ async def forget_pair(session: AsyncSession, a: uuid.UUID, b: uuid.UUID) -> None
     notices and room invites (a room invite needs a friendship to be useful)."""
     await session.execute(
         delete(Notification).where(
-            Notification.kind.in_(("friend_request", "friend_accepted", "room_invite")),
+            Notification.kind.in_(
+                ("friend_request", "friend_accepted", "room_invite", "comment_reply")
+            ),
             or_(
                 and_(Notification.user_id == a, Notification.actor_id == b),
                 and_(Notification.user_id == b, Notification.actor_id == a),

@@ -15,7 +15,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Path, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import ColumnElement, delete, func, select, tuple_
+from sqlalchemy import ColumnElement, delete, func, select, tuple_, update
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 
 from app.db import utcnow
@@ -26,6 +26,7 @@ from app.models import (
     CommentReaction,
     MalLink,
     MangaProgress,
+    Notification,
     TitleComment,
     User,
     WatchProgress,
@@ -566,6 +567,7 @@ async def reply(
         spoiler=False,
     )
     session.add(row)
+    await session.flush()
     if parent.user_id != user.id:
         await notify(
             session,
@@ -577,6 +579,7 @@ async def reply(
             episode=parent.episode,
             chapter=parent.chapter,
             comment_id=parent.id,
+            reply_id=row.id,
             excerpt=excerpt(text),
             title=(await _title_name(request, parent) or "")[:300] or None,
         )
@@ -642,6 +645,13 @@ async def edit_comment(
     # Only a new text counts as an edit; marking a spoiler afterwards doesn't.
     if changed:
         row.edited_at = utcnow()
+        if row.parent_id is not None:
+            # The bell quotes the reply: keep it in step with what the reply now says.
+            await session.execute(
+                update(Notification)
+                .where(Notification.reply_id == row.id)
+                .values(excerpt=excerpt(row.body))
+            )
     await session.commit()
     people = await summaries(session, [user.id])
     out = _out(row, people[user.id], user)

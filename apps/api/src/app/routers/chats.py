@@ -4,16 +4,18 @@ A direct chat is between two friends; if they unfriend, its history stays readab
 can write in it until they are friends again. A group is made by someone from their friends,
 and any member can add their own friends to it. Everyone sees only the chats they are in."""
 
-import asyncio
+import logging
 import re
+import unicodedata
 import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
+import httpx
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import and_, delete, func, select, tuple_, update
+from sqlalchemy import and_, delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 
 from app.avatars import AvatarOut
@@ -26,9 +28,10 @@ from app.mal.client import is_safe
 from app.models import Chat, ChatMember, ChatMessage, User
 from app.routers.comments import clean_body
 from app.routers.friends import UserSummary, friend_ids, summaries
-from app.routers.rooms import KEEPALIVE_SECONDS, _frame, _stream_user
+from app.routers.rooms import _stream_user, live_frames
 from app.soft import soft
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/chats", tags=["chats"])
 
 MAX_BODY = 2000
@@ -39,6 +42,7 @@ MAX_PAGE = 50
 MAX_TARGETS = 10
 # The unread count a chat shows; past it the web shows "99+".
 MAX_UNREAD = 99
+_DROP = ("Cc", "Cf", "Cs")
 _CHAPTER = re.compile(r"^\d{1,6}(\.\d{1,3})?$")
 
 
@@ -193,7 +197,8 @@ def _clean_text(raw: str | None) -> str | None:
 def _clean_name(raw: str | None) -> str | None:
     if raw is None:
         return None
-    name = " ".join(raw.split())
+    # Control and format characters (bidi marks, zero-width spaces) are dropped, like in text.
+    name = " ".join("".join(ch for ch in raw if unicodedata.category(ch) not in _DROP).split())
     if len(name) > MAX_NAME:
         raise ApiError(422, "name_too_long", f"Keep the name under {MAX_NAME} characters")
     return name or None
@@ -210,6 +215,12 @@ async def _membership(session: Session, user: User, chat_id: uuid.UUID) -> tuple
     if row is None:
         raise ApiError(404, "chat_not_found", "Chat not found")
     return row[0], row[1]
+
+
+async def _lock(session: Session, chat: Chat) -> None:
+    """Holds the chat's row until the commit, so two changes to its members run one after the
+    other and each sees the other's result."""
+    await session.execute(select(Chat.id).where(Chat.id == chat.id).with_for_update())
 
 
 async def _member_ids(session: Session, chat_id: uuid.UUID) -> list[uuid.UUID]:
@@ -383,10 +394,17 @@ async def _direct_with(session: Session, user: User, other_id: uuid.UUID) -> tup
 async def _resolve_share(request: Request, share: ShareIn) -> dict:
     """The title's name and art, from MyAnimeList and ani.zip, never from the client."""
     mal = request.app.state.mal
-    if share.kind == "anime":
-        node = await soft(mal.details(share.id), "chats: anime details")
-    else:
-        node = await soft(mal.manga_details(share.id), "chats: manga details")
+    work = mal.details(share.id) if share.kind == "anime" else mal.manga_details(share.id)
+    try:
+        node = await work
+    except ApiError as exc:
+        if exc.status == 404:
+            raise ApiError(404, "title_unavailable", "That title doesn't exist") from None
+        log.warning("chats: title details unavailable: %s", exc.code)
+        node = None
+    except (httpx.HTTPError, ValueError) as exc:
+        log.warning("chats: title details failed: %s", exc)
+        node = None
     if not node or not node.get("title"):
         raise ApiError(502, "title_unavailable", "That title can't be shared right now")
     picture = node.get("main_picture") or {}
@@ -417,16 +435,12 @@ async def _post(
     body: str | None,
     share: dict | None,
 ) -> ChatMessage:
-    """Saves a message, marks the chat read for its sender and tells everyone in it."""
+    """Saves a message. The sender's read mark is left alone: their own messages never count as
+    unread, and sending must not mark what others wrote before it as read."""
     now = utcnow()
     row = ChatMessage(chat_id=chat.id, user_id=user.id, body=body, created_at=now, **(share or {}))
     session.add(row)
     chat.last_message_at = now
-    await session.execute(
-        update(ChatMember)
-        .where(ChatMember.chat_id == chat.id, ChatMember.user_id == user.id)
-        .values(last_read_at=now)
-    )
     await session.flush()
     return row
 
@@ -524,16 +538,8 @@ async def events(request: Request, user: Annotated[User, Depends(_stream_user)])
     async def stream():
         queue = hub.subscribe(user.id)
         try:
-            yield "retry: 3000\n\n"
-            while True:
-                try:
-                    item = await asyncio.wait_for(queue.get(), KEEPALIVE_SECONDS)
-                except TimeoutError:
-                    yield _frame("tick", {})
-                    continue
-                if item is None:
-                    return
-                yield _frame(*item)
+            async for frame in live_frames(request, user.id, queue, dict):
+                yield frame
         finally:
             hub.unsubscribe(user.id, queue)
 
@@ -612,6 +618,7 @@ async def add_members(
     chat, member = await _membership(session, user, chat_id)
     if chat.kind != "group":
         raise ApiError(409, "not_a_group", "A direct chat is between two people")
+    await _lock(session, chat)
     current = set(await _member_ids(session, chat.id))
     new = set(body.user_ids) - current
     if new - set(await friend_ids(session, user.id)):
@@ -632,6 +639,7 @@ async def leave_group(chat_id: uuid.UUID, request: Request, user: CurrentUser, s
     chat, _ = await _membership(session, user, chat_id)
     if chat.kind != "group":
         raise ApiError(409, "not_a_group", "A direct chat can't be left")
+    await _lock(session, chat)
     await session.execute(
         delete(ChatMember).where(ChatMember.chat_id == chat.id, ChatMember.user_id == user.id)
     )
@@ -643,22 +651,27 @@ async def leave_group(chat_id: uuid.UUID, request: Request, user: CurrentUser, s
     _announce(request, rest, chat.id)
 
 
-@router.put("/{chat_id}/mute", status_code=204)
+@router.put("/{chat_id}/mute", status_code=204, dependencies=[throttle("chat_manage")])
 async def mute(chat_id: uuid.UUID, body: MuteIn, user: CurrentUser, session: Session):
     _, member = await _membership(session, user, chat_id)
     member.muted = body.muted
     await session.commit()
 
 
-@router.put("/{chat_id}/read", status_code=204)
+@router.put("/{chat_id}/read", status_code=204, dependencies=[throttle("chat_manage")])
 async def mark_read(chat_id: uuid.UUID, request: Request, user: CurrentUser, session: Session):
     """Marks everything in the chat read, and tells the others (for the "Seen" line)."""
     _, member = await _membership(session, user, chat_id)
     now = utcnow()
     member.last_read_at = now
     await session.commit()
+    # "Seen" only exists in direct chats; in a group nobody else is told who read when.
+    chat = await session.get(Chat, chat_id)
+    audience = (
+        [user.id] if chat is None or chat.kind == "group" else await _member_ids(session, chat_id)
+    )
     _hub(request).publish(
-        await _member_ids(session, chat_id),
+        audience,
         "read",
         {"chat_id": str(chat_id), "user_id": str(user.id), "at": now.isoformat()},
     )
@@ -720,7 +733,9 @@ async def send(
     return _message_out(row, author, user)
 
 
-@router.delete("/{chat_id}/messages/{message_id}", status_code=204)
+@router.delete(
+    "/{chat_id}/messages/{message_id}", status_code=204, dependencies=[throttle("chat_manage")]
+)
 async def unsend(
     chat_id: uuid.UUID,
     message_id: uuid.UUID,
@@ -767,6 +782,9 @@ async def share_to(body: ShareToIn, request: Request, user: CurrentUser, session
         targets[chat.id] = chat
         if new:
             created.append((chat.id, other))
+    # Each message sent counts against the limit, not just the request.
+    for _ in range(len(targets) - 1):
+        request.app.state.action_limits.hit("chat_message", str(user.id))
     share = await _resolve_share(request, body.share)
     rows = [await _post(request, session, user, chat, text, share) for chat in targets.values()]
     await session.commit()
