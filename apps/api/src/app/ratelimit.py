@@ -283,6 +283,8 @@ ACTION_RULES: dict[str, tuple[int, float]] = {
     # Resolving an episode asks the scrapers, warming one does too, and a search asks MAL.
     "play": (90, 600),
     "prepare": (120, 600),
+    # The Language menu: asked when an episode opens and when it nears its end.
+    "languages": (120, 600),
     "search": (120, 60),
     "stream_start": (120, 600),
     # TV sign-in: showing a code and polling it per address, entering codes per user.

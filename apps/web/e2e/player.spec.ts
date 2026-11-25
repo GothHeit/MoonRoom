@@ -208,3 +208,22 @@ test("draws styled subtitles over the video instead of the plain ones", async ({
     }, { timeout: 15_000 })
     .toBe(true);
 });
+
+test("switches language in place when the video carries it, and reloads onto a dub", async ({ page }) => {
+  // Its own account: picking a language saves the subtitle choice.
+  await signIn(page, "en", "owner");
+  await page.goto("/en/watch/stub/4/1");
+  await expect.poll(() => currentTime(page), { timeout: 20_000 }).toBeGreaterThan(1);
+  await page.getByRole("button", { name: /^Language: Portuguese · Subtitled/ }).click();
+  const english = page.getByRole("radiogroup", { name: "English" });
+  await expect(page.getByRole("radiogroup", { name: "Portuguese" }).getByRole("radio", { name: /Dubbed/ })).toBeDisabled();
+  await english.getByRole("radio", { name: /Subtitled.*Same video, no reload/ }).click();
+  await expect(page).toHaveURL(/\/watch\/stub\/4\/1$/);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.getByRole("button", { name: /^Subtitles/ })).toContainText("English");
+  await page.getByRole("button", { name: "Close settings" }).click();
+
+  await page.getByRole("button", { name: /^Language: English · Subtitled/ }).click();
+  await english.getByRole("radio", { name: /Dubbed/ }).click();
+  await expect(page).toHaveURL(/\/watch\/stub\/4\/1\?lang=dub&t=\d+&audio=en&subs=off$/);
+});

@@ -16,6 +16,7 @@ const PATHS = {
   chat: "M4 5h16v11H9l-5 4z",
   invite: "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 19a6 6 0 0 1 12 0M18 8v6M15 11h6",
   send: "M5 12h14M13 6l6 6-6 6",
+  language: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18",
 } as const;
 
 export type PlayerIconName = keyof typeof PATHS;

@@ -26,6 +26,8 @@ type Props = {
   /** The episode's comments button; absent where there is none (in a room). `fresh` marks
    * that friends commented. */
   comments?: { open: boolean; fresh: boolean; onToggle: () => void } | null;
+  /** What language is playing, as a shortcut to the Language menu; absent when there is none. */
+  language?: { label: string; onOpen: () => void } | null;
   onSeekTo: (seconds: number) => void;
   onTogglePlay: () => void;
   onSeekBy: (delta: number) => void;
@@ -96,6 +98,17 @@ export function ControlBar(props: Props) {
           className="hidden w-24 cursor-pointer accent-accent sm:block"
         />
         <span className="flex-1" />
+        {props.language && (
+          <button
+            type="button"
+            onClick={props.language.onOpen}
+            aria-label={`${t("language.title")}: ${props.language.label}`}
+            className="press flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-2.5 text-fg hover:bg-white/10 sm:px-3"
+          >
+            <PlayerIcon name="language" />
+            <span className="text-sm font-bold max-sm:hidden">{props.language.label}</span>
+          </button>
+        )}
         {comments && (
           <button
             type="button"

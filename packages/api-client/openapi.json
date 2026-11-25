@@ -1796,6 +1796,79 @@
         "title": "Keys",
         "type": "object"
       },
+      "LanguageOut": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "sub",
+              "dub"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "enum": [
+                  "sub",
+                  "dub"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
+          },
+          "language": {
+            "enum": [
+              "pt",
+              "en"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "unverified",
+              "none"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language",
+          "kind",
+          "state"
+        ],
+        "title": "LanguageOut",
+        "type": "object"
+      },
       "ListEntryOut": {
         "properties": {
           "linked": {
@@ -11658,6 +11731,70 @@
         ]
       }
     },
+    "/watch/languages/{anime_id}/{episode}": {
+      "get": {
+        "operationId": "languages_watch_languages__anime_id___episode__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "anime_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Anime Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "maximum": 10000,
+              "minimum": 1,
+              "title": "Episode",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LanguageOut"
+                  },
+                  "title": "Response Languages Watch Languages  Anime Id   Episode  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Languages",
+        "tags": [
+          "watch"
+        ]
+      }
+    },
     "/watch/options/{anime_id}/{episode}": {
       "get": {
         "description": "Every source and sub/dub that lists this episode, in fallback order, for the player's\nsource menu. A source that is slow or failing is left out. Kept for a few minutes per\nepisode, so reopening the menu or the player doesn't ask every source again.",
@@ -12902,6 +13039,25 @@
               "description": "Check the stream again instead of trusting a recent check",
               "title": "Fresh",
               "type": "boolean"
+            }
+          },
+          {
+            "description": "Audio to start on for this play only: a dub's language or 'original'",
+            "in": "query",
+            "name": "audio",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 12,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Audio to start on for this play only: a dub's language or 'original'",
+              "title": "Audio"
             }
           }
         ],

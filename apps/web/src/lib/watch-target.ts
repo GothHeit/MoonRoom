@@ -3,10 +3,16 @@ export type Lang = "sub" | "dub";
 /** A way to play a title: which source, and its sub or dub. */
 export type StreamChoice = { source: string; lang: Lang };
 
-export function watchHref(source: string, animeId: number, episode: number, lang: Lang = "sub", startAt = 0) {
+/** Tracks to start on for one play, from the Language menu: the audio ("original" or a dub's
+ * language) and the subtitles (a language code or "off"). */
+export type StartTracks = { audio?: string; subs?: string };
+
+export function watchHref(source: string, animeId: number, episode: number, lang: Lang = "sub", startAt = 0, tracks?: StartTracks) {
   const query = new URLSearchParams();
   if (lang !== "sub") query.set("lang", lang);
   if (startAt > 0) query.set("t", String(Math.floor(startAt)));
+  if (tracks?.audio) query.set("audio", tracks.audio);
+  if (tracks?.subs) query.set("subs", tracks.subs);
   const qs = query.toString();
   return `/watch/${source}/${animeId}/${episode}${qs ? `?${qs}` : ""}`;
 }

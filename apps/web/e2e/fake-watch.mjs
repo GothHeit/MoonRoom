@@ -164,6 +164,22 @@ export async function handleWatch(req, res, { url, send, error, body, authed }) 
       ["sub", "dub"].filter((lang) => EPISODES[lang].includes(episode)).map((lang) => ({ source: SOURCE, lang })),
     );
   }
+  m = /^\/watch\/languages\/(\d+)\/(\d+)$/.exec(path);
+  if (m) {
+    if (!authed) return reply(401, error("not_authenticated"));
+    const episode = Number(m[2]);
+    // The stub's subbed copy of episode 1 carries English and Portuguese subtitles; its dub is
+    // English. Other episodes have neither subtitles nor a dub.
+    const subbed = episode === SUBTITLE_EPISODE;
+    const dubbed = EPISODES.dub.includes(episode);
+    const ready = (lang) => ({ state: "ready", source: SOURCE, lang, resolution: 720 });
+    return reply(200, [
+      { language: "pt", kind: "sub", ...(subbed ? ready("sub") : { state: "none" }) },
+      { language: "pt", kind: "dub", state: "none" },
+      { language: "en", kind: "sub", ...(subbed ? ready("sub") : { state: "none" }) },
+      { language: "en", kind: "dub", ...(dubbed ? ready("dub") : { state: "none" }) },
+    ]);
+  }
   m = /^\/watch\/choice\/(\d+)$/.exec(path);
   if (m && req.method === "PUT") {
     if (!authed) return reply(401, error("not_authenticated"));
@@ -220,6 +236,7 @@ export async function handleWatch(req, res, { url, send, error, body, authed }) 
         : [];
     return reply(200, {
       source: SOURCE,
+      lang,
       skips: SKIPS[episode] ?? [],
       default_audio: null,
       kind: "mp4",

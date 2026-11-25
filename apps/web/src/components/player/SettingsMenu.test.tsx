@@ -4,14 +4,17 @@ import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import messages from "../../../messages/en/player.json";
-import { SettingsMenu } from "./SettingsMenu";
+import { SettingsMenu, type LanguageRow } from "./SettingsMenu";
 import { DEFAULT_STYLE } from "./subtitleStyle";
 
-function setup(streams: string[]) {
+function setup(streams: string[], languages: LanguageRow[] | null = null, initialView?: "main" | "language") {
   const onStream = vi.fn();
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <SettingsMenu
+        languages={languages}
+        languageName="Portuguese · Subtitled"
+        initialView={initialView}
         qualities={[]}
         quality={-1}
         onQuality={vi.fn()}
@@ -63,5 +66,44 @@ describe("SettingsMenu keys", () => {
     expect(screen.getByRole("button", { name: /Playback speed/ })).toBeInTheDocument();
     expect(outside).not.toHaveBeenCalled();
     window.removeEventListener("keydown", outside);
+  });
+});
+
+function row(overrides: Partial<LanguageRow>): LanguageRow {
+  return {
+    key: "pt-sub",
+    section: "Portuguese",
+    label: "Subtitled",
+    detail: "1080p · AniZone",
+    checked: false,
+    disabled: false,
+    checking: false,
+    onPick: vi.fn(),
+    ...overrides,
+  };
+}
+
+describe("SettingsMenu language", () => {
+  it("lists the choices under their language and picks one", async () => {
+    const enSub = row({ key: "en-sub", section: "English", detail: "1080p · Zoko" });
+    setup([], [row({ checked: true }), row({ key: "pt-dub", label: "Dubbed", detail: "Not available", disabled: true }), enSub]);
+    await userEvent.click(screen.getByRole("button", { name: /Language/ }));
+
+    expect(screen.getByRole("radiogroup", { name: "Portuguese" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Dubbed/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole("radio", { name: /1080p · Zoko/ }));
+    expect(enSub.onPick).toHaveBeenCalled();
+  });
+
+  it("opens straight on the language list from the player's language button", () => {
+    setup(["Zoko · Subtitled", "AniZone · Subtitled, all dubs"], [row({})], "language");
+    expect(screen.getByRole("radiogroup", { name: "Portuguese" })).toBeInTheDocument();
+    // The source list stays one step away.
+    expect(screen.getByRole("button", { name: /Source/ })).toBeInTheDocument();
+  });
+
+  it("is not offered without choices", () => {
+    setup([], null);
+    expect(screen.queryByRole("button", { name: /Language/ })).not.toBeInTheDocument();
   });
 });

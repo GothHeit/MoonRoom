@@ -1,6 +1,6 @@
 """Fetching from third-party video hosts, shared by the HLS proxy and the stream checks."""
 
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -34,6 +34,19 @@ async def open_upstream(
         await upstream.aclose()
         url = urljoin(url, location)
     raise ApiError(502, "upstream_failed", "Too many redirects from the video host")
+
+
+def host_headers(referer: str) -> dict[str, str]:
+    """What a video host is sent with each request for a stream's parts: the Referer the source
+    gave, and an Origin from it, since some segment hosts (AnimeStream's) answer 403 without
+    one next to the Referer. The proxy and the playback checks both use this, so a check never
+    fails where playback would work."""
+    headers = {"Referer": referer} if referer else {}
+    if referer:
+        site = urlsplit(referer)
+        if site.scheme and site.netloc:
+            headers["Origin"] = f"{site.scheme}://{site.netloc}"
+    return headers
 
 
 def passthrough_headers(upstream: httpx.Response) -> dict[str, str]:

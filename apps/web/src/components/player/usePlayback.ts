@@ -48,7 +48,7 @@ export type Playback = {
  * fonts, the source's own skips and its default audio. All of it is one value, set at once, so
  * no render ever sees a new stream with the previous one's tracks. `retry` asks again.
  */
-export function usePlayback(source: string, animeId: number, episode: number, lang: Lang) {
+export function usePlayback(source: string, animeId: number, episode: number, lang: Lang, audio?: string) {
   const [attempt, setAttempt] = useState(0);
   const [playback, setPlayback] = useState<Playback | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +59,10 @@ export function usePlayback(source: string, animeId: number, episode: number, la
       .POST("/watch/{source}/{anime_id}/episodes/{episode}/play", {
         // A retry follows a failure, which a recently checked copy of the stream may have
         // caused: have the API check it again, and fall back to another source if it is gone.
-        params: { path: { source, anime_id: animeId, episode }, query: attempt > 0 ? { lang, fresh: true } : { lang } },
+        params: {
+          path: { source, anime_id: animeId, episode },
+          query: { lang, ...(attempt > 0 ? { fresh: true } : {}), ...(audio ? { audio } : {}) },
+        },
       })
       .then(({ data, error: body }) => {
         if (cancelled) return;
@@ -81,7 +84,7 @@ export function usePlayback(source: string, animeId: number, episode: number, la
     return () => {
       cancelled = true;
     };
-  }, [source, animeId, episode, lang, attempt]);
+  }, [source, animeId, episode, lang, audio, attempt]);
 
   const retry = useCallback(() => {
     setError(null);

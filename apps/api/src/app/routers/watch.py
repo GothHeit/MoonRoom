@@ -2,8 +2,9 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Awaitable
+from dataclasses import replace
 from typing import Annotated, Literal
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin
 
 import httpx
 from cachetools import TTLCache
@@ -26,7 +27,13 @@ from app.singleflight import SingleFlight
 from app.source_hints import lacks_subbed
 from app.sources.base import EpisodeList, Lang, SkipKind, Stream, VideoSource
 from app.subtitles import ass_to_vtt
-from app.upstream import open_upstream, passthrough_headers, read_capped, read_playlist
+from app.upstream import (
+    host_headers,
+    open_upstream,
+    passthrough_headers,
+    read_capped,
+    read_playlist,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +161,14 @@ class PlayerPreferencesIn(BaseModel):
     @classmethod
     def _audio_lang(cls, value: str | None) -> str | None:
         return None if value is None else normalize_audio_lang(value)
+
+
+def original_track(tracks: list[tuple[str, str]]) -> str | None:
+    """The `LANGUAGE` of the stream's original (Japanese) audio track, when it lists one."""
+    for name, language in tracks:
+        if base_lang(language or name) == ORIGINAL_AUDIO:
+            return language or name
+    return None
 
 
 def _source(request: Request, name: str) -> VideoSource:
@@ -541,10 +556,23 @@ async def play(
     fresh: Annotated[
         bool, Query(description="Check the stream again instead of trusting a recent check")
     ] = False,
+    audio: Annotated[
+        str | None,
+        Query(
+            max_length=12,
+            description="Audio to start on for this play only: a dub's language or 'original'",
+        ),
+    ] = None,
 ):
+    try:
+        wanted_audio = normalize_audio_lang(audio) if audio is not None else None
+    except ValueError as exc:
+        raise ApiError(422, "invalid_audio", "Unknown audio language") from exc
     anime = await request.app.state.mal.visible_details(anime_id, user.show_nsfw)
     default_audio: str | None = None
     prefs = await load_prefs(session, user.id, user.subtitle_lang)
+    if wanted_audio is not None:
+        prefs = replace(prefs, audio=wanted_audio)
     await session.commit()  # the sources below can take seconds: don't hold a connection
     if source == AUTO:
         picked = await _resolve_auto(request, anime, episode, prefs, fresh)
@@ -568,9 +596,12 @@ async def play(
     if resolution is None and master:
         # The liveness check just read the master; its variants say the best quality.
         resolution = hls.top_resolution(master.text)
-    if default_audio is None and master and not stream.default_audio:
+    if default_audio is None and master and (audio is not None or not stream.default_audio):
         # A viewer who likes a dub hears it whenever the stream carries it, picked by hand or not.
+        # Audio asked for this play (the Language menu) wins over the source's own default.
         default_audio = audio_to_start(hls.audio_tracks(master.text), prefs)
+        if default_audio is None and audio is not None and prefs.audio == ORIGINAL:
+            default_audio = original_track(hls.audio_tracks(master.text))
     return PlaybackOut(
         source=used,
         lang=lang,
@@ -766,12 +797,7 @@ async def hls_proxy(
             headers={"cache-control": "no-store"},
         )
 
-    headers = {"Referer": referer} if referer else {}
-    if referer:
-        # Some segment hosts (AnimeStream's) answer 403 without an Origin next to the Referer.
-        site = urlsplit(referer)
-        if site.scheme and site.netloc:
-            headers["Origin"] = f"{site.scheme}://{site.netloc}"
+    headers = host_headers(referer)
     if "range" in request.headers:
         headers["Range"] = request.headers["range"]
     http: httpx.AsyncClient = request.app.state.http
@@ -838,9 +864,7 @@ async def _video_start(request: Request, master: Master, referer: str) -> int | 
     if master.url in _STARTS:
         return _STARTS[master.url]
     http: httpx.AsyncClient = request.app.state.http
-    headers = {"Referer": referer} if referer else {}
-    if referer and (site := urlsplit(referer)).scheme and site.netloc:
-        headers["Origin"] = f"{site.scheme}://{site.netloc}"
+    headers = host_headers(referer)
     lines = [x.strip() for x in master.text.splitlines() if x.strip()]
     if any(x.startswith("#EXT-X-STREAM-INF") for x in lines):
         playlists = []

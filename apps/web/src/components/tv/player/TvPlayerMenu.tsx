@@ -6,7 +6,16 @@ import { useEffect, useRef } from "react";
 import { useTvFocus } from "../useTvFocus";
 import { setFocus } from "../spatial";
 
-export type MenuOption = { key: string; label: string; selected: boolean; onPick: () => void };
+export type MenuOption = {
+  key: string;
+  label: string;
+  selected: boolean;
+  onPick: () => void;
+  /** A second, smaller line (the Language menu's quality and source). */
+  detail?: string;
+  /** Listed but can't be picked (a language this episode doesn't have). */
+  disabled?: boolean;
+};
 export type MenuSection = { title: string; options: MenuOption[] };
 
 const MENU_KEY = "tvp-menu";
@@ -15,7 +24,7 @@ const optionKey = (key: string) => `tvp-menu-${key}`;
 function Option({ option }: { option: MenuOption }) {
   const { ref, focused } = useTvFocus<HTMLButtonElement>({
     focusKey: optionKey(option.key),
-    onEnter: option.onPick,
+    onEnter: option.disabled ? undefined : option.onPick,
     remember: false,
     // The panel scrolls itself; the page behind it never moves.
     onFocus: () => ref.current?.scrollIntoView({ block: "nearest" }),
@@ -27,15 +36,33 @@ function Option({ option }: { option: MenuOption }) {
         type="button"
         role="menuitemradio"
         aria-checked={option.selected}
-        onClick={option.onPick}
+        aria-disabled={option.disabled || undefined}
+        onClick={option.disabled ? undefined : option.onPick}
         className={`flex min-h-[4.5rem] w-full items-center gap-5 rounded-full px-8 text-left text-[1.75rem] font-bold outline-none transition-transform duration-[160ms] ease-out ${
-          focused ? "scale-[1.03] bg-accent text-on-accent" : option.selected ? "text-fg" : "text-soft"
+          option.detail ? "py-3" : ""
+        } ${
+          focused
+            ? option.disabled
+              ? "bg-line text-muted"
+              : "scale-[1.03] bg-accent text-on-accent"
+            : option.disabled
+              ? "text-muted"
+              : option.selected
+                ? "text-fg"
+                : "text-soft"
         }`}
       >
         <span aria-hidden="true" className={`w-7 shrink-0 text-center ${focused ? "" : "text-accent"}`}>
           {option.selected ? "✓" : ""}
         </span>
-        <span className="min-w-0 flex-1 break-words leading-tight">{option.label}</span>
+        <span className="min-w-0 flex-1 break-words leading-tight">
+          {option.label}
+          {option.detail && (
+            <span className={`mt-1 block text-[1.25rem] font-medium ${focused && !option.disabled ? "text-on-accent" : "text-muted"}`}>
+              {option.detail}
+            </span>
+          )}
+        </span>
       </button>
     </li>
   );

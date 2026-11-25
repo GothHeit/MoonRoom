@@ -14,6 +14,7 @@ from app.chats import ChatHub, ChatPusher
 from app.cleanup import prune
 from app.config import get_settings
 from app.errors import install_error_handlers
+from app.languages import LanguageChecks
 from app.logs import install_logging
 from app.mal.account import MalAccounts
 from app.mal.client import MalClient
@@ -33,6 +34,7 @@ from app.routers import (
     friends,
     home,
     invites,
+    languages,
     mal,
     manga,
     notifications,
@@ -121,6 +123,7 @@ async def lifespan(app: FastAPI):
         app.state.source_hints = new_source_hints()
         app.state.probes = StreamProbes(http)
         app.state.watch = watch.WatchCaches()
+        app.state.language_checks = LanguageChecks(app.state.shared_cache)
         app.state.sources = load_sources(settings.video_source_names)
         app.state.manga_sources = load_manga_sources(
             settings.manga_source_names, app.state.shared_cache
@@ -211,6 +214,7 @@ def create_app() -> FastAPI:
         manga,
         mal,
         rooms,
+        languages,
         watch,
         progress,
         home,

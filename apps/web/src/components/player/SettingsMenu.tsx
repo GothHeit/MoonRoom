@@ -5,12 +5,20 @@ import { useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { BottomSheet } from "@/components/ui/BottomSheet";
 
+import type { LanguageRow } from "./useLanguageSwitch";
 import { BACKGROUNDS, COLORS, POSITIONS, SIZES, type SubtitleStyle } from "./subtitleStyle";
 
+export type { LanguageRow };
 export type Quality = { index: number; height: number };
 export type AudioTrack = { id: number; label: string; lang?: string };
 
 type Props = {
+  /** The Language menu; null where it isn't offered (a room guest). */
+  languages: LanguageRow[] | null;
+  /** What language is playing, for the main list. */
+  languageName: string;
+  /** The list to open on. */
+  initialView?: "main" | "language";
   qualities: Quality[];
   /** -1 for automatic. */
   quality: number;
@@ -40,7 +48,36 @@ type Props = {
   onClose: () => void;
 };
 
-type View = "main" | "source" | "audio" | "subtitles" | "speed" | "quality" | "style";
+type View = "main" | "language" | "source" | "audio" | "subtitles" | "speed" | "quality" | "style";
+
+function LanguageOption({ row }: { row: LanguageRow }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={row.checked}
+      aria-disabled={row.disabled || undefined}
+      disabled={row.disabled}
+      onClick={row.onPick}
+      className={`flex min-h-[3.25rem] w-full items-center gap-3 rounded-ui px-3 py-1.5 text-left ${
+        row.checked ? "bg-accent/10" : ""
+      } ${row.disabled ? "cursor-default" : "hover:bg-white/10 active:bg-white/10"}`}
+    >
+      <span aria-hidden="true" className={`w-4 shrink-0 text-accent ${row.checked ? "" : "invisible"}`}>
+        ✓
+      </span>
+      <span className="min-w-0">
+        <span className={`block text-sm ${row.checked ? "font-bold" : ""} ${row.disabled ? "text-muted" : ""}`}>{row.label}</span>
+        <span className="flex items-center gap-1.5 text-xs text-muted">
+          {row.checking && (
+            <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 animate-spin rounded-full border-2 border-line-strong border-t-accent motion-reduce:animate-none" />
+          )}
+          <span className="min-w-0 break-words">{row.detail}</span>
+        </span>
+      </span>
+    </button>
+  );
+}
 
 function Row({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
   return (
@@ -113,7 +150,7 @@ function Chips<T extends string>({
 
 export function SettingsMenu(props: Props) {
   const t = useTranslations("player");
-  const [view, setView] = useState<View>("main");
+  const [view, setView] = useState<View>(props.initialView ?? "main");
   const { style, onStyle } = props;
   const set = <K extends keyof SubtitleStyle>(key: K, value: SubtitleStyle[K]) => onStyle({ ...style, [key]: value });
 
@@ -124,6 +161,7 @@ export function SettingsMenu(props: Props) {
   const qualityName = props.quality < 0 ? t("settings.auto") : t("settings.height", { height: heightOf(props) });
   const titles: Record<View, string> = {
     main: t("settings.title"),
+    language: t("language.title"),
     source: t("source"),
     audio: t("audio"),
     subtitles: t("subtitles"),
@@ -135,6 +173,29 @@ export function SettingsMenu(props: Props) {
 
   let body: ReactNode;
   switch (view) {
+    case "language": {
+      const sections = [...new Set((props.languages ?? []).map((row) => row.section))];
+      body = (
+        <>
+          {sections.map((section) => (
+            <div key={section} role="radiogroup" aria-label={section}>
+              <p className="px-3 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-muted">{section}</p>
+              {(props.languages ?? [])
+                .filter((row) => row.section === section)
+                .map((row) => (
+                  <LanguageOption key={row.key} row={row} />
+                ))}
+            </div>
+          ))}
+          {props.streams.length > 1 && (
+            <div className="mt-1 border-t border-line pt-1">
+              <Row label={t("source")} value={props.streamName} onClick={() => setView("source")} />
+            </div>
+          )}
+        </>
+      );
+      break;
+    }
     case "source":
       body = (
         <div role="radiogroup" aria-label={titles.source}>
@@ -213,6 +274,7 @@ export function SettingsMenu(props: Props) {
     default:
       body = (
         <>
+          {props.languages && <Row label={t("language.title")} value={props.languageName} onClick={() => setView("language")} />}
           {props.streams.length > 1 && <Row label={t("source")} value={props.streamName} onClick={() => setView("source")} />}
           {hasAudioTracks && <Row label={t("audio")} value={audioName ?? ""} onClick={() => setView("audio")} />}
           {hasSubtitles && <Row label={t("subtitles")} value={subtitleName} onClick={() => setView("subtitles")} />}

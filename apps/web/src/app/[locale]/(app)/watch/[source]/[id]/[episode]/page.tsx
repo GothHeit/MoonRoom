@@ -35,6 +35,9 @@ export default async function WatchPage({ params, searchParams }: Params) {
   const { animeId, ep } = parseIds(id, episode);
   const query = await searchParams;
   const lang: Lang = query.lang === "dub" ? "dub" : "sub";
+  // Set by the Language menu when it reloads onto another stream: the tracks to start on.
+  const audio = typeof query.audio === "string" && /^[a-z]{2,8}$/.test(query.audio) ? query.audio : undefined;
+  const subs = typeof query.subs === "string" && /^(off|[a-z]{2,3}(-[A-Z]{2})?)$/.test(query.subs) ? query.subs : undefined;
   const api = await serverApi();
 
   const [anime, me, progressResult, episodesResult, preferences] = await Promise.all([
@@ -58,7 +61,7 @@ export default async function WatchPage({ params, searchParams }: Params) {
 
   return (
     <Player
-      key={`${source}-${animeId}-${ep}-${lang}`}
+      key={`${source}-${animeId}-${ep}-${lang}-${audio ?? ""}-${subs ?? ""}`}
       source={source}
       animeId={animeId}
       episode={ep}
@@ -66,7 +69,8 @@ export default async function WatchPage({ params, searchParams }: Params) {
       episodes={episodes}
       lang={lang}
       startAt={startAt}
-      subtitleLang={me.subtitle_lang}
+      audio={audio}
+      subtitleLang={subs ?? me.subtitle_lang}
       subtitleStyle={styleOf(preferences?.data)}
       showSkips={preferences?.data?.show_skip_buttons ?? true}
     />

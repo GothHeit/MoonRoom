@@ -15,6 +15,8 @@ import { useHls } from "@/components/player/useHls";
 import { usePlayback } from "@/components/player/usePlayback";
 import { useProgressSaver } from "@/components/player/useProgressSaver";
 import { useSkips } from "@/components/player/useSkips";
+import { useLanguageSwitch } from "@/components/player/useLanguageSwitch";
+import { warmLanguages } from "@/components/player/useLanguages";
 import { useSubtitles } from "@/components/player/useSubtitles";
 import { togglePlayback } from "@/components/player/useVideoControls";
 import { useFollowFallback } from "@/components/room/useFollowFallback";
@@ -46,6 +48,8 @@ type Props = {
   /** The title's poster, behind the end screen when there's no wide art. */
   poster: string | null;
   lang: Lang;
+  /** Audio to start on for this play ("original" or a dub's language), set by the Language menu. */
+  audio?: string;
   /** Seconds to start from: the saved position, or where a source switch left off. */
   startAt: number;
   /** Saved subtitle choice: a language code, "off", or null for automatic. */
@@ -56,7 +60,7 @@ type Props = {
   room?: RoomBinding;
 };
 
-type Panel = "subtitles" | "audio" | "source";
+type Panel = "language" | "subtitles" | "audio" | "source";
 type TitleArt = components["schemas"]["TitleArtOut"];
 
 // Longer than the site's 3 s: the person is across the room and the remote is slower.
@@ -67,7 +71,7 @@ const ARROWS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
 // Room the control bar takes at the bottom, so subtitles sit above it while it shows.
 const CONTROLS_HEIGHT = "16rem";
 
-const PANEL_BUTTON: Record<Panel, string> = { subtitles: "tvp-subtitles", audio: "tvp-audio", source: "tvp-source" };
+const PANEL_BUTTON: Record<Panel, string> = { language: "tvp-language", subtitles: "tvp-subtitles", audio: "tvp-audio", source: "tvp-source" };
 
 /**
  * The TV mode's player: the same play pipeline as the site (sources with fallback, signed links,
@@ -86,7 +90,7 @@ export function TvPlayer(props: Props) {
   const started = useRef(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const playback = usePlayback(source, animeId, episode, lang);
+  const playback = usePlayback(source, animeId, episode, lang, props.audio);
   const { attempt, url, kind, tracks, fonts, answered, answeredLang, ownSkips, defaultAudio, maxHeight, error, setError } = playback;
   const [panel, setPanel] = useState<Panel | null>(null);
   const [streams, setStreams] = useState<StreamChoice[]>([]);
@@ -166,8 +170,11 @@ export function TvPlayer(props: Props) {
   const next = episodes.find((e) => e > episode);
   const nearEnd = next !== undefined && duration > 0 && current > Math.max(duration - WARM_NEXT_SECONDS, duration / 2);
   useEffect(() => {
-    if (nearEnd && next !== undefined) warmPlayback(source, animeId, next, lang);
-  }, [nearEnd, source, animeId, next, lang]);
+    if (nearEnd && next !== undefined) {
+      warmPlayback(source, animeId, next, lang);
+      if (!room) warmLanguages(animeId, next);
+    }
+  }, [nearEnd, source, animeId, next, lang, room]);
   const { save, onTime } = useProgressSaver(video, animeId, episode);
 
   // Wide art and the next episode's still and title for the end screen, asked for near the end.
@@ -264,6 +271,22 @@ export function TvPlayer(props: Props) {
   }, [url, seek]);
 
   const closePanel = useCallback(() => setPanel(null), []);
+
+  // The Language menu. A room keeps its source menu: there the host's pick has to move everyone.
+  const language = useLanguageSwitch({
+    animeId,
+    episode,
+    enabled: (askStreams || panel !== null || error !== null) && !room,
+    loaded: url !== null,
+    now: { audioTracks: hls.audioTracks, audioTrack: hls.audioTrack, subtitles: tracks, subtitle: selected, source: answered, lang: answeredLang },
+    heights: hls.qualities.map((q) => q.height),
+    chooseAudio: (id) => chooseAudio(id),
+    chooseSubtitle: subtitles.chooseTrack,
+    showSubtitle: subtitles.showTrack,
+    position: () => video.current?.currentTime ?? current,
+    reload: (href) => router.replace(tvHref(href)),
+    onPicked: () => setPanel(null),
+  });
 
   function switchStream(to: StreamChoice) {
     setPanel(null);
@@ -392,7 +415,21 @@ export function TvPlayer(props: Props) {
   }
 
   const subtitleNames = trackNames(tracks, locale);
+  const languageRows = language.rows();
   const sections: Record<Panel, MenuSection[]> = {
+    language: [...new Set(languageRows.map((row) => row.section))].map((section) => ({
+      title: section,
+      options: languageRows
+        .filter((row) => row.section === section)
+        .map((row) => ({
+          key: `lang-${row.key}`,
+          label: row.label,
+          detail: row.detail,
+          selected: row.checked,
+          disabled: row.disabled,
+          onPick: row.onPick,
+        })),
+    })),
     subtitles: [
       {
         title: tv("subtitleLanguage"),
@@ -454,7 +491,7 @@ export function TvPlayer(props: Props) {
       },
     ],
   };
-  const panelTitle: Record<Panel, string> = { subtitles: t("subtitles"), audio: t("audio"), source: canSwitchStream ? t("source") : t("settings.quality") };
+  const panelTitle: Record<Panel, string> = { language: t("language.title"), subtitles: t("subtitles"), audio: t("audio"), source: canSwitchStream ? t("source") : t("settings.quality") };
   const others = canSwitchStream ? streams.filter((s) => !sameStream(s, { source, lang })) : [];
   // This TV's video comes from another source than the room's, so it may not line up exactly.
   const otherSource = room && url && !automatic && !following && !sameStream(playingFrom, { source, lang }) ? streamLabel(names, { source, lang }) : null;
@@ -598,6 +635,7 @@ export function TvPlayer(props: Props) {
               {next !== undefined && <TvControl focusKey="tvp-next" icon="next" label={t("nextShort")} onPress={goNext} />}
               <p className="mx-4 min-w-0 flex-1 truncate text-right text-[1.375rem] text-soft">{sourceLine}</p>
               <div className="flex shrink-0 items-center gap-6">
+                {language.offered && <TvControl focusKey="tvp-language" label={t("language.title")} onPress={() => setPanel("language")} />}
                 {tracks.length > 0 && <TvControl focusKey="tvp-subtitles" label={t("subtitles")} onPress={() => setPanel("subtitles")} />}
                 {audioNames.length > 1 && <TvControl focusKey="tvp-audio" label={t("audio")} onPress={() => setPanel("audio")} />}
                 {/* A room's guest can't move the room to another source; what is left is the picture quality. */}
@@ -611,6 +649,18 @@ export function TvPlayer(props: Props) {
       )}
 
       {room?.overlay}
+
+      {language.notice && !error && (
+        <div
+          role="status"
+          className="pointer-events-none absolute left-1/2 top-16 flex max-w-[60rem] -translate-x-1/2 items-center gap-4 rounded-full border border-line bg-surface px-8 py-4 text-[1.5rem] text-fg"
+        >
+          {language.notice.busy && (
+            <span aria-hidden="true" className="h-7 w-7 shrink-0 animate-spin rounded-full border-[3px] border-line-strong border-t-accent motion-reduce:animate-none" />
+          )}
+          <span>{language.notice.text}</span>
+        </div>
+      )}
 
       {panel && !error && <TvPlayerMenu title={panelTitle[panel]} sections={sections[panel]} empty={tv("nothingElse")} />}
     </div>

@@ -107,6 +107,22 @@
         "sub": "Automático (o melhor para você)",
         "dub": "Automático (o melhor para você)"
       }
+    },
+    "language": {
+      "title": "Idioma",
+      "pt": "Português",
+      "en": "Inglês",
+      "sub": "Legendado",
+      "dub": "Dublado",
+      "checking": "Verificando…",
+      "none": "Indisponível neste episódio",
+      "unverified": "Não deu para verificar",
+      "instant": "Mesmo vídeo, sem recarregar",
+      "height": "{height}p",
+      "name": "{language} · {kind}",
+      "other": "Outro",
+      "switching": "Trocando para {language}. Continua tocando até ficar pronto",
+      "failed": "{language} não começou. Você continua no que estava."
     }
   }
 }

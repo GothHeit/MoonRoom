@@ -1960,6 +1960,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/watch/languages/{anime_id}/{episode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Languages */
+        get: operations["languages_watch_languages__anime_id___episode__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/watch/options/{anime_id}/{episode}": {
         parameters: {
             query?: never;
@@ -2986,6 +3003,30 @@ export interface components {
             auth: string;
             /** P256Dh */
             p256dh: string;
+        };
+        /** LanguageOut */
+        LanguageOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sub" | "dub";
+            /** Lang */
+            lang?: ("sub" | "dub") | null;
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "pt" | "en";
+            /** Resolution */
+            resolution?: number | null;
+            /** Source */
+            source?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "unverified" | "none";
         };
         /** ListEntryOut */
         ListEntryOut: {
@@ -7964,6 +8005,38 @@ export interface operations {
             };
         };
     };
+    languages_watch_languages__anime_id___episode__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                anime_id: number;
+                episode: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LanguageOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     options_watch_options__anime_id___episode__get: {
         parameters: {
             query?: never;
@@ -8704,6 +8777,8 @@ export interface operations {
                 lang?: "sub" | "dub";
                 /** @description Check the stream again instead of trusting a recent check */
                 fresh?: boolean;
+                /** @description Audio to start on for this play only: a dub's language or 'original' */
+                audio?: string | null;
             };
             header?: never;
             path: {

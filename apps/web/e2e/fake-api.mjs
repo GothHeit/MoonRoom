@@ -7,7 +7,8 @@ import { handleManga, MANGA } from "./fake-manga.mjs";
 import { choiceFor, handleWatch, streamFor } from "./fake-watch.mjs";
 
 // The saved subtitle choice, like the real account setting.
-let subtitleLang = null;
+// username -> saved subtitle language, so tests running side by side don't change each other's.
+const subtitleLangs = new Map();
 // Other devices shown in the sessions list; revoking one removes it.
 const otherSessions = new Set(["phone"]);
 
@@ -230,17 +231,17 @@ createServer(async (req, res) => {
   }
   if (url.pathname === "/me") {
     if (!authed) return send(401, error("not_authenticated"));
+    const username = userOf(token);
     if (req.method === "PATCH") {
       const patch = await body(req);
-      if ("subtitle_lang" in patch) subtitleLang = patch.subtitle_lang;
+      if ("subtitle_lang" in patch) subtitleLangs.set(username, patch.subtitle_lang);
     }
-    const username = userOf(token);
     return send(200, {
       id: idOf(username),
       username,
       locale: "en",
       show_nsfw: false,
-      subtitle_lang: subtitleLang,
+      subtitle_lang: subtitleLangs.get(username) ?? null,
       is_admin: username === "owner",
       avatar: { kind: "none", version: 0 },
       share_activity: true,

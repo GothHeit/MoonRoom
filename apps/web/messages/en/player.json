@@ -107,6 +107,22 @@
         "sub": "Automatic (best for you)",
         "dub": "Automatic (best for you)"
       }
+    },
+    "language": {
+      "title": "Language",
+      "pt": "Portuguese",
+      "en": "English",
+      "sub": "Subtitled",
+      "dub": "Dubbed",
+      "checking": "Checking…",
+      "none": "Not available for this episode",
+      "unverified": "Couldn’t be checked",
+      "instant": "Same video, no reload",
+      "height": "{height}p",
+      "name": "{language} · {kind}",
+      "other": "Other",
+      "switching": "Switching to {language}. Still playing until it’s ready",
+      "failed": "{language} didn’t start. You’re still on what you had."
     }
   }
 }

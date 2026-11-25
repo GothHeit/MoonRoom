@@ -13,14 +13,16 @@ store (Redis) can sit behind these same methods when that matters.
 
 import asyncio
 from dataclasses import dataclass
+from urllib.parse import urljoin
 
 import httpx
 from cachetools import TTLCache
 
+from app import hls
 from app.errors import ApiError
 from app.singleflight import SingleFlight
 from app.sources.base import Stream
-from app.upstream import open_upstream, read_capped
+from app.upstream import host_headers, open_upstream, read_capped
 
 # How long a fetched master (and so an "alive" verdict) is reused. Long enough to cover the
 # title page warming a stream and the user pressing play; short enough that a host taking a
@@ -32,6 +34,8 @@ DEAD_TTL = 60
 PROBE_TIMEOUT = 6.0
 # Answers that mean the file is gone, not that the host is having a bad moment.
 GONE = (404, 410)
+# Answers to a piece of the picture that mean the viewer won't get it either.
+REFUSED = (401, 403, 404, 410)
 
 type Key = tuple[str, str]
 
@@ -62,6 +66,8 @@ class StreamProbes:
         self._dead: TTLCache[Key, None] = TTLCache(maxsize=4096, ttl=DEAD_TTL)
         self._files: TTLCache[Key, bool] = TTLCache(maxsize=4096, ttl=MASTER_TTL)
         self._flights: SingleFlight[Key, Master] = SingleFlight()
+        # Whether the first bytes of the picture could be fetched (see `plays`).
+        self._plays: TTLCache[Key, bool] = TTLCache(maxsize=4096, ttl=MASTER_TTL)
 
     def peek(self, url: str, referer: str) -> Master | None:
         """The master already fetched for this stream, without asking the host."""
@@ -70,7 +76,7 @@ class StreamProbes:
     def forget(self, url: str, referer: str) -> None:
         """Drops what is known about this stream, so the next check asks the host again."""
         key = (url, referer)
-        for cache in (self._masters, self._dead, self._files):
+        for cache in (self._masters, self._dead, self._files, self._plays):
             cache.pop(key, None)
 
     async def master(self, url: str, referer: str) -> Master:
@@ -140,3 +146,58 @@ class StreamProbes:
             return False
         self._files[key] = True
         return True
+
+    async def plays(self, stream: Stream) -> bool | None:
+        """A deeper check than `check`: whether the first piece of the picture can be fetched,
+        which is what fails when a host lists a file but refuses to serve it (a 403 on the
+        segments, a dead video server behind a working playlist). For HLS that is the first
+        segment of the first variant; for an MP4, its first bytes. None when it couldn't tell."""
+        if stream.url.startswith("file:"):
+            return True
+        key = (stream.url, stream.upstream_headers.get("Referer", ""))
+        if (known := self._plays.get(key)) is not None:
+            return known
+        if key in self._dead:
+            return False
+        try:
+            async with asyncio.timeout(PROBE_TIMEOUT):
+                target = stream.url if stream.kind == "mp4" else await self._first_segment(key)
+                if target is None:
+                    return None
+                headers = {**stream.upstream_headers, **host_headers(key[1])}
+                response, _ = await open_upstream(
+                    self._http, target, {**headers, "Range": "bytes=0-1023"}
+                )
+                status = response.status_code
+                await response.aclose()
+        except (Gone, ApiError):
+            self._plays[key] = False
+            return False
+        except (HostError, httpx.HTTPError, TimeoutError):
+            return None
+        if status in REFUSED:
+            self._plays[key] = False
+            return False
+        if status >= 400:
+            return None
+        self._plays[key] = True
+        return True
+
+    async def _first_segment(self, key: Key) -> str | None:
+        """The address of the first segment the player would load."""
+        master = await self.master(*key)
+        playlist_url, text = master.url, master.text
+        variant = hls.first_variant(text)
+        if variant is not None:
+            playlist_url = urljoin(master.url, variant)
+            response, final = await open_upstream(self._http, playlist_url, host_headers(key[1]))
+            if response.status_code >= 400:
+                status = response.status_code
+                await response.aclose()
+                if status in REFUSED:
+                    raise Gone(playlist_url)
+                raise HostError(status)
+            text = await read_capped(response)
+            playlist_url = final
+        segment = hls.first_segment(text)
+        return urljoin(playlist_url, segment) if segment else None

@@ -266,6 +266,23 @@ def audio_tracks(master: str) -> list[tuple[str, str]]:
     return found
 
 
+def first_variant(master: str) -> str | None:
+    """The URI of the first variant a master playlist lists; None for a media playlist."""
+    lines = [line.strip() for line in master.splitlines()]
+    for index, line in enumerate(lines):
+        if line.startswith("#EXT-X-STREAM-INF"):
+            return next((n for n in lines[index + 1 :] if n and not n.startswith("#")), None)
+    return None
+
+
+def first_segment(media: str) -> str | None:
+    """The URI of the first segment of a media playlist."""
+    return next(
+        (n for n in (line.strip() for line in media.splitlines()) if n and not n.startswith("#")),
+        None,
+    )
+
+
 def rewrite_playlist(text: str, base_url: str, referer: str, viewer: "Viewer | str") -> str:
     local = base_url.startswith("file:")
 

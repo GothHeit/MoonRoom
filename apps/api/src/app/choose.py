@@ -101,6 +101,60 @@ def audio_to_start(tracks: list[tuple[str, str]], prefs: Prefs) -> str | None:
     return None
 
 
+@dataclass(frozen=True)
+class Found:
+    """A version a source can play, with what it was built from."""
+
+    offer: Offer
+    stream: Stream
+    # The master's audio tracks as (NAME, LANGUAGE); empty for a stream without any.
+    tracks: list[tuple[str, str]]
+
+
+async def probe_offer(
+    source: VideoSource,
+    name: str,
+    order: int,
+    lang: Lang,
+    anime: dict,
+    episode: int,
+    probes: StreamProbes,
+    fresh: bool = False,
+) -> Found | None:
+    """What one source can play of this episode as sub or dub, checked against its host. None
+    when it doesn't list the episode, gives no stream, or the stream's file is gone. Raises when
+    the source itself fails, so callers can tell an outage from a missing episode."""
+    # Together: a source that lacks the episode wastes one cached call, one that has it saves a
+    # whole round trip.
+    answers = await asyncio.gather(
+        source.episodes(anime, lang), source.stream(anime, episode, lang), return_exceptions=True
+    )
+    for answer in answers:
+        if isinstance(answer, BaseException):
+            raise answer
+    listed, stream = cast(tuple[EpisodeList | None, Stream | None], tuple(answers))
+    if listed is None or episode not in listed.episodes:
+        return None
+    # A source that lists more episodes than the show has matched another season.
+    expected = anime.get("num_episodes") or 0
+    if expected and len(listed.episodes) > expected:
+        return None
+    if stream is None:
+        return None
+    referer = stream.upstream_headers.get("Referer", "")
+    if fresh:
+        probes.forget(stream.url, referer)
+    alive = await probes.check(stream)
+    if alive is False:
+        log.warning("Source %s gave a dead stream for MAL %s ep %s", name, anime.get("id"), episode)
+        return None
+    master = probes.peek(stream.url, referer) if stream.kind == "hls" else None
+    traits = getattr(source, "traits", Traits())
+    offer = build_offer(name, order, lang, stream, master.text if master else None, traits)
+    tracks = hls.audio_tracks(master.text) if master else []
+    return Found(offer if alive else _unverified(offer), stream, tracks)
+
+
 async def resolve_auto(
     sources: dict[str, VideoSource],
     probes: StreamProbes,
@@ -116,45 +170,18 @@ async def resolve_auto(
 
     async def consider(name: str, order: int, lang: Lang) -> Offer | None:
         nonlocal failures
-        source = sources[name]
         try:
-            # Together: a source that lacks the episode wastes one cached call, one that has it
-            # saves a whole round trip.
-            answers = await asyncio.gather(
-                source.episodes(anime, lang),
-                source.stream(anime, episode, lang),
-                return_exceptions=True,
+            found = await probe_offer(
+                sources[name], name, order, lang, anime, episode, probes, fresh
             )
-            for answer in answers:
-                if isinstance(answer, BaseException):
-                    raise answer
-            listed, stream = cast(tuple[EpisodeList | None, Stream | None], tuple(answers))
-            if listed is None or episode not in listed.episodes:
-                return None
-            # A source that lists more episodes than the show has matched another season.
-            expected = anime.get("num_episodes") or 0
-            if expected and len(listed.episodes) > expected:
-                return None
         except Exception:
             log.exception("Source %s failed for MAL %s ep %s", name, anime.get("id"), episode)
             failures += 1
             return None
-        if stream is None:
+        if found is None:
             return None
-        referer = stream.upstream_headers.get("Referer", "")
-        if fresh:
-            probes.forget(stream.url, referer)
-        alive = await probes.check(stream)
-        if alive is False:
-            log.warning(
-                "Source %s gave a dead stream for MAL %s ep %s", name, anime.get("id"), episode
-            )
-            return None
-        master = probes.peek(stream.url, referer) if stream.kind == "hls" else None
-        traits = getattr(source, "traits", Traits())
-        offer = build_offer(name, order, lang, stream, master.text if master else None, traits)
-        seen[(name, lang)] = (stream, hls.audio_tracks(master.text) if master else [])
-        return offer if alive else _unverified(offer)
+        seen[(name, lang)] = (found.stream, found.tracks)
+        return found.offer
 
     loop = asyncio.get_running_loop()
     started = loop.time()

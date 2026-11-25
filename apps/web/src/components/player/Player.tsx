@@ -32,6 +32,8 @@ import { SubtitleOverlay } from "./SubtitleOverlay";
 import type { SubtitleStyle } from "./subtitleStyle";
 import { useCastLink } from "./useCastLink";
 import { useHls } from "./useHls";
+import { useLanguageSwitch } from "./useLanguageSwitch";
+import { warmLanguages } from "./useLanguages";
 import { usePlayback } from "./usePlayback";
 import { usePlayerKeys } from "./usePlayerKeys";
 import { useDroppedPrompt } from "./useDroppedPrompt";
@@ -50,6 +52,8 @@ type Props = {
   /** Sorted episode numbers the source has, used for the next episode. May be empty. */
   episodes: number[];
   lang: Lang;
+  /** Audio to start on for this play ("original" or a dub's language), set by the Language menu. */
+  audio?: string;
   /** Seconds to start from: the saved position, or where a source or sub/dub switch left off. */
   startAt: number;
   /** Saved subtitle choice: a language code, "off", or null for automatic. */
@@ -85,9 +89,11 @@ export function Player(props: Props) {
   const started = useRef(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const playback = usePlayback(source, animeId, episode, lang);
+  const playback = usePlayback(source, animeId, episode, lang, props.audio);
   const { attempt, url, kind, tracks, fonts, answered, answeredLang, ownSkips, defaultAudio, maxHeight, error, setError } = playback;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The list the settings open on: the language button opens the Language menu directly.
+  const [settingsView, setSettingsView] = useState<"main" | "language">("main");
   // Every source and sub/dub that has this episode, for the source menu.
   const [streams, setStreams] = useState<StreamChoice[]>([]);
   // The menu is only asked for once the stream has loaded (or failed, or the menu is opened),
@@ -161,8 +167,12 @@ export function Player(props: Props) {
   // Near the end, have the API resolve the next episode so pressing next (or auto-next) is quick.
   const nearEnd = next !== undefined && duration > 0 && current > Math.max(duration - WARM_NEXT_SECONDS, duration / 2);
   useEffect(() => {
-    if (nearEnd && next !== undefined) warmPlayback(source, animeId, next, lang);
-  }, [nearEnd, source, animeId, next, lang]);
+    if (nearEnd && next !== undefined) {
+      warmPlayback(source, animeId, next, lang);
+      // Rooms keep their own source menu for now.
+      if (!room) warmLanguages(animeId, next);
+    }
+  }, [nearEnd, source, animeId, next, lang, room]);
   const backHref = `/anime/${animeId}`;
   const dropped = useDroppedPrompt(animeId);
   const { save, onTime } = useProgressSaver(video, animeId, episode, dropped.check);
@@ -205,6 +215,22 @@ export function Player(props: Props) {
       cancelled = true;
     };
   }, [animeId, episode, wantStreams]);
+
+  // The Language menu. A room keeps its source menu: there the host's pick has to move everyone.
+  const language = useLanguageSwitch({
+    animeId,
+    episode,
+    enabled: wantStreams && !room,
+    loaded: url !== null,
+    now: { audioTracks: hls.audioTracks, audioTrack: hls.audioTrack, subtitles: tracks, subtitle: selected, source: answered, lang: answeredLang },
+    heights: hls.qualities.map((q) => q.height),
+    chooseAudio,
+    chooseSubtitle: subtitles.chooseTrack,
+    showSubtitle: subtitles.showTrack,
+    position: () => video.current?.currentTime ?? current,
+    reload: (href) => router.replace(href),
+    onPicked: () => setSettingsOpen(false),
+  });
 
   // Whole seconds, so the small corrections players make to the length don't ask again.
   const length = url && Number.isFinite(duration) && duration > 0 ? Math.round(duration) : 0;
@@ -455,7 +481,21 @@ export function Player(props: Props) {
               v.volume = level;
               v.muted = v.volume === 0;
             }}
-            onToggleSettings={() => setSettingsOpen((o) => !o)}
+            onToggleSettings={() => {
+              setSettingsView("main");
+              setSettingsOpen((o) => !o);
+            }}
+            language={
+              language.offered
+                ? {
+                    label: language.label,
+                    onOpen: () => {
+                      setSettingsView("language");
+                      setSettingsOpen(true);
+                    },
+                  }
+                : null
+            }
             comments={
               commentScope
                 ? { open: commentsOpen, fresh: (commentSummary?.total ?? 0) > 0, onToggle: () => (commentsOpen ? closeComments() : openComments()) }
@@ -500,6 +540,10 @@ export function Player(props: Props) {
             className="absolute inset-0 cursor-default"
           />
           <SettingsMenu
+            key={settingsView}
+            languages={!room && language.listed ? language.rows() : null}
+            languageName={language.label}
+            initialView={settingsView}
             qualities={hls.qualities}
             quality={hls.quality}
             onQuality={hls.chooseQuality}
@@ -537,6 +581,18 @@ export function Player(props: Props) {
           >
             {t(skip.kind === "intro" ? "skipIntro" : skip.kind === "recap" ? "skipRecap" : "skipOutro")}
           </button>
+        </div>
+      )}
+
+      {language.notice && !error && (
+        <div
+          role="status"
+          className="pointer-events-none absolute left-1/2 top-[calc(5rem+env(safe-area-inset-top))] flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-2xl border border-line bg-surface px-4 py-2.5 text-sm text-fg"
+        >
+          {language.notice.busy && (
+            <span aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-line-strong border-t-accent motion-reduce:animate-none" />
+          )}
+          <span>{language.notice.text}</span>
         </div>
       )}
 

@@ -44,11 +44,17 @@ export function useSubtitles(tracks: Track[], savedLang: string | null, savedSty
     void api.PATCH("/me", { body: { subtitle_lang: lang } }).catch(() => undefined);
   }
 
+  /** Shows a track for this stream only, without saving it as the viewer's choice (a dub
+   * picked from the Language menu turns subtitles off just here). */
+  function showTrack(index: number) {
+    setPicked({ tracks, index });
+  }
+
   function changeStyle(next: SubtitleStyle) {
     setStyle(next);
     // Best effort, like the subtitle language: the look still applies to this episode.
     void api.PUT("/watch/preferences", { body: next }).catch(() => undefined);
   }
 
-  return { selected, styled, onAssFail, chooseTrack, style, changeStyle };
+  return { selected, styled, onAssFail, chooseTrack, showTrack, style, changeStyle };
 }
