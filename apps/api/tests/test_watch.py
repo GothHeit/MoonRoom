@@ -264,6 +264,27 @@ async def test_fallback_needs_a_matching_episode_list_and_is_reported(client, se
     assert r.json()["source"] == "other"
 
 
+@respx.mock
+async def test_a_source_that_could_not_play_leaves_the_episode_menu(client, session):
+    _, headers = await make_user(session, "kafka")
+    mock_details()
+    fastapi_app.state.sources = {"fake": Gone(), "other": OtherSeason(3)}
+    before = await client.get("/watch/options/21/2", headers=headers)
+    assert {"source": "fake", "lang": "sub"} in before.json()
+
+    # It lists the episode but has no stream for it: the other source answers instead.
+    r = await client.post("/watch/fake/21/episodes/2/play", headers=headers)
+    assert r.json()["source"] == "other"
+
+    after = await client.get("/watch/options/21/2", headers=headers)
+    assert {"source": "fake", "lang": "sub"} not in after.json()
+    assert {"source": "fake", "lang": "dub"} in after.json()
+    # Other episodes still offer it.
+    assert {"source": "fake", "lang": "sub"} in (
+        await client.get("/watch/options/21/3", headers=headers)
+    ).json()
+
+
 class Thumbs(FakeSource):
     async def episodes(self, anime, lang):
         return EpisodeList([1, 2], "x", {2: "https://img.example/2.jpg"})

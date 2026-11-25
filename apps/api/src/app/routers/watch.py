@@ -51,6 +51,8 @@ OPTION_PROBE_TIMEOUT = 8.0
 # How long a source menu is reused for the same episode. Sources gain episodes when they air,
 # not from one minute to the next.
 OPTIONS_TTL = 600
+# How long a source that couldn't play an episode stays out of that episode's source menu.
+UNPLAYABLE_TTL = 600
 LANGS: tuple[Lang, ...] = ("sub", "dub")
 # Streams resolved ahead of a play (the title page's next episode, the one after the episode
 # playing) at once. Warming is a bonus: when this many are running, more requests are dropped.
@@ -65,6 +67,11 @@ class WatchCaches:
             maxsize=4096, ttl=OPTIONS_TTL
         )
         self.option_flights: SingleFlight[tuple[int, int], list[StreamOption]] = SingleFlight()
+        # (anime, episode, source, lang) that listed the episode but had no stream for it, or
+        # a dead one, so the menu stops offering a choice that would only fall back.
+        self.unplayable: TTLCache[tuple[int, int, str, str], bool] = TTLCache(
+            maxsize=4096, ttl=UNPLAYABLE_TTL
+        )
         self.preparing: set[tuple] = set()
         # The loop only holds tasks weakly: keep them here until they finish.
         self.tasks: set[asyncio.Task] = set()
@@ -201,6 +208,7 @@ async def _resolve_stream(
     requested = _source(request, source)
     names = [source] + [n for n in request.app.state.sources if n != source]
     probes: StreamProbes = request.app.state.probes
+    unplayable = request.app.state.watch.unplayable
     expected: int | None = None
     failed = False
     unchecked: tuple[str, Stream] | None = None
@@ -221,15 +229,18 @@ async def _resolve_stream(
             failed = True
             continue
         if stream is None:
+            unplayable[(anime["id"], episode, name, lang)] = True
             continue
         if fresh:
             probes.forget(stream.url, stream.upstream_headers.get("Referer", ""))
         alive = await _stream_alive(probes, stream)
         if alive:
+            unplayable.pop((anime["id"], episode, name, lang), None)
             return name, stream
         if alive is None:
             unchecked = unchecked or (name, stream)
         else:
+            unplayable[(anime["id"], episode, name, lang)] = True
             logger.warning(
                 "Source %s gave a dead stream for MAL %s ep %s", name, anime.get("id"), episode
             )
@@ -298,9 +309,27 @@ async def options(request: Request, anime_id: AnimeId, episode: PlayableEpisode,
     anime = await request.app.state.mal.visible_details(anime_id, user.show_nsfw)
     caches: WatchCaches = request.app.state.watch
     key = (anime_id, episode)
-    if (found := caches.options.get(key)) is not None:
-        return found
-    return await caches.option_flights.run(key, lambda: _probe_options(request, anime, episode))
+    found = caches.options.get(key)
+    if found is None:
+        found = await caches.option_flights.run(
+            key, lambda: _probe_options(request, anime, episode)
+        )
+    return playable_options(found, caches.unplayable, anime_id, episode)
+
+
+def playable_options(
+    menu: list[StreamOption], unplayable: TTLCache, anime_id: int, episode: int
+) -> list[StreamOption]:
+    """The menu without the sources that just failed to play this episode, so picking one
+    never quietly falls back to another. Automatic stays only while there is a choice."""
+    kept = [
+        o
+        for o in menu
+        if o.source == AUTO or (anime_id, episode, o.source, o.lang) not in unplayable
+    ]
+    if sum(o.source != AUTO for o in kept) < 2:
+        kept = [o for o in kept if o.source != AUTO]
+    return kept
 
 
 async def _probe_options(request: Request, anime: dict, episode: int) -> list[StreamOption]:

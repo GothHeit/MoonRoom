@@ -14,6 +14,7 @@ import { watchHref, type Lang, type StreamChoice } from "@/lib/watch-target";
 import { CommentsPanel } from "@/components/comments/CommentsPanel";
 import { usePartSummary } from "@/components/comments/usePartSummary";
 import { RoomNotices } from "@/components/room/RoomNotices";
+import { recentFollow, useFollowFallback } from "@/components/room/useFollowFallback";
 import { useRoomSync, type RoomBinding } from "@/components/room/useRoomSync";
 
 import { useAutoNext } from "./autoNext";
@@ -134,6 +135,18 @@ export function Player(props: Props) {
   const playingName = streamLabel(names, playingFrom);
   // In a room only the host moves everyone to another stream.
   const canSwitchStream = !room || room.switchStream !== undefined;
+  // The room's stream couldn't play for the host: the room moves to the one that did.
+  const following = useFollowFallback({
+    room,
+    animeId,
+    episode,
+    asked: { source, lang },
+    playing: playingFrom,
+    ready: url !== null,
+    automatic,
+  });
+  // Set when the room just moved here because its stream couldn't play: said once, over the video.
+  const [moved] = useState(() => recentFollow(animeId, episode));
   const audioNames = hls.audioTracks.map((a) => ({ ...a, label: languageName(a.lang, locale) ?? a.label }));
 
   // The audio the viewer picks is the one they will want next time: the automatic choice and
@@ -461,11 +474,16 @@ export function Player(props: Props) {
           onUnblock={sync.unblock}
           controlsShown={shown}
           otherSource={
-            url && !automatic && answered !== source
+            url && !automatic && !following && !sameStream(playingFrom, { source, lang })
               ? {
                   room: streamLabel(names, { source, lang }),
                   onMove: room.switchStream ? () => void room.switchStream?.(playingFrom) : undefined,
                 }
+              : undefined
+          }
+          moved={
+            moved
+              ? t("roomFollowedFallback", { failed: streamLabel(names, moved.failed), playing: streamLabel(names, moved.playing) })
               : undefined
           }
           debug={room.debug && { stats: sync.stats, ...room.debug }}

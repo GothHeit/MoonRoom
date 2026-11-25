@@ -55,6 +55,7 @@
     "roomTapToJoin": "Entrar no vídeo da sala",
     "roomTapHint": "Seu navegador precisa de um toque para começar.",
     "roomOtherSource": "A sala usa {room}, então você pode ficar um pouco fora de sincronia.",
+    "roomFollowedFallback": "{failed} não conseguiu tocar este episódio, então a sala passou todo mundo para {playing}.",
     "roomMoveEveryone": "Trazer todos para cá",
     "roomDismiss": "Ocultar aviso",
     "syncDebug": "Sincronia",

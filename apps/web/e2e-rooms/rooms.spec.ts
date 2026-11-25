@@ -8,15 +8,19 @@ import { signIn } from "../e2e/helpers";
 const CLIP = readFileSync(join(__dirname, "../e2e/fixtures/clip.webm"));
 const SYNC_TOLERANCE = 1.6;
 
-async function stubVideo(page: Page) {
+/** `answers` says which stream plays for each one asked (by "source:lang"); unset plays the asked one. */
+async function stubVideo(page: Page, answers: Record<string, string> = {}) {
   await page.route(/\/api\/proxy\/watch\/zoko\/\d+\/episodes(\?|$)/, (route) =>
     route.fulfill({ json: { source: "zoko", source_title: "Test", episodes: [1, 2, 3], thumbnails: {} } }),
   );
-  await page.route(/\/api\/proxy\/watch\/zoko\/\d+\/episodes\/\d+\/play/, (route) =>
-    route.fulfill({
-      json: { source: "zoko", kind: "mp4", resolution: null, url: "/watch/video?token=clip", subtitles: [], skips: [] },
-    }),
-  );
+  await page.route(/\/api\/proxy\/watch\/\w+\/\d+\/episodes\/\d+\/play/, (route) => {
+    const url = new URL(route.request().url());
+    const asked = `${url.pathname.split("/").at(-5)}:${url.searchParams.get("lang") ?? "sub"}`;
+    const [source, lang] = (answers[asked] ?? asked).split(":");
+    return route.fulfill({
+      json: { source, lang, kind: "mp4", resolution: null, url: "/watch/video?token=clip", subtitles: [], skips: [] },
+    });
+  });
   await page.route(/\/api\/proxy\/watch\/options\/\d+\/\d+/, (route) =>
     route.fulfill({ json: [{ source: "zoko", lang: "sub" }, { source: "zoko", lang: "dub" }] }),
   );
@@ -42,11 +46,11 @@ test.afterEach(async () => {
   await Promise.all(contexts.splice(0).map((c) => c.close()));
 });
 
-async function viewer(browser: Browser, username: string): Promise<Page> {
+async function viewer(browser: Browser, username: string, answers: Record<string, string> = {}): Promise<Page> {
   const context = await browser.newContext();
   contexts.push(context);
   const page = await context.newPage();
-  await stubVideo(page);
+  await stubVideo(page, answers);
   await signIn(page, "en", username);
   return page;
 }
@@ -120,6 +124,29 @@ test("the host switches everyone to another source where the room is", async ({ 
   await host.getByRole("radio", { name: "Zoko · English dub" }).click();
   await reloaded;
   await expect.poll(() => time(guest)).toBeGreaterThan(14);
+  await expectInSync(host, guest);
+});
+
+test("a stream that can't play for the host moves the room to the one that did", async ({ browser }) => {
+  // The dub can't play here: the API answers with the sub instead.
+  const host = await viewer(browser, "alice", { "zoko:dub": "zoko:sub" });
+  const guest = await viewer(browser, "bob");
+  const code = await createRoom(host);
+  await enter(host, code);
+  await enter(guest, code);
+  await expect(host.getByRole("button", { name: /People, 2 watching/ })).toBeVisible();
+
+  const reloaded = guest.waitForRequest(/\/episodes\/1\/play\?lang=sub/);
+  await host.getByRole("button", { name: "Settings" }).click();
+  await host.getByRole("button", { name: /^Source/ }).click();
+  const dub = host.waitForRequest(/\/episodes\/1\/play\?lang=dub/);
+  await host.getByRole("radio", { name: "Zoko · English dub" }).click();
+  await dub;
+  await expect(host.getByText("Zoko · English dub couldn't play this episode, so the room moved everyone to Zoko · Subtitled.")).toBeVisible();
+  await reloaded;
+  // Everyone ends up on the stream that plays, so nobody is told they are out of step.
+  await expect(host.getByText(/The room plays/)).toHaveCount(0);
+  await expect(guest.getByText(/The room plays/)).toHaveCount(0);
   await expectInSync(host, guest);
 });
 

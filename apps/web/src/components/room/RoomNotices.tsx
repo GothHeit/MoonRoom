@@ -15,14 +15,25 @@ type Props = {
   controlsShown: boolean;
   /** Set when this viewer's video comes from another source than the room's. */
   otherSource?: { room: string; onMove?: () => void };
+  /** Set when the room just moved here because its stream couldn't play: what to tell the host. */
+  moved?: string;
   /** Set to show the sync numbers (the room page opened with ?debug=sync). */
   debug?: { stats: RefObject<SyncStats>; offset: () => number; rtt: () => number | null };
 };
 
+/** How long the host is told why the room moved to another source. */
+const MOVED_MS = 10_000;
+
 /** What a room viewer may need to see over the video: a tap to start, a source mismatch, sync numbers. */
-export function RoomNotices({ blocked, onUnblock, controlsShown, otherSource, debug }: Props) {
+export function RoomNotices({ blocked, onUnblock, controlsShown, otherSource, moved, debug }: Props) {
   const t = useTranslations("player");
   const [dismissed, setDismissed] = useState(false);
+  const [movedShown, setMovedShown] = useState(moved !== undefined);
+  useEffect(() => {
+    if (!movedShown) return;
+    const id = setTimeout(() => setMovedShown(false), MOVED_MS);
+    return () => clearTimeout(id);
+  }, [movedShown]);
   return (
     <>
       {blocked && (
@@ -37,6 +48,23 @@ export function RoomNotices({ blocked, onUnblock, controlsShown, otherSource, de
             </button>
             <p className="text-sm text-muted">{t("roomTapHint")}</p>
           </div>
+        </div>
+      )}
+      {moved && movedShown && !otherSource && (
+        // Says once why the source changed, then goes; it can be closed sooner.
+        <div
+          role="status"
+          className="absolute left-4 right-4 top-20 z-10 flex items-center gap-2 rounded-ui border border-line bg-surface py-1.5 pl-4 pr-1.5 text-sm sm:left-8 sm:right-auto sm:max-w-xl"
+        >
+          <p className="min-w-0 flex-1 text-soft">{moved}</p>
+          <button
+            type="button"
+            onClick={() => setMovedShown(false)}
+            aria-label={t("roomDismiss")}
+            className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-line hover:text-fg"
+          >
+            <PlayerIcon name="close" />
+          </button>
         </div>
       )}
       {otherSource && !dismissed && (

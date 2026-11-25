@@ -17,6 +17,7 @@ import { useProgressSaver } from "@/components/player/useProgressSaver";
 import { useSkips } from "@/components/player/useSkips";
 import { useSubtitles } from "@/components/player/useSubtitles";
 import { togglePlayback } from "@/components/player/useVideoControls";
+import { useFollowFallback } from "@/components/room/useFollowFallback";
 import { useRoomSync, type RoomBinding } from "@/components/room/useRoomSync";
 import { useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
@@ -149,6 +150,16 @@ export function TvPlayer(props: Props) {
   const playingName = streamLabel(names, playingFrom);
   // In a room only the host moves everyone to another stream.
   const canSwitchStream = !room || room.switchStream !== undefined;
+  // The room's stream couldn't play for the host: the room moves to the one that did.
+  const following = useFollowFallback({
+    room,
+    animeId,
+    episode,
+    asked: { source, lang },
+    playing: playingFrom,
+    ready: url !== null,
+    automatic,
+  });
   const audioNames = hls.audioTracks.map((a) => ({ ...a, label: languageName(a.lang, locale) ?? a.label }));
   const titleHref = tvHref(`/anime/${animeId}`);
 
@@ -446,7 +457,7 @@ export function TvPlayer(props: Props) {
   const panelTitle: Record<Panel, string> = { subtitles: t("subtitles"), audio: t("audio"), source: canSwitchStream ? t("source") : t("settings.quality") };
   const others = canSwitchStream ? streams.filter((s) => !sameStream(s, { source, lang })) : [];
   // This TV's video comes from another source than the room's, so it may not line up exactly.
-  const otherSource = room && url && !automatic && answered !== source ? streamLabel(names, { source, lang }) : null;
+  const otherSource = room && url && !automatic && !following && !sameStream(playingFrom, { source, lang }) ? streamLabel(names, { source, lang }) : null;
   const sourceLine = automatic ? t("autoPlaying", { stream: playingName }) : playingName;
 
   return (

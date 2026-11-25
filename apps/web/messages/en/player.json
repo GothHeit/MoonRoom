@@ -55,6 +55,7 @@
     "roomTapToJoin": "Join the room's video",
     "roomTapHint": "Your browser needs a tap to start playing.",
     "roomOtherSource": "The room plays {room}, so you may be slightly out of step.",
+    "roomFollowedFallback": "{failed} couldn't play this episode, so the room moved everyone to {playing}.",
     "roomMoveEveryone": "Move everyone here",
     "roomDismiss": "Hide this notice",
     "syncDebug": "Sync",
