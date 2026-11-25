@@ -48,7 +48,7 @@ CHECK_DEADLINE = 12.0
 # Requests at once to one source from these checks.
 PER_SOURCE = 2
 # Versioned: a change to what is stored gets a new name, so old entries are never misread.
-NAMESPACE = "episode-offers-v1"
+NAMESPACE = "episode-offers-v2"
 
 
 @dataclass(frozen=True)

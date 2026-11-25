@@ -136,6 +136,9 @@ that folder before the first start so the API (which runs unprivileged) can writ
 `VIDEO_SOURCES` lists unlicensed sources and is meant for this private deployment only. Leave it
 empty for anything public or any store build. `PT_SYNOPSIS_SCRAPE` is the same kind of switch: it
 fetches Portuguese synopses from an unlicensed site, so keep it `false` outside this deployment.
+`OPENSUBTITLES_USER_AGENT` turns on Brazilian Portuguese subtitles from OpenSubtitles for
+episodes whose sharp copy has none: each file is synced to the copy's own track and only offered
+when it fits. Machine-translated files are never used. Keep it empty outside this deployment.
 
 Unless a viewer picks a source by hand in the player, each episode plays from the best version
 for them across every enabled source, in this order: playable, their audio (a dub in the language

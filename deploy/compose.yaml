@@ -55,6 +55,7 @@ services:
       MANGA_CACHE_DIR: /data/manga-pages
       MANGA_CACHE_MAX_MB: ${MANGA_CACHE_MAX_MB:-20480}
       PT_SYNOPSIS_SCRAPE: ${PT_SYNOPSIS_SCRAPE:-false}
+      OPENSUBTITLES_USER_AGENT: ${OPENSUBTITLES_USER_AGENT:-}
       # Only Caddy can reach the API, and it writes the real client address.
       TRUST_PROXY_HEADERS: "true"
       API_DOCS: "false"

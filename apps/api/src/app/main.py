@@ -125,6 +125,17 @@ async def lifespan(app: FastAPI):
         app.state.watch = watch.WatchCaches()
         app.state.language_checks = LanguageChecks(app.state.shared_cache)
         app.state.sources = load_sources(settings.video_source_names)
+        app.state.pt_subtitles = None
+        if settings.opensubtitles_user_agent:
+            from app import extsubs
+
+            site = extsubs.OpenSubtitles(
+                http, app.state.shared_cache, settings.opensubtitles_user_agent
+            )
+            app.state.pt_subtitles = extsubs.PortugueseSubtitles(http, app.state.shared_cache, site)
+            app.state.sources = extsubs.with_portuguese_subtitles(
+                app.state.sources, app.state.pt_subtitles
+            )
         app.state.manga_sources = load_manga_sources(
             settings.manga_source_names, app.state.shared_cache
         )

@@ -103,6 +103,11 @@ class Settings(BaseSettings):
     # The single-folder form of the same setting, still read (listed first).
     local_library_dir: str = ""
 
+    # Brazilian Portuguese subtitles from OpenSubtitles for episodes whose sharp copy has none,
+    # fitted to that copy (app.extsubs). The user agent its old public interface knows, such as
+    # "TemporaryUserAgent"; empty turns the feature off. Private deployments only.
+    opensubtitles_user_agent: str = ""
+
     # Manga sources to enable, by name and in order of preference (e.g. "mangadex").
     manga_sources: str = ""
     # Chapter pages fetched once are kept here, up to MANGA_CACHE_MAX_MB, oldest-read first out.

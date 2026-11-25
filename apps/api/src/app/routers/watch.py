@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import hls
+from app import extsubs, hls
 from app.choose import Picked, audio_to_start, resolve_auto, union_episodes
 from app.deps import CurrentSessionId, CurrentUser, Session, session_check, throttle
 from app.errors import ApiError
@@ -779,6 +779,8 @@ async def hls_proxy(
             headers={"cache-control": "no-store"},
         )
 
+    if u is not None and k == "sub" and url.startswith(extsubs.SCHEME):
+        return await _fitted_subtitles(request, url)
     if url.startswith("file:"):
         return await asyncio.to_thread(_serve_local, url, viewer)
     if u is None:
@@ -851,6 +853,20 @@ async def hls_proxy(
 
     return StreamingResponse(
         body(), status_code=upstream.status_code, media_type=media_type, headers=passthrough
+    )
+
+
+async def _fitted_subtitles(request: Request, link: str) -> Response:
+    """A pt-BR track fitted to this copy (app.extsubs), from the cache."""
+    found, start = hls.split_start(link)
+    pt_subtitles = request.app.state.pt_subtitles
+    vtt = await pt_subtitles.vtt(found) if pt_subtitles is not None else None
+    if vtt is None:
+        raise ApiError(404, "not_available", "These subtitles aren't available any more")
+    return Response(
+        hls.with_timestamp_map(vtt, start) if start else vtt,
+        media_type="text/vtt",
+        headers={"x-content-type-options": "nosniff"},
     )
 
 
