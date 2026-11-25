@@ -16,6 +16,11 @@ Machine-translated files are never used (kafka turned them down), whatever the f
 
 What is found is kept in the shared cache: the fitted track for two weeks (per source, since
 each source's copy can start at a different time), a miss for a day.
+
+A lookup never slows playback much: only a play waits for one, at most FIRST_WAIT, and nothing
+waits while OpenSubtitles is failing (a breaker skips it for a while). Everything else (the
+master playlist, the Language menu's check, warming the next episode) starts the lookup in the
+background and moves on.
 """
 
 import asyncio
@@ -24,9 +29,12 @@ import re
 import zlib
 from bisect import bisect_left, bisect_right
 from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from statistics import median
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 
 import httpx
 from cachetools import TTLCache
@@ -49,14 +57,24 @@ LABEL = "Português (Brasil) · OpenSubtitles"
 LANG = "pt-BR"
 
 API = "https://rest.opensubtitles.org"
-SEARCH_TIMEOUT = 10.0
-DOWNLOAD_TIMEOUT = 15.0
+SEARCH_TIMEOUT = 8.0
+DOWNLOAD_TIMEOUT = 8.0
+# The longest a whole lookup (search, the copy's track, a few files) may run in the background.
+LOOKUP_DEADLINE = 30.0
+# After OpenSubtitles fails or times out, no lookup is started for this long.
+BREAKER_SECONDS = 900.0
+MAX_REDIRECTS = 3
 # A compressed subtitle file is tens of kilobytes; anything far larger isn't one.
 MAX_DOWNLOAD = 1024 * 1024
 MAX_TEXT = 4 * 1024 * 1024
 # Files tried per episode, best first.
 MAX_CANDIDATES = 3
 FORMATS = {"srt", "vtt", "ass", "ssa"}
+
+# How long a lookup may hold up the stream being resolved. Only a play sets it (`waiting`).
+_WAIT: ContextVar[float] = ContextVar("pt_subtitle_wait", default=0.0)
+# Sources whose lookup was still running, for a check that wants to know (`noting_pending`).
+_PENDING: ContextVar[list[str] | None] = ContextVar("pt_subtitle_pending", default=None)
 
 # How long the first look for an episode may hold up a play. It goes on in the background
 # after that, and the next play (or the next episode warmed ahead) has it.
@@ -68,7 +86,7 @@ MISS_TTL = 24 * 3600
 ERROR_TTL = 600
 # Versioned: a change to what is stored gets a new name, so old entries are never misread.
 SEARCH_NS = "opensubtitles-search-v1"
-TRACK_NS = "pt-subtitle-fit-v1"
+TRACK_NS = "pt-subtitle-fit-v2"
 
 # Two starts this close count as the same line.
 MATCH = 0.2
@@ -76,10 +94,15 @@ MATCH = 0.2
 MAX_SHIFT = 600.0
 BIN = 0.1
 # A fit is offered when this share of the lines meets the copy's track, and at least this many.
-MIN_RATIO = 0.4
+MIN_RATIO = 0.5
 MIN_MATCHED = 15
-# A fit in two pieces is used when it places this many more of the lines.
-SPLIT_GAIN = 0.05
+# Shifts tried per file, and the lines one must place to be tried.
+MAX_PIECES = 4
+MIN_PIECE = 5
+# What changing shift costs, in lines: a new piece starts only where it places more than this.
+SWITCH = 3.5
+# This many lines in a row that meet nothing are left out rather than shown at a guess.
+DROP_RUN = 6
 
 # Words that say a file was made by a translation engine. "IA"/"AI" only in capitals: "ia" is
 # a common Portuguese word.
@@ -114,17 +137,25 @@ class Cue:
 
 @dataclass(frozen=True)
 class Fit:
-    # Seconds added to every cue, and the cue time after which `late_shift` applies instead.
-    shift: float
+    # (cue time it starts at, seconds added) for each piece of the file, in order: one piece
+    # when the file only starts at another time, more when a scene was cut or moved.
+    pieces: tuple[tuple[float, float], ...]
     matched: int
     ratio: float
-    split: float | None = None
-    late_shift: float | None = None
+    # Cues left out: long runs that meet nothing on the copy's track (sung lyrics, or a stretch
+    # that can't be placed with confidence).
+    dropped: frozenset[int] = frozenset()
+
+    @property
+    def shift(self) -> float:
+        return self.pieces[0][1]
 
     def place(self, t: float) -> float:
-        if self.split is not None and self.late_shift is not None and t >= self.split:
-            return t + self.late_shift
-        return t + self.shift
+        moved = self.pieces[0][1]
+        for begins, shift in self.pieces:
+            if t >= begins:
+                moved = shift
+        return t + moved
 
 
 # --- Reading subtitle files --------------------------------------------------------------
@@ -220,41 +251,21 @@ def _timestamp(t: float) -> str:
 
 
 def _escape(text: str) -> str:
-    text = text.replace("&", "&amp;")
+    text = text.replace("&", "&amp;").replace("-->", "--&gt;")
     return re.sub(rf"<(?!{ALLOWED_TAG})", "&lt;", text)
 
 
 def to_vtt(cues: list[Cue]) -> str:
     lines = ["WEBVTT", ""]
     for cue in cues:
-        lines += [f"{_timestamp(cue.start)} --> {_timestamp(cue.end)}", _escape(cue.text), ""]
+        # A blank line would end the cue early.
+        text = "\n".join(line for line in _escape(cue.text).split("\n") if line.strip())
+        if text:
+            lines += [f"{_timestamp(cue.start)} --> {_timestamp(cue.end)}", text, ""]
     return "\n".join(lines)
 
 
 # --- Fitting a file to the copy ----------------------------------------------------------
-
-
-def _best_shift(starts: list[float], reference: list[float]) -> float | None:
-    """The shift that makes the most of `starts` meet a start in `reference`."""
-    votes: Counter[int] = Counter()
-    for t in starts:
-        lo = bisect_left(reference, t - MAX_SHIFT)
-        hi = bisect_right(reference, t + MAX_SHIFT)
-        for r in reference[lo:hi]:
-            votes[round((r - t) / BIN)] += 1
-    if not votes:
-        return None
-    best = max(votes, key=lambda b: (votes[b - 1] + votes[b] + votes[b + 1], votes[b]))
-    near = [
-        r - t
-        for t in starts
-        for r in reference[
-            bisect_left(reference, t + best * BIN - 0.25) : bisect_right(
-                reference, t + best * BIN + 0.25
-            )
-        ]
-    ]
-    return median(near) if near else best * BIN
 
 
 def _hits(starts: list[float], reference: list[float], shift: float) -> list[bool]:
@@ -267,42 +278,96 @@ def _hits(starts: list[float], reference: list[float], shift: float) -> list[boo
     return hits
 
 
+def _shifts(starts: list[float], reference: list[float]) -> list[float]:
+    """The shifts that place a good number of lines: the main one first, then the shifts of
+    pieces that moved (a cold open cut differently, a recap left out)."""
+    votes: Counter[int] = Counter()
+    for t in starts:
+        lo = bisect_left(reference, t - MAX_SHIFT)
+        hi = bisect_right(reference, t + MAX_SHIFT)
+        for r in reference[lo:hi]:
+            votes[round((r - t) / BIN)] += 1
+    smooth = {b: votes[b - 1] + votes[b] + votes[b + 1] for b in votes}
+    found: list[float] = []
+    for b in sorted(smooth, key=lambda b: (-smooth[b], -votes[b])):
+        if len(found) == MAX_PIECES or smooth[b] < MIN_PIECE:
+            break
+        if any(abs(b * BIN - f) < 1.0 for f in found):
+            continue
+        near = [
+            r - t
+            for t in starts
+            for r in reference[
+                bisect_left(reference, t + b * BIN - 0.25) : bisect_right(
+                    reference, t + b * BIN + 0.25
+                )
+            ]
+        ]
+        found.append(median(near) if near else b * BIN)
+    return found
+
+
 def fit(cues: list[Cue], reference: list[Cue]) -> Fit | None:
     """How to move `cues` onto the copy whose own track is `reference`, or None when they don't
-    fit it well enough to be the same episode and cut."""
-    starts = sorted(c.start for c in cues)
+    fit it well enough to be the same episode and cut.
+
+    Each line is placed by one of a few candidate shifts; which shift holds where is chosen for
+    the whole file at once (Viterbi), with a cost for changing shift, so a new piece only starts
+    where it places several lines the current shift can't."""
+    order = sorted(range(len(cues)), key=lambda i: cues[i].start)
+    starts = [cues[i].start for i in order]
     ref = sorted(c.start for c in reference)
     if len(starts) < MIN_MATCHED or len(ref) < MIN_MATCHED:
         return None
-    whole = _best_shift(starts, ref)
-    if whole is None:
+    shifts = _shifts(starts, ref)
+    if not shifts:
         return None
-    base = len(starts) if len(starts) < len(ref) else len(ref)
-    hits = _hits(starts, ref, whole)
-    best = Fit(whole, sum(hits), sum(hits) / base)
+    hits = [_hits(starts, ref, shift) for shift in shifts]
+    k = len(shifts)
+    # score[j]: best total ending on shift j; back[i][j]: the shift before it.
+    score = [float(hits[j][0]) for j in range(k)]
+    back: list[list[int]] = [list(range(k))]
+    for i in range(1, len(starts)):
+        row, new = [], []
+        for j in range(k):
+            prev = max(range(k), key=lambda p: (score[p] - (SWITCH if p != j else 0), p == j))
+            row.append(prev)
+            new.append(score[prev] - (SWITCH if prev != j else 0) + hits[j][i])
+        back.append(row)
+        score = new
+    j = max(range(k), key=lambda j: score[j])
+    path = [j]
+    for i in range(len(starts) - 1, 0, -1):
+        j = back[i][j]
+        path.append(j)
+    path.reverse()
 
-    half = len(starts) // 2
-    early, late = _best_shift(starts[:half], ref), _best_shift(starts[half:], ref)
-    if early is not None and late is not None and abs(early - late) > 0.5:
-        # A cut: find where the second shift takes over, the point placing the most lines.
-        first, second = _hits(starts, ref, early), _hits(starts, ref, late)
-        score = sum(second)
-        top, at = score, 0
-        for i in range(len(starts)):
-            score += first[i] - second[i]
-            if score > top:
-                top, at = score, i + 1
-        if 0 < at < len(starts) and top - best.matched >= SPLIT_GAIN * len(starts):
-            best = Fit(early, top, top / base, starts[at], late)
-    if best.matched < MIN_MATCHED or best.ratio < MIN_RATIO:
+    placed = [hits[path[i]][i] for i in range(len(starts))]
+    pieces: list[tuple[float, float]] = []
+    for i, j in enumerate(path):
+        if not pieces or pieces[-1][1] != shifts[j]:
+            pieces.append((starts[i] if pieces else 0.0, shifts[j]))
+    dropped: set[int] = set()
+    run: list[int] = []
+    for i, hit in enumerate([*placed, True]):
+        if hit:
+            if len(run) >= DROP_RUN:
+                dropped.update(order[x] for x in run)
+            run = []
+        else:
+            run.append(i)
+    matched = sum(placed)
+    ratio = matched / min(len(starts), len(ref))
+    if matched < MIN_MATCHED or ratio < MIN_RATIO:
         return None
-    return best
+    return Fit(tuple(pieces), matched, ratio, frozenset(dropped))
 
 
 def apply(cues: list[Cue], placed: Fit) -> list[Cue]:
     moved = [
         replace(c, start=placed.place(c.start), end=placed.place(c.start) + (c.end - c.start))
-        for c in cues
+        for i, c in enumerate(cues)
+        if i not in placed.dropped
     ]
     return sorted((c for c in moved if c.end > 0), key=lambda c: c.start)
 
@@ -323,6 +388,8 @@ def _season(anime: dict) -> int:
 def usable(row: dict, anime: dict, episode: int) -> bool:
     """A pt-BR file for this episode in a format we read, not made by a machine, for a show
     whose name shares a word with the title's."""
+    if not row.get("IDSubtitleFile") or not isinstance(row.get("SubDownloadLink"), str):
+        return False
     if row.get("SubLanguageID") != "pob" or str(row.get("SeriesEpisode")) != str(episode):
         return False
     if str(row.get("SubAutoTranslation")) == "1" or str(row.get("SubForeignPartsOnly")) == "1":
@@ -330,7 +397,7 @@ def usable(row: dict, anime: dict, episode: int) -> bool:
     credits = f"{row.get('SubTranslator', '')} {row.get('SubAuthorComment', '')}"
     if MACHINE.search(credits) or MACHINE_ACRONYM.search(credits):
         return False
-    if str(row.get("SubSumCD", "1")) != "1" or row.get("SubFormat", "").lower() not in FORMATS:
+    if str(row.get("SubSumCD", "1")) != "1" or str(row.get("SubFormat")).lower() not in FORMATS:
         return False
     link = urlsplit(row.get("SubDownloadLink") or "")
     if link.scheme != "https" or not (link.hostname or "").endswith(".opensubtitles.org"):
@@ -348,9 +415,24 @@ def _slim(row: dict) -> dict:
         "encoding": row.get("SubEncoding") or "",
         "season": str(row.get("SeriesSeason") or ""),
         "trusted": str(row.get("SubFromTrusted")) == "1",
-        "downloads": int(row.get("SubDownloadsCnt") or 0),
+        "downloads": _count(row.get("SubDownloadsCnt")),
         "hearing": str(row.get("SubHearingImpaired")) == "1",
     }
+
+
+def _count(value: object) -> int:
+    try:
+        return int(str(value))
+    except ValueError:
+        return 0
+
+
+def _from_site(url: str) -> bool:
+    link = urlsplit(url)
+    host = link.hostname or ""
+    return link.scheme == "https" and (
+        host == "opensubtitles.org" or host.endswith(".opensubtitles.org")
+    )
 
 
 def _decode(data: bytes, encoding: str) -> str:
@@ -375,6 +457,26 @@ class OpenSubtitles:
         self._searches: SingleFlight[tuple[int, int], list[dict]] = SingleFlight()
         self._downloads: SingleFlight[str, str | None] = SingleFlight()
         self._files: TTLCache[str, str | None] = TTLCache(maxsize=64, ttl=3600)
+        self._down_until = 0.0
+
+    @property
+    def available(self) -> bool:
+        """False for a while after the site failed: lookups aren't started then."""
+        return asyncio.get_running_loop().time() >= self._down_until
+
+    def _failed(self, exc: BaseException) -> None:
+        """Opens the breaker when the failure says the site as a whole is down or refusing us:
+        a timeout, a lost connection, a rate limit, a server error, or a refusal (it answers a
+        captcha with 401 when it blocks downloads). A missing file only fails that lookup."""
+        if isinstance(exc, httpx.HTTPStatusError):
+            code = exc.response.status_code
+            if code not in (401, 403, 429) and code < 500:
+                return
+        elif not isinstance(exc, (TimeoutError, httpx.TransportError)):
+            return
+        if self.available:
+            log.warning("OpenSubtitles failed, skipped for %d min: %r", BREAKER_SECONDS // 60, exc)
+        self._down_until = asyncio.get_running_loop().time() + BREAKER_SECONDS
 
     async def search(self, anime: dict, episode: int) -> list[dict]:
         """The best few pt-BR files for the episode, best first. Raises when the site fails."""
@@ -382,7 +484,11 @@ class OpenSubtitles:
         stored = await self._cache.get(SEARCH_NS, list(key))
         if stored is not None:
             return stored["files"]
-        return await self._searches.run(key, lambda: self._search(anime, episode))
+        try:
+            return await self._searches.run(key, lambda: self._search(anime, episode))
+        except (httpx.HTTPError, TimeoutError) as exc:
+            self._failed(exc)
+            raise
 
     async def _search(self, anime: dict, episode: int) -> list[dict]:
         found: dict[str, dict] = {}
@@ -410,14 +516,40 @@ class OpenSubtitles:
         """A file's text, or None when it can't be read. Raises when the site fails."""
         if file["id"] in self._files:
             return self._files[file["id"]]
-        return await self._downloads.run(file["id"], lambda: self._download(file))
+        try:
+            return await self._downloads.run(file["id"], lambda: self._download(file))
+        except (httpx.HTTPError, TimeoutError) as exc:
+            self._failed(exc)
+            raise
+
+    async def _fetch(self, url: str) -> bytes | None:
+        """A file from the site, read up to MAX_DOWNLOAD; None when larger or sent elsewhere."""
+        for _ in range(MAX_REDIRECTS + 1):
+            if not _from_site(url):
+                return None
+            request = self._http.build_request(
+                "GET", url, headers=self._headers, timeout=DOWNLOAD_TIMEOUT
+            )
+            answer = await self._http.send(request, stream=True, follow_redirects=False)
+            try:
+                if answer.is_redirect and "location" in answer.headers:
+                    url = urljoin(url, answer.headers["location"])
+                    continue
+                answer.raise_for_status()
+                data = bytearray()
+                async for chunk in answer.aiter_raw():
+                    data += chunk
+                    if len(data) > MAX_DOWNLOAD:
+                        return None
+                return bytes(data)
+            finally:
+                await answer.aclose()
+        return None
 
     async def _download(self, file: dict) -> str | None:
-        answer = await self._http.get(file["link"], headers=self._headers, timeout=DOWNLOAD_TIMEOUT)
-        answer.raise_for_status()
-        data = answer.content
+        data = await self._fetch(file["link"]) or b""
         text: str | None = None
-        if len(data) <= MAX_DOWNLOAD:
+        if data:
             try:
                 if data[:2] == b"\x1f\x8b":
                     inflate = zlib.decompressobj(16 + zlib.MAX_WBITS)
@@ -450,12 +582,15 @@ class PortugueseSubtitles:
         self._cache = cache
         self._site = site
         self._fits: SingleFlight[tuple[int, int, str], dict] = SingleFlight()
+        # Lookups going on in the background; the loop only holds tasks weakly.
+        self._tasks: set[asyncio.Task] = set()
 
     async def for_stream(
         self, anime: dict, episode: int, source: str, stream: Stream
     ) -> Subtitle | None:
         """A fitted pt-BR track for this copy, when the copy has none of its own and one is
-        found. The first look waits at most FIRST_WAIT and then goes on in the background."""
+        found. A lookup still running is waited on only as long as `waiting` says (a play), and
+        not at all while the site is failing; it goes on in the background either way."""
         if any(base_lang(s.lang) == "pt" for s in stream.subtitles):
             return None
         ref = reference(stream.subtitles)
@@ -464,17 +599,36 @@ class PortugueseSubtitles:
         key = (int(anime["id"]), episode, source)
         stored: dict | None = await self._cache.get(TRACK_NS, list(key))
         if stored is None:
-            referer = stream.upstream_headers.get("Referer", "")
-            try:
-                stored = await asyncio.wait_for(
-                    self._fits.run(key, lambda: self._find(anime, episode, source, ref, referer)),
-                    FIRST_WAIT,
-                )
-            except TimeoutError:
+            if not self._site.available:
+                # Counted as still looking: the answer may change once the site is back.
+                if (pending := _PENDING.get()) is not None:
+                    pending.append(source)
                 return None
-        if stored is None or not stored.get("vtt"):
+            referer = stream.upstream_headers.get("Referer", "")
+            job = asyncio.ensure_future(
+                self._fits.run(key, lambda: self._find(anime, episode, source, ref, referer))
+            )
+            self._tasks.add(job)
+            job.add_done_callback(self._done)
+            wait = _WAIT.get()
+            try:
+                stored = await asyncio.wait_for(asyncio.shield(job), wait) if wait > 0 else None
+            except TimeoutError:
+                stored = None
+            if stored is None:
+                if (pending := _PENDING.get()) is not None:
+                    pending.append(source)
+                return None
+        if not stored.get("vtt"):
             return None
         return Subtitle(lang=LANG, label=LABEL, url=f"{SCHEME}{key[0]}/{key[1]}/{key[2]}")
+
+    def _done(self, job: asyncio.Future) -> None:
+        self._tasks.discard(job)
+        # Read the outcome, so a lookup that fails after every waiter gave up isn't reported as
+        # "exception was never retrieved".
+        if not job.cancelled() and (exc := job.exception()) is not None:
+            log.info("pt-BR subtitle lookup failed: %r", exc)
 
     async def vtt(self, link: str) -> str | None:
         """The fitted track a link names, while it is cached."""
@@ -491,7 +645,9 @@ class PortugueseSubtitles:
     ) -> dict:
         key = [int(anime["id"]), episode, source]
         try:
-            stored, ttl = await self._fit_best(anime, episode, source, ref, referer)
+            stored, ttl = await asyncio.wait_for(
+                self._fit_best(anime, episode, source, ref, referer), LOOKUP_DEADLINE
+            )
         except (httpx.HTTPError, TimeoutError, ApiError, ValueError) as exc:
             log.info(
                 "pt-BR subtitles for MAL %s ep %s on %s: lookup failed: %r",
@@ -523,9 +679,9 @@ class PortugueseSubtitles:
                 episode,
                 source,
                 file["id"],
-                f"fits at {placed.shift:+.2f}s"
-                + (f" then {placed.late_shift:+.2f}s" if placed.late_shift is not None else "")
-                + f", {placed.matched} lines ({placed.ratio:.0%})"
+                "fits at "
+                + ", then ".join(f"{shift:+.2f}s from {at:.0f}s" for at, shift in placed.pieces)
+                + f"; {placed.matched} lines ({placed.ratio:.0%}), {len(placed.dropped)} left out"
                 if placed
                 else "doesn't fit",
             )
@@ -587,3 +743,24 @@ def with_portuguese_subtitles(
         burned = traits is not None and base_lang(traits.hard_sub_lang or "") == "pt"
         wrapped[name] = source if burned else WithPortugueseSubtitles(name, source, subtitles)
     return wrapped
+
+
+@contextmanager
+def waiting(seconds: float = FIRST_WAIT) -> Iterator[None]:
+    """Within it, resolving a stream waits up to `seconds` for a pt-BR lookup (a play)."""
+    token = _WAIT.set(seconds)
+    try:
+        yield
+    finally:
+        _WAIT.reset(token)
+
+
+@contextmanager
+def noting_pending() -> Iterator[list[str]]:
+    """Within it, the sources whose pt-BR lookup was still running are listed."""
+    pending: list[str] = []
+    token = _PENDING.set(pending)
+    try:
+        yield pending
+    finally:
+        _PENDING.reset(token)

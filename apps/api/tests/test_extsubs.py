@@ -133,7 +133,7 @@ def test_a_file_made_for_another_broadcast_is_shifted_onto_the_copy() -> None:
     placed = fit(cues(theirs), cues(own))
     assert placed is not None
     assert placed.shift == pytest.approx(-9.03, abs=0.05)
-    assert placed.split is None
+    assert len(placed.pieces) == 1
     assert placed.ratio > 0.9
     moved = apply(cues(theirs), placed)
     assert moved[0].start == pytest.approx(own[0], abs=0.1)
@@ -145,11 +145,33 @@ def test_a_cut_in_the_middle_is_fitted_in_two_pieces() -> None:
     theirs = [s - 4.0 for s in own[:120]] + [s + 26.0 for s in own[120:]]
     placed = fit(cues(theirs), cues(own))
     assert placed is not None
-    assert placed.split is not None
-    assert {round(placed.shift, 1), round(placed.late_shift or 0, 1)} == {4.0, -26.0}
+    assert [round(shift, 1) for _, shift in placed.pieces] == [4.0, -26.0]
     assert placed.ratio > 0.95
     moved = apply(cues(theirs), placed)
     assert [round(c.start, 2) for c in moved] == [round(s, 2) for s in own]
+
+
+def test_a_short_cold_open_cut_differently_gets_its_own_piece() -> None:
+    # Grimgar ep 3: the 15 lines before the opening sit 0.8 s late, everything after 9.2 s
+    # early. A single shift left the cold open 10 s early.
+    own = times()
+    theirs = [s - 0.8 for s in own[:15]] + [s + 9.17 for s in own[15:]]
+    placed = fit(cues(theirs), cues(own))
+    assert placed is not None
+    assert [round(shift, 1) for _, shift in placed.pieces] == [0.8, -9.2]
+    assert placed.ratio == pytest.approx(1.0)
+    moved = apply(cues(theirs), placed)
+    assert [c.start for c in moved] == pytest.approx(own, abs=0.02)
+
+
+def test_a_stretch_that_meets_nothing_is_left_out() -> None:
+    own = times()
+    # Ten sung lines with no counterpart on the copy's track, in the middle of the file.
+    theirs = sorted([s + 2.0 for s in own] + [own[100] + 2.3 + 0.2 * i for i in range(10)])
+    placed = fit(cues(theirs), cues(own))
+    assert placed is not None
+    assert len(placed.dropped) == 10
+    assert len(apply(cues(theirs), placed)) == len(own)
 
 
 def test_a_file_for_another_episode_is_not_offered() -> None:
@@ -248,7 +270,8 @@ async def test_a_sharp_copy_gains_a_fitted_portuguese_track() -> None:
     async with httpx.AsyncClient() as http:
         pt = subtitles(http)
         sources = with_portuguese_subtitles({"sharp": Sharp(), "burned": Burned()}, pt)
-        stream = await sources["sharp"].stream(ANIME, 1, "sub")
+        with extsubs.waiting(60):
+            stream = await sources["sharp"].stream(ANIME, 1, "sub")
         assert stream is not None
         assert [(s.lang, s.label) for s in stream.subtitles] == [
             ("en", "English"),
@@ -293,7 +316,8 @@ async def test_a_file_that_does_not_fit_is_not_offered() -> None:
     mock_site(times(seed=4), times(seed=5))
     async with httpx.AsyncClient() as http:
         sources = with_portuguese_subtitles({"sharp": Sharp()}, subtitles(http))
-        stream = await sources["sharp"].stream(ANIME, 1, "sub")
+        with extsubs.waiting(60):
+            stream = await sources["sharp"].stream(ANIME, 1, "sub")
     assert stream is not None and len(stream.subtitles) == 1
 
 
@@ -304,26 +328,109 @@ async def test_an_outage_leaves_the_copy_playing_without_the_track() -> None:
     )
     async with httpx.AsyncClient() as http:
         sources = with_portuguese_subtitles({"sharp": Sharp()}, subtitles(http))
-        stream = await sources["sharp"].stream(ANIME, 1, "sub")
+        with extsubs.waiting(60):
+            stream = await sources["sharp"].stream(ANIME, 1, "sub")
     assert stream is not None and len(stream.subtitles) == 1
 
 
 @respx.mock
-async def test_a_slow_first_look_does_not_hold_up_the_play(monkeypatch) -> None:
-    monkeypatch.setattr(extsubs, "FIRST_WAIT", 0.01)
+async def test_only_a_play_waits_and_others_start_the_lookup_in_the_background() -> None:
+    own = times()
+    mock_site(own, own)
+    async with httpx.AsyncClient() as http:
+        pt = subtitles(http)
+        sources = with_portuguese_subtitles({"sharp": Sharp()}, pt)
+        with extsubs.noting_pending() as pending:
+            stream = await sources["sharp"].stream(ANIME, 1, "sub")
+        assert stream is not None and len(stream.subtitles) == 1
+        assert pending == ["sharp"]
+        await asyncio.gather(*pt._tasks)
+        later = await sources["sharp"].stream(ANIME, 1, "sub")
+        assert later is not None and len(later.subtitles) == 2
+
+
+@respx.mock
+async def test_a_slow_site_holds_a_play_up_only_briefly() -> None:
     own = times()
     mock_site(own, own)
 
     async def slow(*args, **kwargs):
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(5)
         return []
 
     async with httpx.AsyncClient() as http:
         pt = subtitles(http)
-        monkeypatch.setattr(pt._site, "search", slow)
+        pt._site.search = slow  # type: ignore[method-assign]
         sources = with_portuguese_subtitles({"sharp": Sharp()}, pt)
-        stream = await sources["sharp"].stream(ANIME, 1, "sub")
+        loop = asyncio.get_running_loop()
+        began = loop.time()
+        with extsubs.waiting(0.05):
+            stream = await sources["sharp"].stream(ANIME, 1, "sub")
+        assert loop.time() - began < 1
         assert stream is not None and len(stream.subtitles) == 1
+        for task in pt._tasks:
+            task.cancel()
+
+
+@respx.mock
+async def test_after_a_site_failure_lookups_are_skipped_for_a_while() -> None:
+    search = respx.get(url__regex=r"https://rest\.opensubtitles\.org/.*").mock(
+        return_value=httpx.Response(503)
+    )
+    async with httpx.AsyncClient() as http:
+        pt = subtitles(http)
+        sources = with_portuguese_subtitles({"sharp": Sharp()}, pt)
+        with extsubs.waiting(60):
+            await sources["sharp"].stream(ANIME, 1, "sub")
+            assert search.call_count == 1
+            assert not pt._site.available
+            # Another episode: no lookup starts, nothing waits, and a check counts it as
+            # still looking so its answer is kept only briefly.
+            with extsubs.noting_pending() as pending:
+                stream = await sources["sharp"].stream(ANIME, 2, "sub")
+        assert stream is not None and len(stream.subtitles) == 1
+        assert search.call_count == 1 and not pt._tasks
+        assert pending == ["sharp"]
+
+
+@respx.mock
+async def test_a_missing_file_does_not_stop_other_lookups() -> None:
+    respx.get(url__regex=r"https://rest\.opensubtitles\.org/.*").mock(
+        return_value=httpx.Response(404)
+    )
+    async with httpx.AsyncClient() as http:
+        pt = subtitles(http)
+        sources = with_portuguese_subtitles({"sharp": Sharp()}, pt)
+        with extsubs.waiting(60):
+            await sources["sharp"].stream(ANIME, 1, "sub")
+        assert pt._site.available
+
+
+def test_rows_without_an_id_or_link_are_skipped() -> None:
+    assert not usable(row(IDSubtitleFile=None), ANIME, 1)
+    assert not usable(row(SubDownloadLink=None), ANIME, 1)
+    assert extsubs._slim(row(SubDownloadsCnt="lots"))["downloads"] == 0
+
+
+def test_webvtt_output_keeps_each_cue_whole() -> None:
+    assert to_vtt([Cue(1, 2, "a\n\nb --> c"), Cue(3, 4, "\n")]) == (
+        "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\na\nb --&gt; c\n"
+    )
+
+
+@respx.mock
+async def test_downloads_stay_on_the_site_and_small() -> None:
+    async with httpx.AsyncClient() as http:
+        site = OpenSubtitles(http, SharedCache(""), "TestAgent")
+        respx.get(DOWNLOAD).mock(
+            return_value=httpx.Response(302, headers={"location": "https://evil.example/x"})
+        )
+        evil = respx.get("https://evil.example/x").mock(return_value=httpx.Response(200))
+        assert await site.text({"id": "1", "link": DOWNLOAD, "encoding": ""}) is None
+        assert evil.call_count == 0
+        big = "https://dl.opensubtitles.org/big.gz"
+        respx.get(big).mock(return_value=httpx.Response(200, content=b"x" * (2 * 1024 * 1024)))
+        assert await site.text({"id": "2", "link": big, "encoding": ""}) is None
 
 
 @respx.mock
@@ -353,3 +460,32 @@ async def test_the_player_gets_the_track_through_the_proxy(client, session) -> N
         assert (await client.get(forged)).status_code == 403
     finally:
         fastapi_app.state.pt_subtitles = saved
+
+
+async def test_episode_offers_are_kept_briefly_while_a_lookup_runs(monkeypatch) -> None:
+    from app import languages
+    from tests.test_languages import MASTER_720, Probes
+    from tests.test_languages import Source as Plain
+
+    saved: list[float] = []
+
+    class Cache(SharedCache):
+        async def set(self, namespace, key, value, ttl):
+            if namespace == languages.NAMESPACE:
+                saved.append(ttl)
+
+    async def slow(*args, **kwargs):
+        await asyncio.sleep(5)
+        return []
+
+    async with httpx.AsyncClient() as http:
+        pt = subtitles(http)
+        monkeypatch.setattr(pt._site, "search", slow)
+        english = (Subtitle("en", "English", ENGLISH_URL),)
+        sources = with_portuguese_subtitles({"zoko": Plain("zoko", subtitles=english)}, pt)
+        checks = languages.LanguageChecks(Cache(""))
+        anime = {**ANIME, "num_episodes": 2}
+        await checks.offers(sources, Probes({"zoko": MASTER_720}), anime, 1)  # type: ignore[arg-type]
+        for task in pt._tasks:
+            task.cancel()
+    assert saved == [languages.PARTIAL_TTL]

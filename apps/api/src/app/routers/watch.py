@@ -575,7 +575,9 @@ async def play(
         prefs = replace(prefs, audio=wanted_audio)
     await session.commit()  # the sources below can take seconds: don't hold a connection
     if source == AUTO:
-        picked = await _resolve_auto(request, anime, episode, prefs, fresh)
+        # A play is the one time a first pt-BR subtitle lookup is worth a short wait.
+        with extsubs.waiting():
+            picked = await _resolve_auto(request, anime, episode, prefs, fresh)
         if picked is None:
             raise ApiError(404, "not_available", "This episode isn't available")
         used, lang, stream, default_audio = (
@@ -585,7 +587,8 @@ async def play(
             picked.default_audio,
         )
     else:
-        resolved = await _resolve_stream(request, source, anime, episode, lang, fresh)
+        with extsubs.waiting():
+            resolved = await _resolve_stream(request, source, anime, episode, lang, fresh)
         if resolved is None:
             raise ApiError(404, "not_available", "This episode isn't available from this source")
         used, stream = resolved

@@ -22,6 +22,7 @@ from dataclasses import dataclass, replace
 from typing import Literal
 
 from app.choose import probe_offer
+from app.extsubs import noting_pending
 from app.probes import StreamProbes
 from app.ranking import ORIGINAL, Lang, Offer, Prefs, rank
 from app.sharedcache import SharedCache
@@ -190,11 +191,14 @@ class LanguageChecks:
                 return None
             return found.offer
 
-        tasks = [
-            asyncio.create_task(one(name, order, lang))
-            for order, name in enumerate(sources)
-            for lang in ("sub", "dub")
-        ]
+        # A pt-BR subtitle lookup still running makes the answer partial: the track may be
+        # there on the next check.
+        with noting_pending() as looking:
+            tasks = [
+                asyncio.create_task(one(name, order, lang))
+                for order, name in enumerate(sources)
+                for lang in ("sub", "dub")
+            ]
         done, pending = await asyncio.wait(tasks, timeout=CHECK_DEADLINE)
         for task in pending:
             task.cancel()
@@ -204,6 +208,9 @@ class LanguageChecks:
         offers = [o for task in done if (o := task.result()) is not None]
         stored = [_encode(o) for o in offers]
         await self._cache.set(
-            NAMESPACE, [int(anime["id"]), episode], stored, PARTIAL_TTL if failed else OFFERS_TTL
+            NAMESPACE,
+            [int(anime["id"]), episode],
+            stored,
+            PARTIAL_TTL if failed or looking else OFFERS_TTL,
         )
         return stored
