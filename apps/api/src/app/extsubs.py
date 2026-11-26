@@ -86,21 +86,29 @@ MISS_TTL = 24 * 3600
 ERROR_TTL = 600
 # Versioned: a change to what is stored gets a new name, so old entries are never misread.
 SEARCH_NS = "opensubtitles-search-v1"
-TRACK_NS = "pt-subtitle-fit-v2"
+TRACK_NS = "pt-subtitle-fit-v3"
 
-# Two starts this close count as the same line.
+# Two starts this close count as the same line: what finds the shift and says a file fits.
 MATCH = 0.2
+# Releases time the same line up to half a second apart (Steins;Gate's fan files run 0.25 s
+# ahead of AniZone's through whole scenes), so whether a line is in place, and which shift holds
+# where, is judged this loosely. Only lines that meet nothing even then are left out.
+PLACE = 0.5
 # The largest shift looked for, either way.
 MAX_SHIFT = 600.0
 BIN = 0.1
 # A fit is offered when this share of the lines meets the copy's track, and at least this many.
 MIN_RATIO = 0.5
+# Or when this share sits within PLACE: the same episode, timed a little apart throughout. A file
+# for another episode places at most ~60% that loosely (the opening and ending repeat).
+CLOSE_RATIO = 0.75
 MIN_MATCHED = 15
 # Shifts tried per file, and the lines one must place to be tried.
 MAX_PIECES = 4
 MIN_PIECE = 5
-# What changing shift costs, in lines: a new piece starts only where it places more than this.
-SWITCH = 3.5
+# What changing shift costs, in lines placed closely: a new piece starts only where it places
+# more than this (a close start scores 2, a loose one 1).
+SWITCH = 7.0
 # This many lines in a row that meet nothing are left out rather than shown at a guess.
 DROP_RUN = 6
 
@@ -113,7 +121,7 @@ MACHINE = re.compile(
 MACHINE_ACRONYM = re.compile(r"\b(?:IA|AI|I\.A\.)(?:\b|$)")
 # Lines OpenSubtitles or the uploader slip in that aren't the show's.
 ADVERT = re.compile(
-    r"opensubtitles|osdb\.link|www\.|https?://|\.com\b|\.org\b|\.net\b|vip member|advertise",
+    r"opensubtitles|osdb\.link|www\.|https?://|\w\.(?:com|org|net)\b|vip member|advertise",
     re.IGNORECASE,
 )
 # Styles of ASS lines that aren't dialogue: song lyrics, karaoke, on-screen signs, credits.
@@ -268,13 +276,15 @@ def to_vtt(cues: list[Cue]) -> str:
 # --- Fitting a file to the copy ----------------------------------------------------------
 
 
-def _hits(starts: list[float], reference: list[float], shift: float) -> list[bool]:
+def _hits(
+    starts: list[float], reference: list[float], shift: float, within: float = MATCH
+) -> list[bool]:
     hits = []
     for t in starts:
         moved = t + shift
         i = bisect_left(reference, moved)
         near = [reference[j] for j in (i - 1, i) if 0 <= j < len(reference)]
-        hits.append(any(abs(r - moved) <= MATCH for r in near))
+        hits.append(any(abs(r - moved) <= within for r in near))
     return hits
 
 
@@ -322,17 +332,20 @@ def fit(cues: list[Cue], reference: list[Cue]) -> Fit | None:
     shifts = _shifts(starts, ref)
     if not shifts:
         return None
-    hits = [_hits(starts, ref, shift) for shift in shifts]
+    strict = [_hits(starts, ref, shift) for shift in shifts]
+    hits = [_hits(starts, ref, shift, PLACE) for shift in shifts]
+    # A close start counts double a loose one, so where the pieces meet is set by close ones.
+    gain = [[h + s for h, s in zip(hits[j], strict[j], strict=True)] for j in range(len(shifts))]
     k = len(shifts)
     # score[j]: best total ending on shift j; back[i][j]: the shift before it.
-    score = [float(hits[j][0]) for j in range(k)]
+    score = [float(gain[j][0]) for j in range(k)]
     back: list[list[int]] = [list(range(k))]
     for i in range(1, len(starts)):
         row, new = [], []
         for j in range(k):
             prev = max(range(k), key=lambda p: (score[p] - (SWITCH if p != j else 0), p == j))
             row.append(prev)
-            new.append(score[prev] - (SWITCH if prev != j else 0) + hits[j][i])
+            new.append(score[prev] - (SWITCH if prev != j else 0) + gain[j][i])
         back.append(row)
         score = new
     j = max(range(k), key=lambda j: score[j])
@@ -356,9 +369,12 @@ def fit(cues: list[Cue], reference: list[Cue]) -> Fit | None:
             run = []
         else:
             run.append(i)
-    matched = sum(placed)
-    ratio = matched / min(len(starts), len(ref))
-    if matched < MIN_MATCHED or ratio < MIN_RATIO:
+    matched = sum(strict[j][i] for i, j in enumerate(path))
+    most = min(len(starts), len(ref))
+    ratio = matched / most
+    # Of the file's own lines: a long file would otherwise place loosely by chance.
+    close = sum(placed) / len(starts) >= CLOSE_RATIO
+    if matched < MIN_MATCHED or (ratio < MIN_RATIO and not close):
         return None
     return Fit(tuple(pieces), matched, ratio, frozenset(dropped))
 

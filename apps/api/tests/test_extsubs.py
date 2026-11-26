@@ -98,6 +98,19 @@ def test_srt_and_webvtt_cues_lose_markup_and_adverts() -> None:
     ]
 
 
+def test_dialogue_that_reads_like_a_web_address_is_kept() -> None:
+    # Steins;Gate ep 5: "...com a" (Portuguese "with") after an ellipsis looked like ".com".
+    text = (
+        "1\n00:00:01,000 --> 00:00:02,500\n...com a possibilidade de transferência\n\n"
+        "2\n00:00:03,000 --> 00:00:04,000\n-=[ ai.OpenSubtitles.com ]=-\n\n"
+        "3\n00:00:05,000 --> 00:00:06,000\nVeja em osdb.link/lm\n\n"
+        "4\n00:00:07,000 --> 00:00:08,000\nsite.net\n"
+    )
+    assert [c.text for c in without_adverts(parse_timed(text))] == [
+        "...com a possibilidade de transferência"
+    ]
+
+
 def test_ass_keeps_dialogue_and_drops_songs_signs_and_karaoke() -> None:
     script = """[Script Info]
 
@@ -167,15 +180,61 @@ def test_a_short_cold_open_cut_differently_gets_its_own_piece() -> None:
 def test_a_stretch_that_meets_nothing_is_left_out() -> None:
     own = times()
     # Ten sung lines with no counterpart on the copy's track, in the middle of the file.
-    theirs = sorted([s + 2.0 for s in own] + [own[100] + 2.3 + 0.2 * i for i in range(10)])
+    theirs = sorted([s + 2.0 for s in own] + [own[100] + 3.0 + 0.6 * i for i in range(10)])
     placed = fit(cues(theirs), cues(own))
     assert placed is not None
     assert len(placed.dropped) == 10
     assert len(apply(cues(theirs), placed)) == len(own)
 
 
+def test_a_scene_timed_a_little_apart_is_kept() -> None:
+    # Steins;Gate ep 2: the fan file starts a whole scene's lines 0.25 s ahead of AniZone's.
+    # Those lines were left out, and with them the dialogue.
+    own = times()
+    theirs = (
+        [s + 1.0 for s in own[:40]] + [s + 0.72 for s in own[40:50]] + [s + 1.0 for s in own[50:]]
+    )
+    placed = fit(cues(theirs), cues(own))
+    assert placed is not None
+    assert len(placed.pieces) == 1
+    assert placed.dropped == frozenset()
+    assert len(apply(cues(theirs), placed)) == len(own)
+
+
+def test_a_file_timed_a_little_apart_throughout_still_fits() -> None:
+    # Steins;Gate ep 1 on UniqueStream: whole stretches start 0.3-0.45 s off the copy's track,
+    # so too few lines met it closely and the file was cut into wrong pieces or turned down.
+    rng = random.Random(5)
+    own = times()
+    theirs = [
+        s + 1.4 + (0.38 if (i // 25) % 2 else 0.0) + rng.uniform(-0.06, 0.06)
+        for i, s in enumerate(own)
+    ]
+    placed = fit(cues(theirs), cues(own))
+    assert placed is not None
+    assert len(placed.pieces) == 1
+    assert placed.dropped == frozenset()
+    assert len(apply(cues(theirs), placed)) == len(own)
+
+
 def test_a_file_for_another_episode_is_not_offered() -> None:
     assert fit(cues(times(seed=2)), cues(times(seed=3))) is None
+
+
+def test_a_long_file_for_another_episode_is_not_offered() -> None:
+    # A file with many more lines than the copy's track places plenty of them loosely by chance.
+    def dense(n: int, gap: tuple[float, float], seed: int) -> list[float]:
+        rng = random.Random(seed)
+        t, found = 5.0, []
+        for _ in range(n):
+            t += rng.uniform(*gap)
+            found.append(round(t, 3))
+        return found
+
+    for seed in range(20):
+        theirs = dense(700, (0.3, 3.0), seed)
+        own = dense(400, (0.5, 5.25), seed + 100)
+        assert fit(cues(theirs), cues(own)) is None
 
 
 def test_too_few_lines_never_fit() -> None:
