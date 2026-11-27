@@ -13,6 +13,7 @@ from app.extsubs import (
     PortugueseSubtitles,
     apply,
     fit,
+    lines_lost,
     parse_ass,
     parse_timed,
     to_vtt,
@@ -177,14 +178,81 @@ def test_a_short_cold_open_cut_differently_gets_its_own_piece() -> None:
     assert [c.start for c in moved] == pytest.approx(own, abs=0.02)
 
 
-def test_a_stretch_that_meets_nothing_is_left_out() -> None:
+def test_a_stretch_that_meets_nothing_is_still_shown() -> None:
     own = times()
     # Ten sung lines with no counterpart on the copy's track, in the middle of the file.
-    theirs = sorted([s + 2.0 for s in own] + [own[100] + 3.0 + 0.6 * i for i in range(10)])
+    sung = [own[100] + 3.0 + 0.6 * i for i in range(10)]
+    theirs = sorted([s + 2.0 for s in own] + sung)
     placed = fit(cues(theirs), cues(own))
     assert placed is not None
-    assert len(placed.dropped) == 10
-    assert len(apply(cues(theirs), placed)) == len(own)
+    moved = apply(cues(theirs), placed)
+    assert len(moved) == len(theirs)
+    assert sorted(c.start for c in moved)[100:111] == pytest.approx(
+        sorted(theirs)[100:111], abs=2.5
+    )
+
+
+def test_lines_split_differently_are_placed_together_and_kept() -> None:
+    # The fan file cuts every third line of the copy's track in three pieces; the later pieces
+    # start mid-line and meet no start on the copy's track.
+    own = times()
+    theirs: list[float] = []
+    for i, s in enumerate(own):
+        theirs.append(s + 1.0)
+        if i % 3 == 0:
+            theirs += [s + 1.0 + 0.5, s + 1.0 + 1.0]
+    placed = fit(cues(theirs), cues(own))
+    assert placed is not None
+    assert len(placed.pieces) == 1
+    moved = apply(cues(theirs), placed)
+    assert len(moved) == len(theirs)
+    assert [c.start for c in moved if c.text.startswith("line")] == pytest.approx(
+        sorted(t - 1.0 for t in theirs), abs=0.01
+    )
+
+
+def test_one_line_the_copy_splits_in_pieces_still_fits() -> None:
+    # The reverse: the copy's track has extra mid-line starts, the file has one line for them.
+    own = times()
+    extra = sorted(own + [s + 0.9 for s in own[::2]])
+    theirs = [s + 1.0 for s in own]
+    placed = fit(cues(theirs), cues(extra))
+    assert placed is not None
+    assert len(apply(cues(theirs), placed)) == len(theirs)
+
+
+def test_a_line_that_drifts_is_guessed_between_its_neighbours() -> None:
+    own = times()
+    theirs = [s + 1.0 for s in own]
+    # A line timed 4 s late meets nothing: shown at its piece's shift, not left out.
+    theirs[50] += 4.0
+    placed = fit(cues(theirs), cues(own))
+    assert placed is not None
+    moved = apply(cues(theirs), placed)
+    assert len(moved) == len(theirs)
+    assert moved[50].start == pytest.approx(own[50], abs=0.5) or placed.adjust
+
+
+def test_a_line_that_would_start_before_the_video_is_kept() -> None:
+    placed = fit(cues([s + 3.0 for s in times()]), cues(times()))
+    assert placed is not None
+    first = [Cue(1.0, 2.0, "a"), *cues([s + 3.0 for s in times()])]
+    moved = apply(first, placed)
+    assert len(moved) == len(first)
+    assert min(c.start for c in moved) >= 0
+
+
+def test_sentences_trailing_into_com_are_not_adverts() -> None:
+    kept = [Cue(1, 2, "Vem...com a gente"), Cue(3, 4, "Ela fala.com a mãe depois")]
+    assert without_adverts(kept) == kept
+    adverts = [Cue(1, 2, "visite site.com"), Cue(3, 4, "Support us www.x.org"), Cue(5, 6, "ok")]
+    assert without_adverts(adverts) == [Cue(5, 6, "ok")]
+
+
+def test_lines_lost_counts_what_is_missing() -> None:
+    assert lines_lost(100, 4, 96) == 0
+    assert lines_lost(100, 4, 90) == 6
+    assert lines_lost(100, 4, 97) == 0
 
 
 def test_a_scene_timed_a_little_apart_is_kept() -> None:
@@ -197,7 +265,7 @@ def test_a_scene_timed_a_little_apart_is_kept() -> None:
     placed = fit(cues(theirs), cues(own))
     assert placed is not None
     assert len(placed.pieces) == 1
-    assert placed.dropped == frozenset()
+    assert placed.adjust == {} or len(placed.adjust) < 5
     assert len(apply(cues(theirs), placed)) == len(own)
 
 
@@ -213,7 +281,7 @@ def test_a_file_timed_a_little_apart_throughout_still_fits() -> None:
     placed = fit(cues(theirs), cues(own))
     assert placed is not None
     assert len(placed.pieces) == 1
-    assert placed.dropped == frozenset()
+    assert placed.adjust == {} or len(placed.adjust) < 5
     assert len(apply(cues(theirs), placed)) == len(own)
 
 

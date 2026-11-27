@@ -32,7 +32,7 @@ from collections import Counter
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from statistics import median
 from urllib.parse import quote, urljoin, urlsplit
 
@@ -86,7 +86,7 @@ MISS_TTL = 24 * 3600
 ERROR_TTL = 600
 # Versioned: a change to what is stored gets a new name, so old entries are never misread.
 SEARCH_NS = "opensubtitles-search-v1"
-TRACK_NS = "pt-subtitle-fit-v3"
+TRACK_NS = "pt-subtitle-fit-v4"
 
 # Two starts this close count as the same line: what finds the shift and says a file fits.
 MATCH = 0.2
@@ -109,8 +109,10 @@ MIN_PIECE = 5
 # What changing shift costs, in lines placed closely: a new piece starts only where it places
 # more than this (a close start scores 2, a loose one 1).
 SWITCH = 7.0
-# This many lines in a row that meet nothing are left out rather than shown at a guess.
-DROP_RUN = 6
+# Lines that meet nothing are never left out: they are shown at a guess, between the offsets of
+# the placed lines on either side (see `Fit.adjust`). A guess further than this from the piece's
+# own shift is not trusted: the piece's shift is used instead.
+MAX_GUESS_DRIFT = 1.5
 
 # Words that say a file was made by a translation engine. "IA"/"AI" only in capitals: "ia" is
 # a common Portuguese word.
@@ -121,7 +123,9 @@ MACHINE = re.compile(
 MACHINE_ACRONYM = re.compile(r"\b(?:IA|AI|I\.A\.)(?:\b|$)")
 # Lines OpenSubtitles or the uploader slip in that aren't the show's.
 ADVERT = re.compile(
-    r"opensubtitles|osdb\.link|www\.|https?://|\w\.(?:com|org|net)\b|vip member|advertise",
+    r"opensubtitles|osdb\.link|www\.|https?://|vip member|advertise (?:here|your|with)"
+    # A bare address ("site.com"), not a sentence trailing off into "...com a gente".
+    r"|(?<![.\w-])[a-z0-9-]{2,}\.(?:com|org|net)(?:\.[a-z]{2})?\b(?!\s+[^\W\d_])",
     re.IGNORECASE,
 )
 # Styles of ASS lines that aren't dialogue: song lyrics, karaoke, on-screen signs, credits.
@@ -143,16 +147,17 @@ class Cue:
     text: str = ""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class Fit:
     # (cue time it starts at, seconds added) for each piece of the file, in order: one piece
     # when the file only starts at another time, more when a scene was cut or moved.
     pieces: tuple[tuple[float, float], ...]
     matched: int
     ratio: float
-    # Cues left out: long runs that meet nothing on the copy's track (sung lyrics, or a stretch
-    # that can't be placed with confidence).
-    dropped: frozenset[int] = frozenset()
+    # Seconds to add to the cues that meet nothing on the copy's track (a line the other file
+    # splits differently, a stretch that can't be placed with confidence), by cue index: a guess
+    # between the offsets of the placed lines around them. Every cue is shown.
+    adjust: dict[int, float] = field(default_factory=dict)
 
     @property
     def shift(self) -> float:
@@ -288,6 +293,46 @@ def _hits(
     return hits
 
 
+def _guess_offsets(
+    starts: list[float],
+    ref: list[float],
+    path: list[int],
+    shifts: list[float],
+    placed: list[bool],
+    exact: list[bool],
+) -> dict[int, float]:
+    """For each line that meets nothing, the offset to show it at: interpolated between the
+    offsets of the nearest placed lines before and after it within the same piece (where
+    the file's timing drifts), else the piece's own shift. Keyed by position in `starts`."""
+    anchors: list[tuple[int, float]] = []
+    for i, hit in enumerate(exact):
+        if not hit:
+            continue
+        shift = shifts[path[i]]
+        k = bisect_left(ref, starts[i] + shift)
+        near = [ref[j] for j in (k - 1, k) if 0 <= j < len(ref)]
+        local = min((r - starts[i] for r in near), key=lambda o: abs(o - shift), default=shift)
+        anchors.append((i, local if abs(local - shift) <= MAX_GUESS_DRIFT else shift))
+    guesses: dict[int, float] = {}
+    for i, hit in enumerate(placed):
+        if hit:
+            continue
+        shift = shifts[path[i]]
+        before = next(((a, o) for a, o in reversed(anchors) if a < i), None)
+        after = next(((a, o) for a, o in anchors if a > i), None)
+        if before and after and path[before[0]] == path[i] == path[after[0]]:
+            span = starts[after[0]] - starts[before[0]]
+            weight = (starts[i] - starts[before[0]]) / span if span > 0 else 0.0
+            guesses[i] = before[1] + (after[1] - before[1]) * weight
+        elif before and path[before[0]] == path[i]:
+            guesses[i] = before[1]
+        elif after and path[after[0]] == path[i]:
+            guesses[i] = after[1]
+        else:
+            guesses[i] = shift
+    return guesses
+
+
 def _shifts(starts: list[float], reference: list[float]) -> list[float]:
     """The shifts that place a good number of lines: the main one first, then the shifts of
     pieces that moved (a cold open cut differently, a recap left out)."""
@@ -360,15 +405,12 @@ def fit(cues: list[Cue], reference: list[Cue]) -> Fit | None:
     for i, j in enumerate(path):
         if not pieces or pieces[-1][1] != shifts[j]:
             pieces.append((starts[i] if pieces else 0.0, shifts[j]))
-    dropped: set[int] = set()
-    run: list[int] = []
-    for i, hit in enumerate([*placed, True]):
-        if hit:
-            if len(run) >= DROP_RUN:
-                dropped.update(order[x] for x in run)
-            run = []
-        else:
-            run.append(i)
+    adjust = {
+        order[i]: guess
+        for i, guess in _guess_offsets(
+            starts, ref, path, shifts, placed, [strict[path[i]][i] for i in range(len(starts))]
+        ).items()
+    }
     matched = sum(strict[j][i] for i, j in enumerate(path))
     most = min(len(starts), len(ref))
     ratio = matched / most
@@ -376,16 +418,24 @@ def fit(cues: list[Cue], reference: list[Cue]) -> Fit | None:
     close = sum(placed) / len(starts) >= CLOSE_RATIO
     if matched < MIN_MATCHED or (ratio < MIN_RATIO and not close):
         return None
-    return Fit(tuple(pieces), matched, ratio, frozenset(dropped))
+    return Fit(tuple(pieces), matched, ratio, adjust)
 
 
 def apply(cues: list[Cue], placed: Fit) -> list[Cue]:
-    moved = [
-        replace(c, start=placed.place(c.start), end=placed.place(c.start) + (c.end - c.start))
-        for i, c in enumerate(cues)
-        if i not in placed.dropped
-    ]
-    return sorted((c for c in moved if c.end > 0), key=lambda c: c.start)
+    """Every cue, moved onto the copy. None is left out: one that would start before the video
+    does is shown from its very beginning."""
+    moved = []
+    for i, c in enumerate(cues):
+        start = c.start + placed.adjust[i] if i in placed.adjust else placed.place(c.start)
+        length = max(c.end - c.start, 0.5)
+        start = max(start, 0.0)
+        moved.append(replace(c, start=start, end=start + length))
+    return sorted(moved, key=lambda c: c.start)
+
+
+def lines_lost(source: int, adverts: int, output: int) -> int:
+    """How many of the file's lines (minus the adverts taken out) are missing from the output."""
+    return max(source - adverts - output, 0)
 
 
 # --- OpenSubtitles ----------------------------------------------------------------------
@@ -684,10 +734,11 @@ class PortugueseSubtitles:
             log.info("pt-BR subtitles for MAL %s ep %s: none found", anime["id"], episode)
             return {"vtt": None}, MISS_TTL
         own = parse_any(await self._reference_text(ref, referer))
-        best: tuple[Fit, list[Cue], dict] | None = None
+        best: tuple[Fit, list[Cue], dict, int] | None = None
         for file in files:
             text = await self._site.text(file)
-            cues = without_adverts(parse_any(text)) if text else []
+            everything = parse_any(text) if text else []
+            cues = without_adverts(everything)
             placed = await asyncio.to_thread(fit, cues, own) if cues else None
             log.info(
                 "pt-BR subtitles for MAL %s ep %s on %s: file %s %s",
@@ -697,17 +748,42 @@ class PortugueseSubtitles:
                 file["id"],
                 "fits at "
                 + ", then ".join(f"{shift:+.2f}s from {at:.0f}s" for at, shift in placed.pieces)
-                + f"; {placed.matched} lines ({placed.ratio:.0%}), {len(placed.dropped)} left out"
+                + f"; {placed.matched} lines ({placed.ratio:.0%}), {len(placed.adjust)} guessed"
                 if placed
                 else "doesn't fit",
             )
             if placed and (best is None or placed.ratio > best[0].ratio):
-                best = (placed, cues, file)
+                best = (placed, cues, file, len(everything))
         if best is None:
             return {"vtt": None}, MISS_TTL
-        placed, cues, file = best
+        placed, cues, file, parsed = best
+        out = apply(cues, placed)
+        vtt = to_vtt(out)
+        # What the viewer gets, counted from the text itself: cues the player will draw.
+        written = vtt.count(" --> ")
+        lost = lines_lost(len(cues), 0, written)
+        if lost:
+            log.warning(
+                "pt-BR subtitles for MAL %s ep %s on %s: file %s lost %d of %d lines",
+                anime["id"],
+                episode,
+                source,
+                file["id"],
+                lost,
+                len(cues),
+            )
+        log.info(
+            "pt-BR subtitles for MAL %s ep %s on %s: %d lines read, %d adverts or blanks removed, "
+            "%d shown",
+            anime["id"],
+            episode,
+            source,
+            parsed,
+            parsed - len(cues),
+            written,
+        )
         return {
-            "vtt": to_vtt(apply(cues, placed)),
+            "vtt": vtt,
             "file": file["id"],
             "shift": round(placed.shift, 3),
             "ratio": round(placed.ratio, 3),
